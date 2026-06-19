@@ -1,0 +1,32 @@
+# 企业级财务年报分析智能 RAG-Agent 依赖清单
+# Python >= 3.11
+
+# Web 框架
+fastapi
+uvicorn[standard]
+
+# 前端界面
+streamlit
+
+# LLM 与 Embedding
+DashScope
+
+# 向量检索
+faiss-cpu
+
+# 关键词检索
+rank-bm25
+jieba
+
+# 文本分块与 Token 计算
+tiktoken
+
+# 数据科学
+numpy
+matplotlib
+
+# 配置与环境变量
+python-dotenv
+
+# 数据校验（FastAPI 已依赖，显式声明确保版本）
+pydantic

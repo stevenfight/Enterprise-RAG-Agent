@@ -1,0 +1,29 @@
+{
+    "_comment": "RAG-Agent 行为配置文件",
+    "agent": {
+        "max_steps": 5,
+        "llm_timeout": 60,
+        "tool_timeout": 30,
+        "temperature": 0.3,
+        "max_retries": 1,
+        "model": "qwen-max"
+    },
+    "memory": {
+        "working_memory_limit": 10,
+        "episodic_memory_turns": 5,
+        "enable_long_term": false
+    },
+    "reflector": {
+        "enable_verification": true,
+        "enable_hallucination_check": true,
+        "auto_correct": true,
+        "hallucination_threshold": 0.7
+    },
+    "tools": [
+        "retrieve_tool",
+        "calculator_tool",
+        "compare_tool",
+        "chart_tool",
+        "verify_tool"
+    ]
+}

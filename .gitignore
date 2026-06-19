@@ -1,0 +1,88 @@
+# 敏感配置文件
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# 虚拟环境
+env/
+venv/
+.venv/
+env.bak/
+venv.bak/
+
+# 日志文件
+*.log
+logs/
+*.log.*
+
+# Python 缓存和编译文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# 向量数据库（大文件，建议不上传）
+data/stock_data/databases/vector_dbs/
+data/stock_data/databases/vector_dbs_v1_backup/
+
+# IDE 配置
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Python 包构建产物
+*.egg-info/
+dist/
+build/
+
+# 测试与覆盖率
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# PDF 文件（大文件，建议不上传）
+pdf_reports/
+data/stock_data/pdf_reports/
+
+# 调试数据
+data/stock_data/debug_data/
+
+# 临时文件
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# IDE 和编辑器配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# 构建产物
+dist/
+build/
+*.egg-info/
+
+# ===== 个人本地文档（不上传 Git）=====
+_local/
+
+# 根目录临时调试脚本（以 _ 前缀标记）
+/_*.py

@@ -1,0 +1,297 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 960">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap');
+    text { font-family: 'JetBrains Mono', 'Noto Sans SC', 'PingFang SC', sans-serif; }
+  </style>
+
+  <defs>
+    <!-- Grid pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+    </pattern>
+
+    <!-- Standard arrow -->
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+    </marker>
+
+    <!-- Colored arrows -->
+    <marker id="arrow-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
+    </marker>
+    <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/>
+    </marker>
+
+    <!-- Glow filters -->
+    <filter id="glow-red">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-green">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-cyan">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="#0f172a"/>
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+
+  <!-- ============================================================ -->
+  <!-- TITLE -->
+  <!-- ============================================================ -->
+  <text x="40" y="36" fill="white" font-size="18" font-weight="700">企业级内存泄漏修复 — 修复前后对比</text>
+  <text x="40" y="56" fill="#94a3b8" font-size="11" font-weight="400">三个修复点 (P0+P1) 落地后的内存曲线变化  |  api_service.py + conversation.py</text>
+  <line x1="40" y1="68" x2="1160" y2="68" stroke="#1e293b" stroke-width="1"/>
+
+  <!-- ============================================================ -->
+  <!-- OVERVIEW TIMELINE BAR -->
+  <!-- ============================================================ -->
+  <rect x="60" y="90" width="1080" height="40" rx="6" fill="rgba(30,41,59,0.5)" stroke="#334155" stroke-width="1"/>
+  <text x="80" y="114" fill="#22d3ee" font-size="10" font-weight="600">服务启动</text>
+  <line x1="180" y1="105" x2="180" y2="115" stroke="#22d3ee" stroke-width="1.5"/>
+  <line x1="180" y1="105" x2="300" y2="105" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+  <text x="310" y="114" fill="#22d3ee" font-size="10" font-weight="500">用户逐渐增多</text>
+  <line x1="450" y1="105" x2="450" y2="115" stroke="#22d3ee" stroke-width="1.5"/>
+  <line x1="450" y1="105" x2="560" y2="105" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+  <rect x="570" y="94" width="14" height="14" rx="3" fill="#34d399" filter="url(#glow-green)"/>
+  <text x="592" y="106" fill="#34d399" font-size="10" font-weight="600">修复点 1 &amp; 2 &amp; 3 落地</text>
+  <line x1="780" y1="101" x2="780" y2="111" stroke="#34d399" stroke-width="1.5" stroke-dasharray="2,2"/>
+  <line x1="780" y1="101" x2="900" y2="101" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+
+  <text x="910" y="114" fill="#34d399" font-size="10" font-weight="500">内存平稳</text>
+  <line x1="990" y1="105" x2="990" y2="115" stroke="#34d399" stroke-width="1.5"/>
+
+  <!-- Annotations on timeline -->
+  <text x="180" y="80" fill="#fb7185" font-size="8" font-weight="500">无保护</text>
+  <text x="740" y="128" fill="#34d399" font-size="8" font-weight="500">此处落地三项修复</text>
+
+  <!-- ============================================================ -->
+  <!-- ROW 1: FIX 2 - conversations 容量上限 -->
+  <!-- ============================================================ -->
+
+  <!-- Left: 修复前 -->
+  <rect x="40" y="150" width="540" height="220" rx="10" fill="rgba(136,19,55,0.08)" stroke="#fb7185" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="56" y="172" fill="#fb7185" font-size="12" font-weight="700">修复前: conversations 字典无限增长</text>
+  <text x="56" y="190" fill="#94a3b8" font-size="9">每个新 conversation_id 永久追加, 永不删除</text>
+
+  <!-- Memory curve before -->
+  <!-- Memory (MB) vs 会话数 -->
+  <!-- Y axis: 60-310 (250px range) mapping to 0-50MB -->
+  <!-- X axis: 80-550 (470px range) mapping to 0-500 sessions -->
+  <polyline points="80,300 110,290 150,260 200,220 260,170 330,130 420,90 530,60"
+    fill="none" stroke="#fb7185" stroke-width="2.5" filter="url(#glow-red)"/>
+  <circle cx="530" cy="60" r="5" fill="#fb7185" filter="url(#glow-red)"/>
+  <text x="540" y="64" fill="#fb7185" font-size="9" font-weight="600">~45MB</text>
+  <text x="540" y="76" fill="#64748b" font-size="8">500会议</text>
+
+  <!-- Y-axis labels (before) -->
+  <text x="72" y="304" fill="#64748b" font-size="8" text-anchor="end">0MB</text>
+  <text x="72" y="245" fill="#64748b" font-size="8" text-anchor="end">10MB</text>
+  <text x="72" y="185" fill="#64748b" font-size="8" text-anchor="end">20MB</text>
+  <text x="72" y="125" fill="#64748b" font-size="8" text-anchor="end">30MB</text>
+  <text x="72" y="66" fill="#64748b" font-size="8" text-anchor="end">45MB</text>
+
+  <!-- X-axis labels (before) -->
+  <text x="140" y="318" fill="#64748b" font-size="8" text-anchor="middle">100</text>
+  <text x="240" y="318" fill="#64748b" font-size="8" text-anchor="middle">200</text>
+  <text x="340" y="318" fill="#64748b" font-size="8" text-anchor="middle">300</text>
+  <text x="440" y="318" fill="#64748b" font-size="8" text-anchor="middle">400</text>
+  <text x="530" y="318" fill="#64748b" font-size="8" text-anchor="middle">500</text>
+  <text x="310" y="336" fill="#64748b" font-size="8" text-anchor="middle">会话数</text>
+
+  <!-- Connection: 修复前 → 修复后 -->
+  <line x1="580" y1="260" x2="620" y2="260" stroke="#fb923c" stroke-width="2" marker-end="url(#arrow-amber)"/>
+
+  <!-- Center fix label -->
+  <rect x="570" y="242" width="60" height="36" rx="6" fill="rgba(251,146,60,0.2)"/>
+  <text x="600" y="258" fill="#fb923c" font-size="10" font-weight="700" text-anchor="middle">修复点 2</text>
+  <text x="600" y="272" fill="#fb923c" font-size="8" font-weight="500" text-anchor="middle">容量上限</text>
+
+  <!-- Right: 修复后 -->
+  <rect x="630" y="150" width="540" height="220" rx="10" fill="rgba(6,78,59,0.08)" stroke="#34d399" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="646" y="172" fill="#34d399" font-size="12" font-weight="700">修复后: MAX_CONVERSATIONS=100 容量保护</text>
+  <text x="646" y="190" fill="#94a3b8" font-size="9">超过上限自动淘汰最早会话, 内存封顶</text>
+
+  <!-- Memory curve after -->
+  <!-- 0-100: grows, then flat -->
+  <polyline points="670,300 700,280 760,240 830,210 910,195 1000,190 1100,187 1150,187"
+    fill="none" stroke="#34d399" stroke-width="2.5" filter="url(#glow-green)"/>
+  <circle cx="1000" cy="190" r="4" fill="#34d399" filter="url(#glow-green)"/>
+  <text x="1010" y="194" fill="#34d399" font-size="9" font-weight="600">~4MB 封顶</text>
+  <text x="1010" y="206" fill="#64748b" font-size="8">100会后</text>
+
+  <!-- Capacity limit line -->
+  <line x1="670" y1="195" x2="1150" y2="195" stroke="#34d399" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="1155" y="199" fill="#34d399" font-size="8" font-weight="500">上限 100 会话</text>
+
+  <!-- Y-axis labels (after) -->
+  <text x="662" y="304" fill="#64748b" font-size="8" text-anchor="end">0MB</text>
+  <text x="662" y="273" fill="#64748b" font-size="8" text-anchor="end">1MB</text>
+  <text x="662" y="243" fill="#64748b" font-size="8" text-anchor="end">2MB</text>
+  <text x="662" y="213" fill="#64748b" font-size="8" text-anchor="end">3MB</text>
+  <text x="662" y="195" fill="#34d399" font-size="8" text-anchor="end">4MB</text>
+
+  <!-- Compare annotation -->
+  <rect x="710" y="215" width="160" height="30" rx="4" fill="rgba(34,211,238,0.1)" stroke="#22d3ee" stroke-width="0.8"/>
+  <text x="790" y="230" fill="#22d3ee" font-size="9" font-weight="600" text-anchor="middle">内存降低 91%</text>
+  <text x="790" y="242" fill="#64748b" font-size="8" text-anchor="middle">45MB → 4MB</text>
+
+  <!-- ============================================================ -->
+  <!-- ROW 2: FIX 1 - agent_memory 隔离 -->
+  <!-- ============================================================ -->
+
+  <!-- Left: 修复前 -->
+  <rect x="40" y="390" width="540" height="220" rx="10" fill="rgba(136,19,55,0.08)" stroke="#fb7185" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="56" y="412" fill="#fb7185" font-size="12" font-weight="700">修复前: 全局共享 agent_memory (数据泄露)</text>
+  <text x="56" y="430" fill="#94a3b8" font-size="9">所有用户共享一个 AgentMemory 实例, 摘要交叉污染</text>
+
+  <!-- Cross-contamination visualization -->
+  <rect x="80" y="448" width="200" height="55" rx="6" fill="rgba(251,113,133,0.15)" stroke="#fb7185" stroke-width="1"/>
+  <text x="180" y="466" fill="#fb7185" font-size="10" font-weight="600" text-anchor="middle">AgentMemory(共享实例)</text>
+  <text x="180" y="482" fill="#94a3b8" font-size="8" text-anchor="middle">用户A摘要 + 用户B摘要 + ...</text>
+  <text x="180" y="496" fill="#fb7185" font-size="8" font-weight="500" text-anchor="middle">-- 所有用户数据混合 --</text>
+
+  <rect x="310" y="448" width="90" height="26" rx="4" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1"/>
+  <text x="355" y="465" fill="white" font-size="9" font-weight="600" text-anchor="middle">用户 A</text>
+  <rect x="310" y="478" width="90" height="26" rx="4" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1"/>
+  <text x="355" y="495" fill="white" font-size="9" font-weight="600" text-anchor="middle">用户 B</text>
+
+  <line x1="280" y1="462" x2="310" y2="462" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <line x1="280" y1="492" x2="310" y2="492" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+
+  <!-- Memory growth -->
+  <text x="460" y="465" fill="#94a3b8" font-size="8">episodic_memory:</text>
+  <text x="460" y="480" fill="#fb7185" font-size="8">用户A 10条 + 用户B 8条 + ...</text>
+  <text x="460" y="495" fill="#fb7185" font-size="8">全部混合存储, 不可区分</text>
+
+  <!-- Data leak warning at bottom -->
+  <rect x="80" y="515" width="450" height="26" rx="4" fill="rgba(251,113,133,0.15)" stroke="#fb7185" stroke-width="0.8"/>
+  <text x="305" y="532" fill="#fb7185" font-size="9" font-weight="600" text-anchor="middle">BUG: 用户A 的 get_full_context() 能看到用户B 的查询历史</text>
+
+  <!-- Center -->
+  <line x1="580" y1="500" x2="620" y2="500" stroke="#fb923c" stroke-width="2" marker-end="url(#arrow-amber)"/>
+  <rect x="570" y="482" width="60" height="36" rx="6" fill="rgba(251,146,60,0.2)"/>
+  <text x="600" y="498" fill="#fb923c" font-size="10" font-weight="700" text-anchor="middle">修复点 1</text>
+  <text x="600" y="512" fill="#fb923c" font-size="8" font-weight="500" text-anchor="middle">记忆隔离</text>
+
+  <!-- Right: 修复后 -->
+  <rect x="630" y="390" width="540" height="220" rx="10" fill="rgba(6,78,59,0.08)" stroke="#34d399" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="646" y="412" fill="#34d399" font-size="12" font-weight="700">修复后: 每个 conversation_id 独立持有 AgentMemory</text>
+  <text x="646" y="430" fill="#94a3b8" font-size="9">通过 _ensure_conversation() 按会话自动分配独立记忆实例</text>
+
+  <!-- Isolated visualization -->
+  <rect x="660" y="448" width="170" height="55" rx="6" fill="rgba(34,211,238,0.1)" stroke="#22d3ee" stroke-width="1"/>
+  <text x="745" y="466" fill="#22d3ee" font-size="10" font-weight="600" text-anchor="middle">AgentMemory #A</text>
+  <text x="745" y="482" fill="#64748b" font-size="8" text-anchor="middle">用户A 数据</text>
+  <text x="745" y="496" fill="#34d399" font-size="8" text-anchor="middle">隔离, 不可见 #B</text>
+
+  <rect x="860" y="448" width="170" height="55" rx="6" fill="rgba(34,211,238,0.1)" stroke="#22d3ee" stroke-width="1"/>
+  <text x="945" y="466" fill="#22d3ee" font-size="10" font-weight="600" text-anchor="middle">AgentMemory #B</text>
+  <text x="945" y="482" fill="#64748b" font-size="8" text-anchor="middle">用户B 数据</text>
+  <text x="945" y="496" fill="#34d399" font-size="8" text-anchor="middle">隔离, 不可见 #A</text>
+
+  <!-- Lock indicator -->
+  <text x="745" y="530" fill="#34d399" font-size="9" font-weight="600" text-anchor="middle">架构隔离 (无需加锁)</text>
+  <text x="745" y="546" fill="#64748b" font-size="8" text-anchor="middle">同一实例只被一条会话持有</text>
+
+  <!-- ============================================================ -->
+  <!-- ROW 3: FIX 3 - messages 截断 -->
+  <!-- ============================================================ -->
+
+  <!-- Left: 修复前 -->
+  <rect x="40" y="630" width="540" height="220" rx="10" fill="rgba(136,19,55,0.08)" stroke="#fb7185" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="56" y="652" fill="#fb7185" font-size="12" font-weight="700">修复前: ConversationManager.messages 只增不减</text>
+  <text x="56" y="670" fill="#94a3b8" font-size="9">max_turns 仅限制输出, 不影响存储: 100轮对话 → 200条消息永久驻留</text>
+
+  <!-- Bar chart: growing messages per session -->
+  <text x="140" y="700" fill="#64748b" font-size="8" text-anchor="middle">10轮</text>
+  <rect x="120" y="705" width="40" height="40" rx="3" fill="rgba(251,113,133,0.3)" stroke="#fb7185" stroke-width="0.8"/>
+  <text x="140" y="728" fill="white" font-size="8" font-weight="600" text-anchor="middle">20条</text>
+  <text x="140" y="740" fill="#64748b" font-size="7" text-anchor="middle">0.02MB</text>
+
+  <text x="230" y="700" fill="#64748b" font-size="8" text-anchor="middle">50轮</text>
+  <rect x="210" y="690" width="40" height="55" rx="3" fill="rgba(251,113,133,0.4)" stroke="#fb7185" stroke-width="0.8"/>
+  <text x="230" y="720" fill="white" font-size="8" font-weight="600" text-anchor="middle">100条</text>
+  <text x="230" y="733" fill="#64748b" font-size="7" text-anchor="middle">0.1MB</text>
+
+  <text x="320" y="700" fill="#64748b" font-size="8" text-anchor="middle">100轮</text>
+  <rect x="300" y="665" width="40" height="80" rx="3" fill="rgba(251,113,133,0.5)" stroke="#fb7185" stroke-width="0.8"/>
+  <text x="320" y="695" fill="white" font-size="8" font-weight="600" text-anchor="middle">200条</text>
+  <text x="320" y="708" fill="#fb7185" font-size="7" text-anchor="middle">0.2MB</text>
+
+  <text x="410" y="700" fill="#64748b" font-size="8" text-anchor="middle">200轮</text>
+  <rect x="390" y="635" width="40" height="110" rx="3" fill="rgba(251,113,133,0.6)" stroke="#fb7185" stroke-width="0.8"/>
+  <text x="410" y="670" fill="white" font-size="8" font-weight="600" text-anchor="middle">400条</text>
+  <text x="410" y="683" fill="#fb7185" font-size="7" text-anchor="middle">0.4MB</text>
+
+  <text x="500" y="700" fill="#64748b" font-size="8" text-anchor="middle">500轮</text>
+  <rect x="480" y="600" width="40" height="145" rx="3" fill="rgba(251,113,133,0.7)" stroke="#fb7185" stroke-width="0.8"/>
+  <text x="500" y="640" fill="white" font-size="8" font-weight="600" text-anchor="middle">1000条</text>
+  <text x="500" y="653" fill="#fb7185" font-size="7" text-anchor="middle">1MB</text>
+
+  <text x="310" y="760" fill="#64748b" font-size="8" text-anchor="middle">× 500 会话 → 500MB+ OOM 风险</text>
+
+  <!-- Center -->
+  <line x1="580" y1="740" x2="620" y2="740" stroke="#fb923c" stroke-width="2" marker-end="url(#arrow-amber)"/>
+  <rect x="570" y="722" width="60" height="36" rx="6" fill="rgba(251,146,60,0.2)"/>
+  <text x="600" y="738" fill="#fb923c" font-size="10" font-weight="700" text-anchor="middle">修复点 3</text>
+  <text x="600" y="752" fill="#fb923c" font-size="8" font-weight="500" text-anchor="middle">存储截断</text>
+
+  <!-- Right: 修复后 -->
+  <rect x="630" y="630" width="540" height="220" rx="10" fill="rgba(6,78,59,0.08)" stroke="#34d399" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="646" y="652" fill="#34d399" font-size="12" font-weight="700">修复后: _truncate_if_needed() 自动截断</text>
+  <text x="646" y="670" fill="#94a3b8" font-size="9">超过 max_turns × 4 条消息自动淘汰最早记录</text>
+
+  <!-- Truncation visualization -->
+  <rect x="660" y="688" width="470" height="55" rx="6" fill="rgba(34,211,238,0.08)" stroke="#34d399" stroke-width="1"/>
+  <text x="895" y="706" fill="#34d399" font-size="10" font-weight="600" text-anchor="middle">max_turns=5 → MAX_STORED=20条, 封顶</text>
+  <text x="895" y="722" fill="#64748b" font-size="8" text-anchor="middle">窗口 (get_history=10条) + 冗余 (10条) = 20条</text>
+  <text x="895" y="737" fill="#22d3ee" font-size="8" text-anchor="middle">add_message / add_agent_message 触发截断</text>
+
+  <!-- OK indicator -->
+  <rect x="730" y="752" width="320" height="28" rx="4" fill="rgba(34,211,238,0.1)" stroke="#22d3ee" stroke-width="0.8"/>
+  <text x="890" y="770" fill="#22d3ee" font-size="9" font-weight="600" text-anchor="middle">get_history(max_turns) 不受影响, 始终返回最近 N 轮</text>
+
+  <!-- Hidden removed indicator -->
+  <rect x="660" y="790" width="150" height="24" rx="4" fill="rgba(100,116,139,0.15)" stroke="#64748b" stroke-width="0.8" stroke-dasharray="3,2"/>
+  <text x="735" y="805" fill="#64748b" font-size="8" text-anchor="middle">被截断的旧消息: 已移除</text>
+
+  <text x="820" y="805" fill="#334155" font-size="18" font-weight="700">&gt;&gt;</text>
+
+  <rect x="840" y="790" width="150" height="24" rx="4" fill="rgba(34,211,238,0.1)" stroke="#22d3ee" stroke-width="0.8"/>
+  <text x="915" y="805" fill="#22d3ee" font-size="8" text-anchor="middle">保留的最近消息: 20条</text>
+
+  <!-- ============================================================ -->
+  <!-- SUMMARY -->
+  <!-- ============================================================ -->
+  <rect x="40" y="870" width="1130" height="70" rx="8" fill="rgba(30,41,59,0.5)" stroke="#334155" stroke-width="1"/>
+
+  <text x="80" y="895" fill="white" font-size="11" font-weight="700">修复效果总览</text>
+
+  <rect x="80" y="908" width="260" height="22" rx="4" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="0.8"/>
+  <text x="210" y="923" fill="#34d399" font-size="9" font-weight="600" text-anchor="middle">修复点 1 (P0): 数据隔离  0 泄露</text>
+
+  <rect x="360" y="908" width="260" height="22" rx="4" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="0.8"/>
+  <text x="490" y="923" fill="#34d399" font-size="9" font-weight="600" text-anchor="middle">修复点 2 (P1): 会话数量  100 封顶</text>
+
+  <rect x="640" y="908" width="260" height="22" rx="4" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="0.8"/>
+  <text x="770" y="923" fill="#34d399" font-size="9" font-weight="600" text-anchor="middle">修复点 3 (P1): 消息数量  20条封顶</text>
+
+  <rect x="920" y="908" width="220" height="22" rx="4" fill="rgba(34,211,238,0.15)" stroke="#22d3ee" stroke-width="0.8"/>
+  <text x="1030" y="923" fill="#22d3ee" font-size="9" font-weight="700" text-anchor="middle">回归测试: 69/69 PASS</text>
+
+</svg>

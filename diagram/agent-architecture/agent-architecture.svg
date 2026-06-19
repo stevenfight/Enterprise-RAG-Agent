@@ -1,0 +1,290 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 920">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap');
+      text { font-family: 'JetBrains Mono', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace; }
+    </style>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+    </pattern>
+    <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
+    </marker>
+    <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa"/>
+    </marker>
+    <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#60a5fa"/>
+    </marker>
+    <marker id="arrow-slate" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+    </marker>
+
+    <!-- Glow filters -->
+    <filter id="glow-cyan">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="#0f172a"/>
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+
+  <!-- Title -->
+  <text x="600" y="38" fill="white" font-size="18" font-weight="700" text-anchor="middle">企业级财务年报分析 RAG-Agent 智能体架构图</text>
+  <text x="600" y="58" fill="#64748b" font-size="10" text-anchor="middle">双模式共存: 管道模式 (降级方案) + Agent 模式 (ReAct 自主推理)</text>
+
+  <!-- ============================================================ -->
+  <!-- LAYER 6: 外部 API 服务 (right sidebar) -->
+  <!-- ============================================================ -->
+  <rect x="920" y="80" width="250" height="790" rx="10" fill="none" stroke="#fbbf24" stroke-width="1" stroke-dasharray="6,3" opacity="0.6"/>
+  <text x="1045" y="100" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle">外部 API 服务</text>
+
+  <!-- API boxes -->
+  <rect x="935" y="120" width="220" height="38" rx="6" fill="#0f172a"/>
+  <rect x="935" y="120" width="220" height="38" rx="6" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1"/>
+  <text x="1045" y="141" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle">qwen-max · 生成模型</text>
+
+  <rect x="935" y="172" width="220" height="38" rx="6" fill="#0f172a"/>
+  <rect x="935" y="172" width="220" height="38" rx="6" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1"/>
+  <text x="1045" y="193" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle">qwen-plus · 意图识别</text>
+
+  <rect x="935" y="224" width="220" height="38" rx="6" fill="#0f172a"/>
+  <rect x="935" y="224" width="220" height="38" rx="6" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1"/>
+  <text x="1045" y="245" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle">text-embedding-v3 · 向量化</text>
+
+  <rect x="935" y="276" width="220" height="38" rx="6" fill="#0f172a"/>
+  <rect x="935" y="276" width="220" height="38" rx="6" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1"/>
+  <text x="1045" y="297" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle">gte-rerank-v2 · 重排</text>
+
+  <rect x="935" y="328" width="220" height="38" rx="6" fill="#0f172a"/>
+  <rect x="935" y="328" width="220" height="38" rx="6" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1"/>
+  <text x="1045" y="349" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle">MinerU API · PDF 解析</text>
+
+  <!-- API version note -->
+  <text x="1045" y="700" fill="#475569" font-size="8" text-anchor="middle">全部通过 DashScope SDK 调用</text>
+  <text x="1045" y="714" fill="#475569" font-size="8" text-anchor="middle">超时控制: 15~60s</text>
+  <text x="1045" y="728" fill="#475569" font-size="8" text-anchor="middle">自动重试 + Fallback 降级</text>
+
+  <!-- ============================================================ -->
+  <!-- LAYER 1: 用户交互层 -->
+  <!-- ============================================================ -->
+  <rect x="20" y="80" width="880" height="90" rx="10" fill="none" stroke="#22d3ee" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="36" y="98" fill="#22d3ee" font-size="10" font-weight="600">用户交互层</text>
+
+  <!-- Streamlit -->
+  <rect x="50" y="110" width="230" height="44" rx="8" fill="#0f172a"/>
+  <rect x="50" y="110" width="230" height="44" rx="8" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="165" y="130" fill="white" font-size="11" font-weight="600" text-anchor="middle">Streamlit Web UI</text>
+  <text x="165" y="146" fill="#94a3b8" font-size="9" text-anchor="middle">端口 8501 · Agent 模式开关</text>
+
+  <!-- FastAPI -->
+  <rect x="430" y="110" width="230" height="44" rx="8" fill="#0f172a"/>
+  <rect x="430" y="110" width="230" height="44" rx="8" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="545" y="130" fill="white" font-size="11" font-weight="600" text-anchor="middle">FastAPI REST API</text>
+  <text x="545" y="146" fill="#94a3b8" font-size="9" text-anchor="middle">端口 8000 · POST /api/agent/query</text>
+
+  <!-- Dual mode indicator -->
+  <rect x="310" y="115" width="90" height="34" rx="17" fill="#0f172a"/>
+  <rect x="310" y="115" width="90" height="34" rx="17" fill="rgba(59,130,246,0.15)" stroke="#60a5fa" stroke-width="1"/>
+  <text x="355" y="131" fill="#60a5fa" font-size="9" font-weight="600" text-anchor="middle">双模式</text>
+  <text x="355" y="143" fill="#60a5fa" font-size="8" text-anchor="middle">共存</text>
+
+  <!-- ============================================================ -->
+  <!-- LAYER 2: Agent 决策层 (核心) -->
+  <!-- ============================================================ -->
+  <rect x="20" y="195" width="880" height="220" rx="10" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="36" y="213" fill="#22d3ee" font-size="10" font-weight="600">Agent 决策层</text>
+
+  <!-- TaskPlanner -->
+  <rect x="50" y="230" width="175" height="48" rx="8" fill="#0f172a"/>
+  <rect x="50" y="230" width="175" height="48" rx="8" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="137" y="251" fill="white" font-size="10" font-weight="600" text-anchor="middle">TaskPlanner</text>
+  <text x="137" y="268" fill="#94a3b8" font-size="8" text-anchor="middle">4 种拆解策略 · DAG 拓扑</text>
+
+  <!-- Arrow: Planner -> ReActAgent -->
+  <path d="M 225 254 L 275 254" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+  <!-- ReActAgent (main box) -->
+  <rect x="280" y="225" width="390" height="170" rx="10" fill="#0f172a"/>
+  <rect x="280" y="225" width="390" height="170" rx="10" fill="rgba(8,51,68,0.3)" stroke="#22d3ee" stroke-width="2" filter="url(#glow-cyan)"/>
+  <text x="475" y="248" fill="#22d3ee" font-size="12" font-weight="700" text-anchor="middle">ReActAgent · 自主推理循环</text>
+  <text x="475" y="264" fill="#64748b" font-size="8" text-anchor="middle">max_steps=5 · llm_timeout=60s · temperature=0.1</text>
+
+  <!-- ReAct internal boxes -->
+  <rect x="300" y="280" width="100" height="36" rx="6" fill="#0f172a"/>
+  <rect x="300" y="280" width="100" height="36" rx="6" fill="rgba(59,130,246,0.2)" stroke="#60a5fa" stroke-width="1.2"/>
+  <text x="350" y="303" fill="#60a5fa" font-size="10" font-weight="600" text-anchor="middle">Thought</text>
+
+  <rect x="430" y="280" width="100" height="36" rx="6" fill="#0f172a"/>
+  <rect x="430" y="280" width="100" height="36" rx="6" fill="rgba(34,211,238,0.2)" stroke="#22d3ee" stroke-width="1.2"/>
+  <text x="480" y="303" fill="#22d3ee" font-size="10" font-weight="600" text-anchor="middle">Action</text>
+
+  <rect x="560" y="280" width="100" height="36" rx="6" fill="#0f172a"/>
+  <rect x="560" y="280" width="100" height="36" rx="6" fill="rgba(167,139,250,0.2)" stroke="#a78bfa" stroke-width="1.2"/>
+  <text x="610" y="303" fill="#a78bfa" font-size="10" font-weight="600" text-anchor="middle">Observation</text>
+
+  <!-- Arrows in ReAct cycle -->
+  <path d="M 400 298 L 427 298" fill="none" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <path d="M 530 298 L 557 298" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+  <!-- Return arrow -->
+  <path d="M 560 320 L 560 338 L 350 338 L 350 319" fill="none" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#arrow-violet)"/>
+  <text x="455" y="352" fill="#a78bfa" font-size="8" text-anchor="middle">循环直到 Final Answer 或超限</text>
+
+  <!-- Final Answer -->
+  <rect x="370" y="360" width="210" height="24" rx="6" fill="#0f172a"/>
+  <rect x="370" y="360" width="210" height="24" rx="6" fill="rgba(34,211,238,0.15)" stroke="#22d3ee" stroke-width="1"/>
+  <text x="475" y="376" fill="#22d3ee" font-size="9" font-weight="600" text-anchor="middle">Final Answer · 推理链记录</text>
+
+  <!-- Arrow: ReActAgent -> Reflector -->
+  <path d="M 670 310 L 720 310" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+  <!-- AnswerReflector -->
+  <rect x="700" y="275" width="185" height="70" rx="8" fill="#0f172a"/>
+  <rect x="700" y="275" width="185" height="70" rx="8" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.5"/>
+  <text x="792" y="298" fill="#34d399" font-size="10" font-weight="600" text-anchor="middle">AnswerReflector</text>
+  <text x="792" y="314" fill="#94a3b8" font-size="8" text-anchor="middle">幻觉检测 · 来源完整性</text>
+  <text x="792" y="328" fill="#94a3b8" font-size="8" text-anchor="middle">auto_correct · 答案修正</text>
+  <text x="792" y="342" fill="#94a3b8" font-size="8" text-anchor="middle">9 场景验证通过</text>
+
+  <!-- ============================================================ -->
+  <!-- LAYER 3: 工具层 -->
+  <!-- ============================================================ -->
+  <rect x="20" y="440" width="880" height="90" rx="10" fill="none" stroke="#34d399" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="36" y="458" fill="#34d399" font-size="10" font-weight="600">工具层 (ToolRegistry)</text>
+
+  <!-- 5 tools -->
+  <rect x="50" y="472" width="145" height="44" rx="8" fill="#0f172a"/>
+  <rect x="50" y="472" width="145" height="44" rx="8" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.2"/>
+  <text x="122" y="493" fill="white" font-size="10" font-weight="600" text-anchor="middle">retrieve</text>
+  <text x="122" y="507" fill="#94a3b8" font-size="8" text-anchor="middle">混合检索 · 意图权重 · 置信度</text>
+
+  <rect x="210" y="472" width="145" height="44" rx="8" fill="#0f172a"/>
+  <rect x="210" y="472" width="145" height="44" rx="8" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.2"/>
+  <text x="282" y="493" fill="white" font-size="10" font-weight="600" text-anchor="middle">calculator</text>
+  <text x="282" y="507" fill="#94a3b8" font-size="8" text-anchor="middle">yoy · cagr · margin · pct</text>
+
+  <rect x="370" y="472" width="145" height="44" rx="8" fill="#0f172a"/>
+  <rect x="370" y="472" width="145" height="44" rx="8" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.2"/>
+  <text x="442" y="493" fill="white" font-size="10" font-weight="600" text-anchor="middle">compare</text>
+  <text x="442" y="507" fill="#94a3b8" font-size="8" text-anchor="middle">多公司对比 · 三层保底</text>
+
+  <rect x="530" y="472" width="145" height="44" rx="8" fill="#0f172a"/>
+  <rect x="530" y="472" width="145" height="44" rx="8" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.2"/>
+  <text x="602" y="493" fill="white" font-size="10" font-weight="600" text-anchor="middle">chart</text>
+  <text x="602" y="507" fill="#94a3b8" font-size="8" text-anchor="middle">bar · hbar · line · pie</text>
+
+  <rect x="690" y="472" width="145" height="44" rx="8" fill="#0f172a"/>
+  <rect x="690" y="472" width="145" height="44" rx="8" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.2"/>
+  <text x="762" y="493" fill="white" font-size="10" font-weight="600" text-anchor="middle">verify</text>
+  <text x="762" y="507" fill="#94a3b8" font-size="8" text-anchor="middle">反幻觉 · 数值回溯原文</text>
+
+  <!-- Arrow: ToolRegistry -> retrieve -> HybridRetriever -->
+  <path d="M 122 516 L 122 555" fill="none" stroke="#34d399" stroke-width="1" marker-end="url(#arrow-emerald)"/>
+
+  <!-- ============================================================ -->
+  <!-- LAYER 4: 记忆层 -->
+  <!-- ============================================================ -->
+  <rect x="20" y="555" width="880" height="85" rx="10" fill="none" stroke="#a78bfa" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="36" y="573" fill="#a78bfa" font-size="10" font-weight="600">记忆层</text>
+
+  <!-- AgentMemory -->
+  <rect x="50" y="585" width="520" height="44" rx="8" fill="#0f172a"/>
+  <rect x="50" y="585" width="520" height="44" rx="8" fill="rgba(76,29,149,0.3)" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="310" y="606" fill="white" font-size="10" font-weight="600" text-anchor="middle">AgentMemory · 三层记忆系统</text>
+  <text x="310" y="622" fill="#94a3b8" font-size="8" text-anchor="middle">工作记忆 (3步上限 · FIFO 淘汰)  →  情景记忆 (5次总结 · 自动摘要)  →  长期记忆 (可选 · 持久化存储)</text>
+
+  <!-- ConversationManager -->
+  <rect x="600" y="585" width="285" height="44" rx="8" fill="#0f172a"/>
+  <rect x="600" y="585" width="285" height="44" rx="8" fill="rgba(76,29,149,0.25)" stroke="#a78bfa" stroke-width="1.2"/>
+  <text x="742" y="606" fill="white" font-size="10" font-weight="600" text-anchor="middle">ConversationManager</text>
+  <text x="742" y="622" fill="#94a3b8" font-size="8" text-anchor="middle">多轮对话 · 5轮上限 · 存储截断</text>
+
+  <!-- ============================================================ -->
+  <!-- LAYER 5: RAG 管道层 (存量 · 降级方案) -->
+  <!-- ============================================================ -->
+  <rect x="20" y="655" width="880" height="95" rx="10" fill="none" stroke="#94a3b8" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="36" y="673" fill="#94a3b8" font-size="10" font-weight="600">RAG 管道层 (存量 · 降级方案)</text>
+
+  <!-- QP -->
+  <rect x="50" y="688" width="230" height="44" rx="8" fill="#0f172a"/>
+  <rect x="50" y="688" width="230" height="44" rx="8" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="165" y="708" fill="white" font-size="10" font-weight="600" text-anchor="middle">QueryProcessor</text>
+  <text x="165" y="723" fill="#64748b" font-size="8" text-anchor="middle">6 类意图识别 · 查询改写 · 域外拦截</text>
+
+  <!-- Arrow QP -> HR -->
+  <path d="M 280 710 L 320 710" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow-slate)"/>
+
+  <!-- HR -->
+  <rect x="325" y="688" width="255" height="44" rx="8" fill="#0f172a"/>
+  <rect x="325" y="688" width="255" height="44" rx="8" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="452" y="708" fill="white" font-size="10" font-weight="600" text-anchor="middle">HybridRetriever</text>
+  <text x="452" y="723" fill="#64748b" font-size="8" text-anchor="middle">BM25 + 向量 + gte-rerank-v2</text>
+
+  <!-- Arrow HR -> Generator -->
+  <path d="M 580 710 L 620 710" fill="none" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow-slate)"/>
+
+  <!-- Generator -->
+  <rect x="625" y="688" width="260" height="44" rx="8" fill="#0f172a"/>
+  <rect x="625" y="688" width="260" height="44" rx="8" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="755" y="708" fill="white" font-size="10" font-weight="600" text-anchor="middle">RAGGenerator</text>
+  <text x="755" y="723" fill="#64748b" font-size="8" text-anchor="middle">意图专用 Prompt · qwen-max 生成 · CPA</text>
+
+  <!-- ============================================================ -->
+  <!-- LAYER 6: 数据存储层 -->
+  <!-- ============================================================ -->
+  <rect x="20" y="770" width="880" height="80" rx="10" fill="none" stroke="#a78bfa" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="36" y="788" fill="#a78bfa" font-size="10" font-weight="600">数据存储层</text>
+
+  <rect x="50" y="798" width="185" height="38" rx="8" fill="#0f172a"/>
+  <rect x="50" y="798" width="185" height="38" rx="8" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1"/>
+  <text x="142" y="815" fill="white" font-size="10" font-weight="600" text-anchor="middle">FAISS 向量索引</text>
+  <text x="142" y="830" fill="#64748b" font-size="7" text-anchor="middle">IndexFlatIP · 1024维</text>
+
+  <rect x="255" y="798" width="185" height="38" rx="8" fill="#0f172a"/>
+  <rect x="255" y="798" width="185" height="38" rx="8" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1"/>
+  <text x="347" y="815" fill="white" font-size="10" font-weight="600" text-anchor="middle">BM25 关键词索引</text>
+  <text x="347" y="830" fill="#64748b" font-size="7" text-anchor="middle">jieba 分词 · 财经词典</text>
+
+  <rect x="460" y="798" width="185" height="38" rx="8" fill="#0f172a"/>
+  <rect x="460" y="798" width="185" height="38" rx="8" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1"/>
+  <text x="552" y="815" fill="white" font-size="10" font-weight="600" text-anchor="middle">chunked_reports</text>
+  <text x="552" y="830" fill="#64748b" font-size="7" text-anchor="middle">12 份 JSON · Small-to-Big</text>
+
+  <rect x="665" y="798" width="220" height="38" rx="8" fill="#0f172a"/>
+  <rect x="665" y="798" width="220" height="38" rx="8" fill="rgba(76,29,149,0.2)" stroke="#a78bfa" stroke-width="1"/>
+  <text x="775" y="815" fill="white" font-size="10" font-weight="600" text-anchor="middle">config/ · finance/ · docs/</text>
+  <text x="775" y="830" fill="#64748b" font-size="7" text-anchor="middle">agent_config · extensions · docs</text>
+
+  <!-- ============================================================ -->
+  <!-- LEGEND -->
+  <!-- ============================================================ -->
+  <rect x="20" y="865" width="880" height="42" rx="6" fill="rgba(30,41,59,0.4)" stroke="#334155" stroke-width="1"/>
+  <text x="40" y="885" fill="#94a3b8" font-size="8" font-weight="500">图例:</text>
+  <rect x="80" y="873" width="16" height="12" rx="3" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1"/>
+  <text x="100" y="884" fill="#64748b" font-size="8">Agent 核心</text>
+  <rect x="170" y="873" width="16" height="12" rx="3" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1"/>
+  <text x="190" y="884" fill="#64748b" font-size="8">工具层</text>
+  <rect x="240" y="873" width="16" height="12" rx="3" fill="rgba(76,29,149,0.3)" stroke="#a78bfa" stroke-width="1"/>
+  <text x="260" y="884" fill="#64748b" font-size="8">记忆/存储</text>
+  <rect x="330" y="873" width="16" height="12" rx="3" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1"/>
+  <text x="350" y="884" fill="#64748b" font-size="8">RAG 管道</text>
+  <rect x="420" y="873" width="16" height="12" rx="3" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="1"/>
+  <text x="440" y="884" fill="#64748b" font-size="8">外部 API</text>
+  <line x1="510" y1="879" x2="540" y2="879" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+  <text x="546" y="884" fill="#64748b" font-size="8">数据流</text>
+  <line x1="605" y1="879" x2="635" y2="879" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="640" y="884" fill="#64748b" font-size="8">循环/回退</text>
+
+  <!-- TDD badge -->
+  <rect x="740" y="873" width="145" height="22" rx="6" fill="rgba(34,211,238,0.1)" stroke="#22d3ee" stroke-width="0.8"/>
+  <text x="812" y="888" fill="#22d3ee" font-size="8" font-weight="600" text-anchor="middle">TDD: 179/179 GREEN</text>
+
+</svg>
