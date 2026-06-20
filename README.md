@@ -21,7 +21,7 @@
 - **gte-rerank-v2 重排**：批量评分替代逐条 LLM 调用，耗时从 54s 降至 2s
 - **意图识别**：6 类意图分类 + 域外问题拦截 + 查询改写
 - **多轮对话**：ConversationManager 支持 5 轮对话上下文，查询改写结合对话历史补全指代信息
-- **对比查询三层保底**：子查询拆分 + 候选截断保护 + 营收数据保底补充，解决多公司对比数据缺失问题
+- **对比查询四层保底**：公平分配 + 替换策略 + 保底重新检索 + 营收数据保底补充，解决多公司对比数据缺失问题
 - **指令细分化 Prompt**：针对 financial_data / trend / comparison / business_analysis 设计专用 Prompt
 - **双界面**：Streamlit Web 界面 + FastAPI REST API
 - **Agent 智能体模式**：ReAct 自主推理 + 5 个工具调用 + 自我反思修正 (NEW)
@@ -80,6 +80,7 @@
 │   ├── test_reflector.py      # 反思验证测试 (NEW)
 │   ├── run_all.py             # 全量测试一键脚本 (NEW)
 │   ├── test_memory_leak_fixes.py    # 内存泄漏修复测试 (NEW)
+│   ├── test_memory_isolation_demo.py  # 会话隔离验证测试 (NEW)
 │   ├── test_agent_memory_multiturn.py # 多轮追问测试 (NEW)
 │   ├── test_agent_memory_interrupt.py # 中断恢复测试 (NEW)
 │   ├── test_agent_memory_concurrent.py # 并发安全测试 (NEW)
@@ -193,9 +194,9 @@ curl http://localhost:8000/api/companies
 | 重排耗时 | ~2s (gte-rerank-v2 批量) |
 | 支持文档数 | 12 份 PDF |
 | 支持公司数 | 4 家 (中芯国际/中国移动/中国联通/中国电信) |
-| 对比查询覆盖率 | 95%+ (三层保底机制) |
+| 对比查询覆盖率 | 95%+ (四层保底机制) |
 | 查询改写准确率 | 多轮指代消解成功率 > 90% |
-| 回归测试通过率 | 135 PASS, 0 FAIL (100%) |
+| 回归测试通过率 | 137 PASS, 0 FAIL (100%) |
 
 ## 核心架构
 

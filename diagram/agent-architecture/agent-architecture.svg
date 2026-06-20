@@ -174,7 +174,7 @@
   <rect x="370" y="472" width="145" height="44" rx="8" fill="#0f172a"/>
   <rect x="370" y="472" width="145" height="44" rx="8" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.2"/>
   <text x="442" y="493" fill="white" font-size="10" font-weight="600" text-anchor="middle">compare</text>
-  <text x="442" y="507" fill="#94a3b8" font-size="8" text-anchor="middle">多公司对比 · 三层保底</text>
+  <text x="442" y="507" fill="#94a3b8" font-size="8" text-anchor="middle">多公司对比 · 四层保底</text>
 
   <rect x="530" y="472" width="145" height="44" rx="8" fill="#0f172a"/>
   <rect x="530" y="472" width="145" height="44" rx="8" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.2"/>

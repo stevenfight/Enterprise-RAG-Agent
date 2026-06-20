@@ -63,6 +63,12 @@ TEST_SUITES = [
         "requires_llm": False,
     },
     {
+        "name": "会话隔离验证",
+        "file": "test_memory_isolation_demo.py",
+        "category": "memory-safety",
+        "requires_llm": False,
+    },
+    {
         "name": "多轮追问记忆",
         "file": "test_agent_memory_multiturn.py",
         "category": "memory-safety",
@@ -108,8 +114,8 @@ def run_test(filepath):
             text=True,
             timeout=120,
         )
-        # 解析输出的最后几行找汇总
-        output = result.stdout
+        # 解析输出的最后几行找汇总（合并 stdout + stderr，兼容 unittest 汇总输出到 stderr 的情况）
+        output = result.stdout + "\n" + result.stderr
         lines = output.strip().split("\n")
         passed = 0
         failed = 0
@@ -123,6 +129,37 @@ def run_test(filepath):
                     passed = int(m.group(1))
                     failed = int(m.group(2))
                 break
+        else:
+            # 回退：兼容标准 unittest 输出格式
+            import re
+            total = 0
+            for line in lines:
+                m = re.search(r'Ran\s+(\d+)\s+tests?', line)
+                if m:
+                    total = int(m.group(1))
+                    break
+            if total > 0:
+                # 检查是否全部通过
+                ok = any("OK" in line for line in lines[-3:])
+                if ok:
+                    passed = total
+                    failed = 0
+                else:
+                    # 尝试解析失败数
+                    for line in lines:
+                        m = re.search(r'failures=(\d+)', line)
+                        if m:
+                            failed = int(m.group(1))
+                            passed = total - failed
+                            break
+                        m = re.search(r'errors=(\d+)', line)
+                        if m:
+                            errors = int(m.group(1))
+                            failed = max(failed, errors)
+                            passed = total - failed
+                            break
+                    if passed == 0 and failed == 0:
+                        failed = total
 
         return passed, failed, lines
     except subprocess.TimeoutExpired:
