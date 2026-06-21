@@ -43,6 +43,12 @@ TEST_SUITES = [
         "requires_llm": False,
     },
     {
+        "name": "Agent TDD - 空结果边界 (Mock)",
+        "file": "test_agent_mock_boundary.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
         "name": "Agent TDD - 记忆系统",
         "file": "test_agent_memory.py",
         "category": "agent-tdd",
@@ -98,7 +104,13 @@ TEST_SUITES = [
         "name": "端到端集成",
         "file": "test_e2e_agent.py",
         "category": "integration",
-        "requires_llm": False,
+        "requires_llm": True,
+    },
+    {
+        "name": "端到端边界验证 (空结果安全阀)",
+        "file": "test_agent_boundary_verify.py",
+        "category": "integration",
+        "requires_llm": True,
     },
 ]
 

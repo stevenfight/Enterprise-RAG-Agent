@@ -28,6 +28,8 @@
 - **三层记忆系统**：工作记忆 / 情景记忆 / 长期记忆，支持多轮追问 (NEW)
 - **企业级内存保护**：会话隔离 + 容量上限 + 存储截断，防 OOM (NEW)
 - **并发安全**：8 场景验证，会话隔离架构保证线程安全 (NEW)
+- **空结果安全阀**：三层防护机制（空结果检测 + 计数器 + 强制降级），防止 LLM 在连续空检索时陷入无效循环 (NEW)
+- **双轨验证**：保留管道模式作为对照组，同批查询同时跑管道与 Agent 对比答案质量，已发现数值幻觉、容量淘汰、任务拆解不完整等 3 个 Agent 推理链缺陷 (NEW)
 
 ## 技术栈
 
@@ -95,6 +97,7 @@
 │   └── 系统设计决策记录.md          # 关键技术约束与架构决策
 ├── openspec/                 # SDD 规范驱动开发文档
 │   └── changes/
+│       ├── react-empty-result-safety/  # 第五轮迭代：空结果安全阀（三层防护 + NameError 修复）
 │       ├── rag-to-agent/            # 第四轮迭代：Agent 智能体架构
 │       ├── model-upgrade/    # 第一轮迭代：模型升级
 │       └── quality-robustness-enhancement/  # 第二轮迭代：健壮性增强
@@ -196,7 +199,7 @@ curl http://localhost:8000/api/companies
 | 支持公司数 | 4 家 (中芯国际/中国移动/中国联通/中国电信) |
 | 对比查询覆盖率 | 95%+ (四层保底机制) |
 | 查询改写准确率 | 多轮指代消解成功率 > 90% |
-| 回归测试通过率 | 137 PASS, 0 FAIL (100%) |
+| 回归测试通过率 | 135 PASS, 0 FAIL (100%) |
 
 ## 核心架构
 
@@ -239,6 +242,7 @@ curl -X POST http://localhost:8000/api/query \
 
 | 迭代 | 变更 ID | 核心内容 |
 |------|---------|---------|
+| 第五轮 | react-empty-result-safety | 空结果安全阀：三层防护机制（_is_empty_result 检测 + empty_result_count 计数器 + forced_stop 强制降级）、修复 _generate_forced_answer NameError、26 项边界测试覆盖 |
 | 第四轮 | rag-to-agent | Agent 智能体架构（ReAct 推理循环 + 5 工具系统 + 三层记忆 + 反思验证）、企业级内存保护、并发安全（8 场景）、全量回归测试（135 PASS） |
 | 第一轮 | model-upgrade | 模型升级 (Embedding v3 / gte-rerank-v2 / qwen-max)、检索权重自适应、指令细分化 Prompt |
 | 第二轮 | quality-robustness-enhancement | 代码去重、API 超时控制、对话记忆、BM25 财经词典、表格文本预处理 |
@@ -255,4 +259,4 @@ curl -X POST http://localhost:8000/api/query \
 | [上线部署清单](docs/上线部署清单.md) | 环境确认、数据迁移、服务启动、冒烟测试 |
 | [系统设计决策记录](docs/系统设计决策记录.md) | 关键技术约束与架构决策 |
 
-> 更多技术博客文章（避坑指南、架构优化、测试报告等）见 _local/blog/ 文件夹，已发布至知乎专栏
+> 更多技术博客文章（避坑指南、架构优化、测试报告等）见 _local/blog/ 文件夹，同步发布至知乎专栏

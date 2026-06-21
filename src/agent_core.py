@@ -252,6 +252,8 @@ class ReActAgent:
                 logger.warning("[ReActAgent] 工具 '%s' 返回空结果 (累计%d次)", action, empty_result_count)
             else:
                 empty_result_count = max(0, empty_result_count - 1)  # 有结果则重置
+                if empty_result_count == 0:
+                    logger.info("[ReActAgent] 空结果计数器: 发现有效结果, 计数器已重置为0")
 
             step_elapsed = (time.time() - step_start) * 1000
             self.memory.add(
@@ -279,7 +281,7 @@ class ReActAgent:
         # 达到 max_steps，强制生成答案
         elapsed_ms = (time.time() - start_time) * 1000
         logger.warning("[ReActAgent] ===== 达到最大步数 %d，强制生成答案 =====", self.max_steps)
-        forced_answer = self._generate_forced_answer(messages)
+        forced_answer = self._generate_forced_answer(messages, reasoning_chain)
 
         return AgentResult(
             answer=forced_answer,
@@ -428,11 +430,12 @@ class ReActAgent:
         logger.info("[ReActAgent] Observation: %.100s...", obs)
         return obs
 
-    def _generate_forced_answer(self, messages: List[Dict[str, str]]) -> str:
+    def _generate_forced_answer(self, messages: List[Dict[str, str]], reasoning_chain: List[Dict[str, Any]]) -> str:
         """达到 max_steps 后强制生成答案
 
         Args:
             messages: 当前的完整消息列表
+            reasoning_chain: 已完成的推理链步骤列表
 
         Returns:
             强制生成的答案
@@ -484,13 +487,15 @@ class ReActAgent:
             True 表示为空结果
         """
         if not observation or len(observation.strip()) == 0:
+            logger.info("[ReActAgent] 空结果判定: 空字符串")
             return True
-        if observation.startswith("[错误]"):
+        if observation.startswith("[错误]") or observation.startswith("[工具执行失败]"):
+            logger.info("[ReActAgent] 空结果判定: 匹配到失败前缀")
             return True
-        empty_markers = ["未找到相关数据", "无数据", "没有检索到", "没有找到",
-                         "无有效数值", "来源文本不足", "unavailable"]
+        empty_markers = ["未检索到相关数据", "未找到相关数据", "无数据", "没有检索到",
+                         "没有找到", "无有效数值", "来源文本不足", "unavailable"]
         for marker in empty_markers:
             if marker in observation:
-                logger.debug("[ReActAgent] 空结果检测: 匹配到标记 '%s'", marker)
+                logger.info("[ReActAgent] 空结果判定: 匹配到标记 '%s'", marker)
                 return True
         return False

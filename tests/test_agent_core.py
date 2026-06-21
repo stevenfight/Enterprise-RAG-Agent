@@ -11,7 +11,13 @@
   - 模块实现后逐个变 GREEN
   - 测试通过后修改 TEST_STATUS 中对应条目为 "GREEN"
 
-对应 SDD: openspec/changes/rag-to-agent/specs/spec-agent-core.md
+对应 SDD:
+  - openspec/changes/rag-to-agent/specs/spec-agent-core.md (TC-A01~A10)
+  - openspec/changes/react-empty-result-safety/specs/spec-empty-result-safety.md (TC-S/C/N/L/V)
+
+补充测试文件:
+  - tests/test_agent_mock_boundary.py (TC-S/C/N/L, 纯 Mock)
+  - tests/test_agent_boundary_verify.py (TC-V, 端到端)
 """
 
 import sys
@@ -22,6 +28,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 # 测试状态登记表 (开发过程中逐步改为 "GREEN")
 # ============================================================
 TEST_STATUS = {
+    # rag-to-agent 阶段 (openspec/changes/rag-to-agent/)
     "TC-A01": "GREEN",  # test_single_step_retrieve
     "TC-A02": "GREEN",  # test_multi_step_comparison
     "TC-A03": "GREEN",  # test_max_steps_forced_stop
@@ -32,6 +39,30 @@ TEST_STATUS = {
     "TC-A08": "GREEN",  # test_llm_timeout
     "TC-A09": "GREEN",  # test_reasoning_chain_complete
     "TC-A10": "GREEN",  # test_empty_tool_registry
+    # react-empty-result-safety 阶段 (openspec/changes/react-empty-result-safety/)
+    "TC-S01": "GREEN",  # test_empty_string
+    "TC-S02": "GREEN",  # test_error_prefix
+    "TC-S03": "GREEN",  # test_tool_failure_prefix
+    "TC-S04": "GREEN",  # test_no_data_found_marker
+    "TC-S05": "GREEN",  # test_no_data_found_alt
+    "TC-S06": "GREEN",  # test_no_data_marker
+    "TC-S07": "GREEN",  # test_no_retrieve_marker
+    "TC-S08": "GREEN",  # test_no_find_marker
+    "TC-S09": "GREEN",  # test_no_valid_value
+    "TC-S10": "GREEN",  # test_insufficient_source
+    "TC-S11": "GREEN",  # test_unavailable_marker
+    "TC-S12": "GREEN",  # test_normal_result_false
+    "TC-S13": "GREEN",  # test_another_normal_false
+    "TC-C01": "GREEN",  # test_continuous_empty_accumulate
+    "TC-C02": "GREEN",  # test_valid_result_reset
+    "TC-C03": "GREEN",  # test_reset_log_output
+    "TC-C04": "GREEN",  # test_empty_valid_empty_sequence
+    "TC-N01": "GREEN",  # test_generate_forced_signature
+    "TC-N02": "GREEN",  # test_generate_forced_no_name_error
+    "TC-L01": "GREEN",  # test_empty_detection_info_logs
+    "TC-V01": "GREEN",  # test_real_llm_empty_result
+    "TC-V02": "GREEN",  # test_synthetic_empty_forced_stop
+    "TC-V03": "GREEN",  # test_observation_markers_coverage
 }
 
 passed = 0
@@ -309,6 +340,66 @@ def test_a10():
 check("TC-A10", "ToolRegistry.list_all 返回已注册工具列表",
       test_a10()[0], detail=test_a10()[1])
 
+
+# ========== TC-S 系列: 空结果标记检测 (openspec/react-empty-result-safety) ==========
+print("\n--- TC-S: 空结果安全阀标记检测 ---")
+
+
+def test_s_markers():
+    """快速验证 _is_empty_result 方法存在且关键标记正确"""
+    if not _AGENT_AVAILABLE:
+        return False, "Agent 模块未实现"
+
+    from agent_core import ReActAgent
+    agent = ReActAgent.__new__(ReActAgent)
+    if not hasattr(agent, '_is_empty_result'):
+        return False, "_is_empty_result 方法不存在"
+
+    # 快速验证 3 个关键标记
+    checks = [
+        ("", True, "空字符串"),
+        ("[工具执行失败] 测试", True, "工具执行失败前缀"),
+        ("未检索到相关数据", True, "未检索到相关数据标记"),
+        ("中芯国际营收578亿元", False, "正常结果"),
+    ]
+    for obs, expected, label in checks:
+        actual = agent._is_empty_result(obs)
+        if actual != expected:
+            return False, f"{label}: 预期 {expected}, 实际 {actual}"
+    return True, ""
+
+
+check("TC-S01", "_is_empty_result 方法存在且空字符串判定正确",
+      test_s_markers()[0], detail=test_s_markers()[1])
+check("TC-S03", "[工具执行失败] 前缀判定正确",
+      test_s_markers()[0], detail="")
+check("TC-S04", "未检索到相关数据标记判定正确",
+      test_s_markers()[0], detail="")
+check("TC-S12", "正常结果不被误判为空",
+      test_s_markers()[0], detail="")
+
+# ========== TC-N 系列: NameError 修复验证 ==========
+print("\n--- TC-N: _generate_forced_answer 传参修复 ---")
+
+
+def test_n_signature():
+    """验证 _generate_forced_answer 签名包含 reasoning_chain"""
+    if not _AGENT_AVAILABLE:
+        return False, "Agent 模块未实现"
+
+    import inspect
+    from agent_core import ReActAgent
+    sig = inspect.signature(ReActAgent._generate_forced_answer)
+    params = list(sig.parameters.keys())
+    return 'reasoning_chain' in params, f"参数列表: {params}"
+
+
+check("TC-N01", "_generate_forced_answer 签名包含 reasoning_chain 参数",
+      test_n_signature()[0], detail=test_n_signature()[1])
+
+# ========== TC-V 系列: 端到端测试文件引用 ==========
+print("\n--- TC-V: 端到端空结果测试 (运行独立文件) ---")
+print("  [INFO] TC-V01~V03 见 tests/test_agent_boundary_verify.py")
 
 # ============================================================
 # 汇总
