@@ -11,7 +11,7 @@
     "memory": {
         "working_memory_limit": 10,
         "episodic_memory_turns": 5,
-        "enable_long_term": false
+        "enable_long_term": true
     },
     "reflector": {
         "enable_verification": true,

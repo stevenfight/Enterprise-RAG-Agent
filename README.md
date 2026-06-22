@@ -1,7 +1,7 @@
 # 企业知识库智能问答系统 (RAG-Agent)
 
 > **当前状态**: RAG-Agent 智能体架构开发完成。管道模式 (Streamlit + FastAPI) 和 Agent 模式 (ReAct + 工具调用 + 自我反思) 均可用。
-> 开发进度: 64/64 项任务 (100%), TDD 179 GREEN / 0 RED (100%)。
+> 开发进度: 72/72 项任务 (100%), TDD 187 GREEN / 0 RED (100%)。
 
 > 基于 RAG 技术的企业年报智能 Agent 系统，从管道 RAG 进化而来，支持 ReAct 自主推理 + 工具调用。
 > 原始 RAG 项目：[enterprise-rag-financial-reports](https://github.com/stevenfight/enterprise-rag-financial-reports)
@@ -10,6 +10,19 @@
 [![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.x-green)](https://fastapi.tiangolo.com/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-red)](https://streamlit.io/)
+
+---
+
+> **项目定位**：RAG+Agent 混合架构的 POC（概念验证）完整实现，重点展示检索链路的精度优化与 Agent 工具编排的工程化设计。
+
+## 生产环境部署须知
+
+本项目已完成核心链路验证，若需上线生产环境，建议重点关注以下两点：
+
+1. **向量库替换**：当前采用 FAISS（内存索引）保障轻量化快速迭代；生产环境若数据量超 10 万级，可替换为 Milvus/Qdrant。向量检索已封装为独立类 `VectorRetriever`，替换时只需重写该类，上层 `HybridRetriever` 和 `RAGGenerator` 无需变更。
+2. **数值可靠性**：当前通过**正则抽取 + 多源文档交叉比对**双重校验杜绝数字幻觉，若业务对数值精度有极致要求，可叠加 SQL 二次校验层作为第三道防线。
+
+> **设计原则**：所有技术选型均为 POC 阶段的"最优取舍"，非永久性架构缺陷。代码已做模块化解耦，替换底层组件无需重构业务逻辑。
 
 ---
 
@@ -25,7 +38,7 @@
 - **指令细分化 Prompt**：针对 financial_data / trend / comparison / business_analysis 设计专用 Prompt
 - **双界面**：Streamlit Web 界面 + FastAPI REST API
 - **Agent 智能体模式**：ReAct 自主推理 + 5 个工具调用 + 自我反思修正 (NEW)
-- **三层记忆系统**：工作记忆 / 情景记忆 / 长期记忆，支持多轮追问 (NEW)
+- **三层记忆系统**：工作记忆 / 情景记忆 / 长期记忆，跨会话 JSON 文件持久化，支持多轮追问 (NEW)
 - **企业级内存保护**：会话隔离 + 容量上限 + 存储截断，防 OOM (NEW)
 - **并发安全**：8 场景验证，会话隔离架构保证线程安全 (NEW)
 - **空结果安全阀**：三层防护机制（空结果检测 + 计数器 + 强制降级），防止 LLM 在连续空检索时陷入无效循环 (NEW)
@@ -97,10 +110,11 @@
 │   └── 系统设计决策记录.md          # 关键技术约束与架构决策
 ├── openspec/                 # SDD 规范驱动开发文档
 │   └── changes/
+│       ├── long-term-memory-persistence/  # 第六轮迭代：长期记忆 JSON 持久化
 │       ├── react-empty-result-safety/  # 第五轮迭代：空结果安全阀（三层防护 + NameError 修复）
 │       ├── rag-to-agent/            # 第四轮迭代：Agent 智能体架构
 │       ├── model-upgrade/    # 第一轮迭代：模型升级
-│       └── quality-robustness-enhancement/  # 第二轮迭代：健壮性增强
+│       └── quality-robustness-enhancement/  # 第二~三轮迭代：健壮性增强
 ├── snippets/                 # 独立工具代码片段
 │   ├── small_to_big_chunker.py       # Small-to-Big 分块算法演示
 │   └── coverage_guarantee.py         # 覆盖率保障逻辑
@@ -242,11 +256,12 @@ curl -X POST http://localhost:8000/api/query \
 
 | 迭代 | 变更 ID | 核心内容 |
 |------|---------|---------|
-| 第五轮 | react-empty-result-safety | 空结果安全阀：三层防护机制（_is_empty_result 检测 + empty_result_count 计数器 + forced_stop 强制降级）、修复 _generate_forced_answer NameError、26 项边界测试覆盖 |
-| 第四轮 | rag-to-agent | Agent 智能体架构（ReAct 推理循环 + 5 工具系统 + 三层记忆 + 反思验证）、企业级内存保护、并发安全（8 场景）、全量回归测试（135 PASS） |
 | 第一轮 | model-upgrade | 模型升级 (Embedding v3 / gte-rerank-v2 / qwen-max)、检索权重自适应、指令细分化 Prompt |
 | 第二轮 | quality-robustness-enhancement | 代码去重、API 超时控制、对话记忆、BM25 财经词典、表格文本预处理 |
 | 第三轮 | quality-robustness-enhancement | 对比查询优化（候选截断保护、营收数据保底）、查询改写上下文注入、检索日志增强 |
+| 第四轮 | rag-to-agent | Agent 智能体架构（ReAct 推理循环 + 5 工具系统 + 三层记忆 + 反思验证）、企业级内存保护、并发安全（8 场景）、全量回归测试（135 PASS） |
+| 第五轮 | react-empty-result-safety | 空结果安全阀：三层防护机制（_is_empty_result 检测 + empty_result_count 计数器 + forced_stop 强制降级）、修复 _generate_forced_answer NameError、26 项边界测试覆盖 |
+| 第六轮 | long-term-memory-persistence | 长期记忆 JSON 文件持久化：每 session 独立 JSON 文件，情景记忆同步写入磁盘，进程重启后可恢复历史上下文，27 项测试全量通过 |
 
 详见 openspec/changes/ 目录下的各轮迭代设计文档
 

@@ -5,13 +5,17 @@ Agent 记忆系统
 实现三层记忆架构：
   工作记忆 (Working Memory)  - 当前任务的 Thought/Action/Observation 序列
   情景记忆 (Episodic Memory) - 已完成会话的摘要
-  长期记忆 (Long Term Memory) - 公司知识、术语定义（可选启用的静态字典）
+  长期记忆 (Long Term Memory) - 公司知识 + 跨会话持久化（JSON 文件）
 
 对应 SDD: openspec/changes/rag-to-agent/specs/spec-memory.md
+         openspec/changes/long-term-memory-persistence/specs/spec-persistence.md
 """
 
+import json
 import logging
+import os
 import sys
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("agent_memory")
@@ -35,6 +39,8 @@ class AgentMemory:
         working_memory_limit: 工作记忆最大步数（默认 10）
         episodic_memory_turns: 情景记忆保留轮数（默认 5）
         enable_long_term: 是否启用长期记忆（默认 False）
+        session_id: session 标识，非空时启用 JSON 持久化
+        persist_dir: JSON 持久化文件目录
     """
 
     def __init__(
@@ -42,6 +48,8 @@ class AgentMemory:
         working_memory_limit: int = 10,
         episodic_memory_turns: int = 5,
         enable_long_term: bool = False,
+        session_id: str = "",
+        persist_dir: str = "data/long_term_memory",
     ):
         """初始化记忆系统
 
@@ -49,6 +57,8 @@ class AgentMemory:
             working_memory_limit: 工作记忆保留的最大步数
             episodic_memory_turns: 情景记忆保留的对话轮数
             enable_long_term: 是否启用长期记忆
+            session_id: session 标识（如 Streamlit session_id），非空时启用 JSON 持久化
+            persist_dir: JSON 持久化文件的存储目录
         """
         self.working_memory: List[Dict[str, Any]] = []
         self.episodic_memory: List[Dict[str, str]] = []
@@ -57,14 +67,19 @@ class AgentMemory:
         self.working_memory_limit = working_memory_limit
         self.episodic_memory_turns = episodic_memory_turns
         self.enable_long_term = enable_long_term
+        self.session_id = session_id
+        self.persist_dir = persist_dir
 
         logger.info("[AgentMemory] 初始化记忆系统: working_limit=%d, episodic_limit=%d, long_term=%s",
                     working_memory_limit, episodic_memory_turns, enable_long_term)
 
         if self.enable_long_term:
             self._init_long_term_memory()
-            logger.info("[AgentMemory] 长期记忆已初始化，共 %d 个分类",
+            logger.info("[AgentMemory] 长期记忆知识库已初始化，共 %d 个分类",
                         len(self.long_term_memory))
+            # 从 JSON 文件加载历史情景记忆
+            if self.session_id:
+                self._load_persisted()
 
     # ============================================================
     # 工作记忆 (Working Memory)
@@ -153,6 +168,7 @@ class AgentMemory:
             "answer_preview": final_answer[:100] + ("..." if len(final_answer) > 100 else ""),
             "steps_count": str(len(self.working_memory)),
             "tools_used": ", ".join(tools_used) if tools_used else "无",
+            "timestamp": datetime.now().isoformat(),
         }
         self.episodic_memory.append(summary)
 
@@ -163,6 +179,9 @@ class AgentMemory:
         while len(self.episodic_memory) > self.episodic_memory_turns:
             removed = self.episodic_memory.pop(0)
             logger.info("[AgentMemory] 情景记忆淘汰: 移除 '%s'", removed["query"][:30])
+
+        # 持久化到 JSON 文件
+        self._save_persisted()
 
     def get_episodic_context(self, max_turns: int = 3) -> str:
         """获取情景记忆的格式化上下文
@@ -224,6 +243,62 @@ class AgentMemory:
             }
         }
         logger.info("[AgentMemory] 长期记忆知识库加载完成")
+
+    def _save_persisted(self) -> None:
+        """将情景记忆全量写入 JSON 持久化文件
+
+        仅在 enable_long_term=True 且 session_id 非空时执行。
+        写入格式: [{timestamp, query, answer_preview, steps_count, tools_used}, ...]
+        """
+        if not self.enable_long_term or not self.session_id:
+            return
+
+        os.makedirs(self.persist_dir, exist_ok=True)
+        filepath = os.path.join(self.persist_dir, f"{self.session_id}.json")
+
+        data = []
+        for ep in self.episodic_memory:
+            item = {
+                "timestamp": ep.get("timestamp", datetime.now().isoformat()),
+                "query": ep["query"],
+                "answer_preview": ep["answer_preview"],
+                "steps_count": ep["steps_count"],
+                "tools_used": ep["tools_used"],
+            }
+            data.append(item)
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+        logger.info("[AgentMemory] 持久化写入: %s, %d 轮", filepath, len(data))
+
+    def _load_persisted(self) -> None:
+        """从 JSON 持久化文件加载情景记忆
+
+        仅在 enable_long_term=True 且 session_id 非空时执行。
+        加载最近 episodic_memory_turns 轮摘要。
+        """
+        if not self.enable_long_term or not self.session_id:
+            return
+
+        filepath = os.path.join(self.persist_dir, f"{self.session_id}.json")
+        if not os.path.exists(filepath):
+            logger.info("[AgentMemory] 持久化文件不存在，从空列表开始: %s", filepath)
+            return
+
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            # 只加载最近 episodic_memory_turns 轮
+            recent = data[-self.episodic_memory_turns:] if len(data) > self.episodic_memory_turns else data
+            self.episodic_memory = recent
+
+            logger.info("[AgentMemory] 持久化加载: %s, 共 %d 轮, 加载 %d 轮",
+                        filepath, len(data), len(recent))
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning("[AgentMemory] 持久化文件损坏或无法读取: %s, 错误: %s", filepath, e)
+            self.episodic_memory = []
 
     # ============================================================
     # 对话摘要（供 Agent System Prompt 使用）

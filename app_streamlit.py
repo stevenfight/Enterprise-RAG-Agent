@@ -9,6 +9,7 @@ import json
 import logging
 import sys
 import time
+import uuid
 from pathlib import Path
 
 import streamlit as st
@@ -71,6 +72,8 @@ def init_session_state():
         st.session_state.agent = None
     if "agent_registry" not in st.session_state:
         st.session_state.agent_registry = None
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
 
 
 def load_components():
@@ -112,7 +115,10 @@ def _init_agent_mode():
     st.session_state.agent_registry = registry
     st.session_state.agent = ReActAgent(
         tool_registry=registry,
-        memory=AgentMemory(),
+        memory=AgentMemory(
+            enable_long_term=True,
+            session_id=st.session_state.session_id,
+        ),
         max_steps=5,
         temperature=0.3,
         model="qwen-max",
