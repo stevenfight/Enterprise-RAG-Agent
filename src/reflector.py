@@ -83,7 +83,7 @@ class AnswerReflector:
         enable_verification: bool = True,
         enable_hallucination_check: bool = True,
         auto_correct: bool = True,
-        hallucination_threshold: float = 0.7,
+        hallucination_threshold: float = 0.05,
     ):
         """
         Args:

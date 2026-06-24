@@ -25,6 +25,10 @@ tiktoken
 numpy
 matplotlib
 
+# PDF 解析
+PyMuPDF
+mineru
+
 # 配置与环境变量
 python-dotenv
 

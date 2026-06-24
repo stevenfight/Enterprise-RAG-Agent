@@ -111,4 +111,4 @@ Reflector SHALL 输出结构化的验证结果，供 API 和界面使用。
 | enable_verification | true | 是否启用答案验证 |
 | enable_hallucination_check | true | 是否启用幻觉检测 |
 | auto_correct | true | 是否自动修正 |
-| hallucination_threshold | 0.7 | 幻觉检测置信度阈值 |
+| hallucination_threshold | 0.05 | 幻觉检测置信度阈值 |

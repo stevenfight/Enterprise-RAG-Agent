@@ -1,0 +1,417 @@
+{
+  "description": "反射器 50 组测试数据 — 覆盖幻觉检测、无幻觉、来源完整性、自动修正、关闭修正六大场景",
+  "hallucination_threshold": 0.05,
+  "categories": {
+    "hallucination_detection": "幻觉检测 — 数据与来源不一致，应判定为幻觉",
+    "no_hallucination": "无幻觉 — 数据与来源一致，应判定为非幻觉",
+    "source_completeness_high": "来源完整性 >= 0.9 — 绝大部分数据点有来源",
+    "source_completeness_partial": "来源完整性 < 1.0 — 部分数据点无来源",
+    "auto_correct_enabled": "auto_correct=True — 自动替换幻觉值",
+    "auto_correct_disabled": "auto_correct=False — 仅追加警告，不替换"
+  },
+  "test_cases": [
+    {
+      "id": "H-01",
+      "category": "hallucination_detection",
+      "answer": "中芯国际2024年营收为1500亿元",
+      "sources": [{"text": "营业收入1250.38亿元"}],
+      "expected": {"has_hallucination": true, "hallucination_count": 1},
+      "description": "1500 vs 1250.38 — 误差20%，应判幻觉"
+    },
+    {
+      "id": "H-02",
+      "category": "hallucination_detection",
+      "answer": "中国移动净利润为2000亿元",
+      "sources": [{"text": "归属于母公司股东的净利润为1384亿元"}],
+      "expected": {"has_hallucination": true, "hallucination_count": 1},
+      "description": "2000 vs 1384 — 误差44.5%，明显幻觉"
+    },
+    {
+      "id": "H-03",
+      "category": "hallucination_detection",
+      "answer": "中国电信营收3000亿元",
+      "sources": [{"text": "营业收入3950.14亿元"}],
+      "expected": {"has_hallucination": true, "hallucination_count": 1},
+      "description": "3000 vs 3950.14 — 误差24%，应判幻觉"
+    },
+    {
+      "id": "H-04",
+      "category": "hallucination_detection",
+      "answer": "中芯国际营收578亿，净利润120亿",
+      "sources": [{"text": "营收578.21亿元，净利润36.99亿元"}],
+      "expected": {"has_hallucination": true, "hallucination_count": 1},
+      "description": "两个数据点，净利润120 vs 36.99差值大，营收578 vs 578.21接近"
+    },
+    {
+      "id": "H-05",
+      "category": "hallucination_detection",
+      "answer": "毛利率为60%",
+      "sources": [{"text": "毛利率23.5%"}],
+      "expected": {"has_hallucination": true, "hallucination_count": 1},
+      "description": "60 vs 23.5 — 误差远超5%，判幻觉"
+    },
+    {
+      "id": "H-06",
+      "category": "hallucination_detection",
+      "answer": "总资产约为5000亿元",
+      "sources": [{"text": "资产总计2543.21亿元"}],
+      "expected": {"has_hallucination": true, "hallucination_count": 1},
+      "description": "5000 vs 2543.21 — 误差96.5%，明显幻觉"
+    },
+    {
+      "id": "H-07",
+      "category": "hallucination_detection",
+      "answer": "中国联通营收800亿元",
+      "sources": [{"text": "营业收入3725.96亿元"}],
+      "expected": {"has_hallucination": true, "hallucination_count": 1},
+      "description": "800 vs 3725.96 — 跨数量级错误"
+    },
+    {
+      "id": "H-08",
+      "category": "hallucination_detection",
+      "answer": "营收同比增长100%",
+      "sources": [{"text": "同比增长17.48%"}],
+      "expected": {"has_hallucination": true, "hallucination_count": 1},
+      "description": "100 vs 17.48 — 增速幻觉"
+    },
+    {
+      "id": "H-09",
+      "category": "hallucination_detection",
+      "answer": "净利润30亿元",
+      "sources": [{"text": "净利润36.99亿元"}],
+      "expected": {"has_hallucination": true, "hallucination_count": 1},
+      "description": "30 vs 36.99 — 误差18.9%，超5%"
+    },
+    {
+      "id": "H-10",
+      "category": "hallucination_detection",
+      "answer": "研发投入50亿元",
+      "sources": [{"text": "研发投入82.4亿元"}],
+      "expected": {"has_hallucination": true, "hallucination_count": 1},
+      "description": "50 vs 82.4 — 误差39.3%"
+    },
+    {
+      "id": "H-11",
+      "category": "hallucination_detection",
+      "answer": "员工人数约80000人",
+      "sources": [{"text": "在职员工合计58293人"}],
+      "expected": {"has_hallucination": true, "hallucination_count": 1},
+      "description": "80000 vs 58293 — 误差37.2%"
+    },
+    {
+      "id": "H-12",
+      "category": "hallucination_detection",
+      "answer": "每股收益0.5元",
+      "sources": [{"text": "基本每股收益0.38元"}],
+      "expected": {"has_hallucination": true, "hallucination_count": 1},
+      "description": "0.5 vs 0.38 — 误差31.6%"
+    },
+    {
+      "id": "N-01",
+      "category": "no_hallucination",
+      "answer": "中芯国际2024年营收为578.21亿元",
+      "sources": [{"text": "营业收入578.21亿元"}],
+      "expected": {"has_hallucination": false, "hallucination_count": 0},
+      "description": "578.21 vs 578.21 — 完全一致"
+    },
+    {
+      "id": "N-02",
+      "category": "no_hallucination",
+      "answer": "中国移动净利润1384亿元",
+      "sources": [{"text": "归属于母公司股东的净利润为1384亿元"}],
+      "expected": {"has_hallucination": false, "hallucination_count": 0},
+      "description": "1384 vs 1384 — 完全一致"
+    },
+    {
+      "id": "N-03",
+      "category": "no_hallucination",
+      "answer": "毛利率23.5%",
+      "sources": [{"text": "毛利率23.5%"}],
+      "expected": {"has_hallucination": false, "hallucination_count": 0},
+      "description": "23.5 vs 23.5 — 完全一致"
+    },
+    {
+      "id": "N-04",
+      "category": "no_hallucination",
+      "answer": "营收约1250亿元",
+      "sources": [{"text": "营业收入1250.38亿元"}],
+      "expected": {"has_hallucination": false, "hallucination_count": 0},
+      "description": "1250 vs 1250.38 — 误差0.03%，在5%内"
+    },
+    {
+      "id": "N-05",
+      "category": "no_hallucination",
+      "answer": "中国电信营收3950亿元",
+      "sources": [{"text": "营业收入3950.14亿元"}],
+      "expected": {"has_hallucination": false, "hallucination_count": 0},
+      "description": "3950 vs 3950.14 — 误差0.004%，在5%内"
+    },
+    {
+      "id": "N-06",
+      "category": "no_hallucination",
+      "answer": "研发投入82.4亿元，同比增长20%",
+      "sources": [{"text": "研发投入82.4亿元，同比增长20.2%"}],
+      "expected": {"has_hallucination": false, "hallucination_count": 0},
+      "description": "两个数据点都在5%容差内"
+    },
+    {
+      "id": "N-07",
+      "category": "no_hallucination",
+      "answer": "净利润36.99亿元",
+      "sources": [{"text": "净利润约为37亿元"}],
+      "expected": {"has_hallucination": false, "hallucination_count": 0},
+      "description": "36.99 vs 37 — 误差0.03%，在5%内"
+    },
+    {
+      "id": "N-08",
+      "category": "no_hallucination",
+      "answer": "总资产2543亿元",
+      "sources": [{"text": "资产总计2543.21亿元"}],
+      "expected": {"has_hallucination": false, "hallucination_count": 0},
+      "description": "2543 vs 2543.21 — 误差0.008%，在5%内"
+    },
+    {
+      "id": "S-01",
+      "category": "source_completeness_high",
+      "answer": "中芯国际营收578.21亿元，净利润36.99亿元，总资产1000亿元",
+      "sources": [{"text": "营业收入578.21亿元，净利润36.99亿元，总资产1023.5亿元"}],
+      "expected": {"source_completeness": 0.9, "completeness_min": 0.9},
+      "description": "3个数据点全部有来源，评分1.0"
+    },
+    {
+      "id": "S-02",
+      "category": "source_completeness_high",
+      "answer": "营收3950亿元，净利润250亿元",
+      "sources": [{"text": "营业收入3950.14亿元，净利润248.6亿元"}],
+      "expected": {"source_completeness": 0.9, "completeness_min": 0.9},
+      "description": "2个数据点都有来源，评分1.0"
+    },
+    {
+      "id": "S-03",
+      "category": "source_completeness_high",
+      "answer": "营收578亿，净利37亿，毛利率23.5%",
+      "sources": [{"text": "营收578.21亿元，净利36.99亿元，毛利率23.5%"}],
+      "expected": {"source_completeness": 0.9, "completeness_min": 0.9},
+      "description": "3个数据点全部有来源"
+    },
+    {
+      "id": "S-04",
+      "category": "source_completeness_high",
+      "answer": "中国移动营收1250亿，净利润1384亿",
+      "sources": [{"text": "营业收入1250.38亿元，归母净利润1384亿元"}],
+      "expected": {"source_completeness": 0.9, "completeness_min": 0.9},
+      "description": "2对2全匹配"
+    },
+    {
+      "id": "S-05",
+      "category": "source_completeness_high",
+      "answer": "每股收益0.38，ROE为15.2%，总资产2543亿",
+      "sources": [{"text": "基本每股收益0.38元，ROE15.2%，资产总计2543.21亿"}],
+      "expected": {"source_completeness": 0.9, "completeness_min": 0.9},
+      "description": "3个指标全部有来源"
+    },
+    {
+      "id": "S-06",
+      "category": "source_completeness_high",
+      "answer": "营收578亿，增长17.5%，净利37亿，研发82亿",
+      "sources": [{"text": "营收578.21亿，同比增17.48%，净利36.99亿，研发82.4亿"}],
+      "expected": {"source_completeness": 0.9, "completeness_min": 0.9},
+      "description": "4个数据点都在5%容差内"
+    },
+    {
+      "id": "S-07",
+      "category": "source_completeness_high",
+      "answer": "现金流净额-50亿，总负债800亿",
+      "sources": [{"text": "经营活动现金流净额-52.3亿，负债合计823.1亿"}],
+      "expected": {"source_completeness": 0.9, "completeness_min": 0.9},
+      "description": "包含负数测试"
+    },
+    {
+      "id": "S-08",
+      "category": "source_completeness_high",
+      "answer": "中国联通营收3726亿，净利润90亿",
+      "sources": [{"text": "营业收入3725.96亿元，净利润90.3亿元"}],
+      "expected": {"source_completeness": 0.9, "completeness_min": 0.9},
+      "description": "2个数据点全有来源"
+    },
+    {
+      "id": "S-09",
+      "category": "source_completeness_high",
+      "answer": "营收1250亿，净利1384亿，员工58293人",
+      "sources": [{"text": "营收1250.38亿，净利1384亿，员工58293"}],
+      "expected": {"source_completeness": 0.9, "completeness_min": 0.9},
+      "description": "3个数据点全部匹配"
+    },
+    {
+      "id": "S-10",
+      "category": "source_completeness_high",
+      "answer": "中芯国际营收578亿和中国移动营收1250亿",
+      "sources": [
+        {"text": "中芯国际营业收入578.21亿元"},
+        {"text": "中国移动营业收入1250.38亿元"}
+      ],
+      "expected": {"source_completeness": 0.9, "completeness_min": 0.9},
+      "description": "跨来源多数据点匹配"
+    },
+    {
+      "id": "SP-01",
+      "category": "source_completeness_partial",
+      "answer": "中芯国际营收578亿，净利润120亿",
+      "sources": [{"text": "营业收入578.21亿元"}],
+      "expected": {"source_completeness": 1.0, "completeness_max": 1.0},
+      "description": "2个数据点，只有1个有来源 — 评分0.5"
+    },
+    {
+      "id": "SP-02",
+      "category": "source_completeness_partial",
+      "answer": "营收3950亿，净利润250亿，毛利率30%，总资产5000亿",
+      "sources": [{"text": "营业收入3950.14亿元，净利润248.6亿元"}],
+      "expected": {"source_completeness": 1.0, "completeness_max": 1.0},
+      "description": "4个数据点，只有2个有来源 — 评分0.5"
+    },
+    {
+      "id": "SP-03",
+      "category": "source_completeness_partial",
+      "answer": "营收578亿，毛利23.5%，研发82亿，市占率15%",
+      "sources": [{"text": "营收578.21亿元，毛利23.5%"}],
+      "expected": {"source_completeness": 1.0, "completeness_max": 1.0},
+      "description": "4个数据点，2个有来源 — 评分0.5"
+    },
+    {
+      "id": "SP-04",
+      "category": "source_completeness_partial",
+      "answer": "营收1250亿，净利1384亿，用户数10亿，ARPU值50元",
+      "sources": [{"text": "营收1250.38亿，净利1384亿"}],
+      "expected": {"source_completeness": 1.0, "completeness_max": 1.0},
+      "description": "4个数据点，只有2个有来源"
+    },
+    {
+      "id": "SP-05",
+      "category": "source_completeness_partial",
+      "answer": "营收3726亿，净利90亿，负债率60%，现金流-50亿",
+      "sources": [{"text": "营收3725.96亿"}],
+      "expected": {"source_completeness": 1.0, "completeness_max": 1.0},
+      "description": "4个数据点，仅1个有来源 — 评分0.25"
+    },
+    {
+      "id": "SP-06",
+      "category": "source_completeness_partial",
+      "answer": "公司经营状况良好，营收稳步增长",
+      "sources": [{"text": "营业收入578.21亿元"}],
+      "expected": {"source_completeness": 1.0, "completeness_max": 1.0},
+      "description": "定性陈述无数字 — 应标记valid=None而非幻觉"
+    },
+    {
+      "id": "AC-01",
+      "category": "auto_correct_enabled",
+      "answer": "中芯国际2024年营收1500亿元",
+      "sources": [{"text": "营业收入1250.38亿元"}],
+      "expected": {"has_hallucination": true, "auto_correct": true, "corrected_contains": "1250.38"},
+      "description": "1500 → 自动替换为1250.38"
+    },
+    {
+      "id": "AC-02",
+      "category": "auto_correct_enabled",
+      "answer": "中国移动净利润2000亿元",
+      "sources": [{"text": "归母净利润1384亿元"}],
+      "expected": {"has_hallucination": true, "auto_correct": true, "corrected_contains": "1384"},
+      "description": "2000 → 自动替换为1384"
+    },
+    {
+      "id": "AC-03",
+      "category": "auto_correct_enabled",
+      "answer": "中国电信营收3000亿",
+      "sources": [{"text": "营业收入3950.14亿元"}],
+      "expected": {"has_hallucination": true, "auto_correct": true, "corrected_contains": "3950.14"},
+      "description": "3000 → 自动替换为3950.14"
+    },
+    {
+      "id": "AC-04",
+      "category": "auto_correct_enabled",
+      "answer": "毛利率60%",
+      "sources": [{"text": "毛利率23.5%"}],
+      "expected": {"has_hallucination": true, "auto_correct": true, "corrected_contains": "23.5"},
+      "description": "60 → 自动替换为23.5"
+    },
+    {
+      "id": "AC-05",
+      "category": "auto_correct_enabled",
+      "answer": "研发投入50亿，员工80000人",
+      "sources": [{"text": "研发投入82.4亿，在职员工58293人"}],
+      "expected": {"has_hallucination": true, "auto_correct": true, "corrected_contains": "82.4"},
+      "description": "两个幻觉数字都应被替换"
+    },
+    {
+      "id": "AC-06",
+      "category": "auto_correct_enabled",
+      "answer": "总资产5000亿元",
+      "sources": [{"text": "资产总计2543.21亿元"}],
+      "expected": {"has_hallucination": true, "auto_correct": true, "corrected_contains": "2543.21"},
+      "description": "5000 → 自动替换为2543.21"
+    },
+    {
+      "id": "AC-07",
+      "category": "auto_correct_enabled",
+      "answer": "净利润30亿",
+      "sources": [{"text": "净利润36.99亿元"}],
+      "expected": {"has_hallucination": true, "auto_correct": true, "corrected_contains": "36.99"},
+      "description": "30 → 替换为36.99"
+    },
+    {
+      "id": "AC-08",
+      "category": "auto_correct_enabled",
+      "answer": "每股收益0.5元",
+      "sources": [{"text": "基本每股收益0.38元"}],
+      "expected": {"has_hallucination": true, "auto_correct": true, "corrected_contains": "0.38"},
+      "description": "0.5 → 替换为0.38"
+    },
+    {
+      "id": "NA-01",
+      "category": "auto_correct_disabled",
+      "answer": "中芯国际2024年营收1500亿元",
+      "sources": [{"text": "营业收入1250.38亿元"}],
+      "expected": {"has_hallucination": true, "auto_correct": false, "corrected_answer_empty": true},
+      "description": "检测到幻觉但不替换，答案保持1500"
+    },
+    {
+      "id": "NA-02",
+      "category": "auto_correct_disabled",
+      "answer": "净利润2000亿元",
+      "sources": [{"text": "归母净利润1384亿元"}],
+      "expected": {"has_hallucination": true, "auto_correct": false, "corrected_answer_empty": true},
+      "description": "检测到幻觉但仅追加警告"
+    },
+    {
+      "id": "NA-03",
+      "category": "auto_correct_disabled",
+      "answer": "毛利率60%",
+      "sources": [{"text": "毛利率23.5%"}],
+      "expected": {"has_hallucination": true, "auto_correct": false, "corrected_answer_empty": true},
+      "description": "检测到幻觉但仅警告，不改答案"
+    },
+    {
+      "id": "NA-04",
+      "category": "auto_correct_disabled",
+      "answer": "总资产5000亿元，员工80000人",
+      "sources": [{"text": "资产总计2543.21亿元，员工58293人"}],
+      "expected": {"has_hallucination": true, "auto_correct": false, "corrected_answer_empty": true},
+      "description": "两个幻觉数字都检测到但不替换"
+    },
+    {
+      "id": "NA-05",
+      "category": "auto_correct_disabled",
+      "answer": "中国联通营收800亿",
+      "sources": [{"text": "营业收入3725.96亿元"}],
+      "expected": {"has_hallucination": true, "auto_correct": false, "corrected_answer_empty": true},
+      "description": "跨数量级幻觉但仅警告"
+    },
+    {
+      "id": "NA-06",
+      "category": "auto_correct_disabled",
+      "answer": "营收增长100%",
+      "sources": [{"text": "同比增长17.48%"}],
+      "expected": {"has_hallucination": true, "auto_correct": false, "corrected_answer_empty": true},
+      "description": "增速幻觉但仅警告不替换"
+    }
+  ]
+}

@@ -100,4 +100,66 @@ registry.register(ChartTool())
 registry.register(VerifyTool())
 print("  5工具 + reflector 模块共存正常")
 
+print("\n10. 阈值边界测试（0.05 边界）")
+print("-" * 40)
+
+# 以 1000 为基准，精确计算边界值
+BASE = 1000.0
+MARGIN_049 = 1049.0  # 误差 = 49/1000 = 0.049
+MARGIN_050 = 1050.0  # 误差 = 50/1000 = 0.050
+MARGIN_051 = 1051.0  # 误差 = 51/1000 = 0.051
+
+# 10.1 边界内（0.049）
+result = r.verify(
+    answer="营收为%.2f亿元" % MARGIN_049,
+    sources=[{"text": "营收%.2f亿元" % BASE}],
+)
+detail = result.details[0]
+assert not detail["is_hallucination"], \
+    "0.049 误差应判定为非幻觉，实际 best_distance=%.4f" % detail.get("best_distance", -1)
+print("  [PASS] 0.049 边界内 → 非幻觉 (best_distance=%.4f)" % detail.get("best_distance", 0))
+
+# 10.2 边界上（0.050）
+result = r.verify(
+    answer="营收为%.2f亿元" % MARGIN_050,
+    sources=[{"text": "营收%.2f亿元" % BASE}],
+)
+detail = result.details[0]
+assert not detail["is_hallucination"], \
+    "0.050 边界上应判定为非幻觉，实际 best_distance=%.4f" % detail.get("best_distance", -1)
+print("  [PASS] 0.050 边界上 → 非幻觉 (best_distance=%.4f)" % detail.get("best_distance", 0))
+
+# 10.3 边界外（0.051）
+result = r.verify(
+    answer="营收为%.2f亿元" % MARGIN_051,
+    sources=[{"text": "营收%.2f亿元" % BASE}],
+)
+detail = result.details[0]
+assert detail["is_hallucination"], \
+    "0.051 误差应判定为幻觉，实际 best_distance=%.4f" % detail.get("best_distance", -1)
+print("  [PASS] 0.051 边界外 → 幻觉 (best_distance=%.4f)" % detail.get("best_distance", 0))
+
+# 10.4 单位换算（千元 vs 亿元）
+result = r.verify(
+    answer="营收为1250.38亿元",
+    sources=[{"text": "营业收入125038000千元"}],
+)
+detail = result.details[0]
+assert not detail["is_hallucination"], \
+    "单位换算应通过，实际 best_distance=%.4f" % detail.get("best_distance", -1)
+print("  [PASS] 125038000千元 vs 1250.38亿元 → 非幻觉 (best_distance=%.4f)" % detail.get("best_distance", 0))
+
+# 10.5 跨数量级幻觉（10倍）
+result = r.verify(
+    answer="营收为12503.8亿元",
+    sources=[{"text": "营业收入1250.38亿元"}],
+)
+detail = result.details[0]
+assert detail["is_hallucination"], \
+    "10倍误差应判定为幻觉，实际 best_distance=%.4f" % detail.get("best_distance", -1)
+print("  [PASS] 12503.8 vs 1250.38（10倍）→ 幻觉 (best_distance=%.4f)" % detail.get("best_distance", 0))
+
+print("-" * 40)
+print("  5/5 边界测试全部通过")
+
 print("\n全部验证完成")

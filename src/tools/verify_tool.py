@@ -42,12 +42,17 @@ if not logger.handlers:
 # 数值匹配容差 (相对误差)
 TOLERANCE = 0.05
 
-# 匹配时单位换算系数
+# 量级单位换算系数（按从大到小排列，避免正则匹配冲突）
 UNIT_MULTIPLIERS = {
+    "十亿": 1e9,
     "亿": 1e8,
+    "百万": 1e6,
     "万": 1e4,
     "千": 1e3,
 }
+
+# 货币后缀（不影响数值换算，仅用于跨币种匹配时判定不可比）
+CURRENCY_SUFFIXES = {"美元", "港元", "欧元", "日元", "人民币"}
 
 # 置信度阈值
 HIGH_CONFIDENCE = 0.9
@@ -62,7 +67,8 @@ class VerifyTool(BaseTool):
 
     验证规则:
       - 提取 claim 和 source_text 中的数字
-      - 考虑单位换算（亿/万）
+      - 考虑量级单位换算（十亿/亿/百万/万/千）
+      - 识别货币后缀（美元/港元/欧元/日元/人民币），跨币种时标记警告
       - 相对误差 ≤ 5% 视为匹配
       - 多重验证来源时加权置信度
     """
@@ -142,10 +148,10 @@ class VerifyTool(BaseTool):
 
         logger.info("[VerifyTool] claim 提取到 %d 个数值: %s",
                      len(claim_numbers),
-                     [(n["value"], n["unit"]) for n in claim_numbers])
+                     [(n["value"], n["unit"], n.get("currency", "")) for n in claim_numbers])
         logger.info("[VerifyTool] source 提取到 %d 个数值: %s",
                      len(source_numbers),
-                     [(n["value"], n["unit"]) for n in source_numbers])
+                     [(n["value"], n["unit"], n.get("currency", "")) for n in source_numbers])
 
         # ---- 无来源数值 ----
         if not source_numbers:
@@ -182,9 +188,10 @@ class VerifyTool(BaseTool):
             claim_val = cn["value"]
             claim_unit = cn["unit"]
             claim_str = cn["raw"]
+            claim_currency = cn.get("currency", "")
 
-            logger.info("[VerifyTool] 比对声明值: raw='%s', value=%.4f, unit='%s'",
-                         claim_str, claim_val, claim_unit)
+            logger.info("[VerifyTool] 比对声明值: raw='%s', value=%.4f, unit='%s', currency='%s'",
+                         claim_str, claim_val, claim_unit, claim_currency)
 
             best_match = None
             best_distance = float("inf")
@@ -193,6 +200,7 @@ class VerifyTool(BaseTool):
                 source_val = sn["value"]
                 source_unit = sn["unit"]
                 source_str = sn["raw"]
+                source_currency = sn.get("currency", "")
 
                 # 统一单位后比较
                 claim_scaled = self._scale_to_unit(claim_val, claim_unit, source_unit)
@@ -203,9 +211,10 @@ class VerifyTool(BaseTool):
                 else:
                     relative_error = float("inf")
 
-                logger.info("[VerifyTool]   比源: value=%.4f, unit='%s', 统一后claim=%.4f, "
-                             "distance=%.4f, rel_err=%.4f",
-                             source_val, source_unit, claim_scaled, distance, relative_error)
+                logger.info("[VerifyTool]   比源: value=%.4f, unit='%s', currency='%s', "
+                             "统一后claim=%.4f, distance=%.4f, rel_err=%.4f",
+                             source_val, source_unit, source_currency,
+                             claim_scaled, distance, relative_error)
 
                 if relative_error < best_distance:
                     best_distance = relative_error
@@ -213,24 +222,40 @@ class VerifyTool(BaseTool):
                         "source_raw": source_str,
                         "source_value": source_val,
                         "source_unit": source_unit,
+                        "source_currency": source_currency,
                         "relative_error": round(relative_error, 4),
                     }
 
+            # 跨币种检测：声明和来源货币不同时标记警告
+            cross_currency_warning = ""
+            if claim_currency and best_match:
+                src_currency = best_match.get("source_currency", "")
+                if src_currency and claim_currency != src_currency:
+                    cross_currency_warning = " (警告: 币种不同，claim=%s, source=%s)" % (
+                        claim_currency, src_currency
+                    )
+                    logger.warning("[VerifyTool]   跨币种: claim=%s, source=%s",
+                                   claim_currency, src_currency)
+
             if best_match is not None and best_match["relative_error"] <= TOLERANCE:
-                detail = "匹配: claim='%s' vs source='%s' (误差=%.2f%%)" % (
+                detail = "匹配: claim='%s' vs source='%s' (误差=%.2f%%)%s" % (
                     claim_str,
                     best_match["source_raw"],
                     best_match["relative_error"] * 100,
+                    cross_currency_warning,
                 )
                 matched_count += 1
                 logger.info("[VerifyTool]   [OK] 匹配: %s", detail)
             else:
                 if best_match is not None:
-                    detail = "不匹配: claim='%s' (%.4f%s), 最接近 source='%s' (%.4f%s), 误差=%.2f%%" % (
+                    detail = "不匹配: claim='%s' (%.4f%s%s), 最接近 source='%s' (%.4f%s%s), 误差=%.2f%%%s" % (
                         claim_str, claim_val, claim_unit,
+                        ("(%s)" % claim_currency) if claim_currency else "",
                         best_match["source_raw"], best_match["source_value"],
                         best_match["source_unit"],
+                        ("(%s)" % best_match.get("source_currency", "")) if best_match.get("source_currency", "") else "",
                         best_match["relative_error"] * 100,
+                        cross_currency_warning,
                     )
                 else:
                     detail = "不匹配: claim='%s', 来源中无任何数值可比对" % claim_str
@@ -290,25 +315,33 @@ class VerifyTool(BaseTool):
 
         支持的格式:
           - 纯数字: 1250, 578.21
-          - 带单位: 1250亿元, 578.21万元, 1,384亿元
-          - 带宽单位: 1250亿, 578万
+          - 量级单位: 1250亿元, 500百万, 3.5十亿, 578.21万, 1,384千
+          - 货币后缀: 1250亿美元, 300万港元, 500百万欧元
+          - 纯货币: 500美元, 1000港元（量级单位=个，货币=美元）
 
         Args:
             text: 原始文本
 
         Returns:
-            数值列表，每项包含 value(float), unit(str), raw(str)
+            数值列表，每项包含 value(float), unit(str), currency(str), raw(str)
         """
         results = []
 
-        # 匹配模式: 数字 + 可选单位(亿/万/千)
-        pattern = r"([\d,，]+\.?[\d]*)\s*([亿万千]?)"
+        # 量级单位按长到短排列，确保"十亿"优先于"亿"匹配
+        magnitude_units = "|".join(
+            sorted(UNIT_MULTIPLIERS.keys(), key=lambda x: -len(x))
+        )
+        currency_units = "|".join(sorted(CURRENCY_SUFFIXES, key=lambda x: -len(x)))
+
+        # 匹配模式: 数字 + 可选量级单位(十亿/百万/亿/万/千) + 可选货币后缀
+        pattern = r"([\d,，]+\.?[\d]*)\s*(%s)?\s*(%s)?" % (magnitude_units, currency_units)
         matches = re.finditer(pattern, text)
 
         for m in matches:
             raw = m.group(0).strip()
             num_str = m.group(1).replace(",", "").replace("，", "")
-            unit = m.group(2) if m.group(2) else "个"
+            magnitude_unit = m.group(2) if m.group(2) else "个"
+            currency = m.group(3) if m.group(3) else ""
 
             # 跳过孤立的小数点或明显非数值
             if num_str in (".", ",", "，", ""):
@@ -319,8 +352,8 @@ class VerifyTool(BaseTool):
                 logger.debug("[VerifyTool] 跳过无法解析的数字: '%s'", num_str)
                 continue
 
-            # 跳过四年份 (1900-2099) 且单位为空/个
-            if unit in ("个", "") and 1900 <= value <= 2099 and value == int(value):
+            # 跳过四年份 (1900-2099) 且无量级单位
+            if magnitude_unit == "个" and 1900 <= value <= 2099 and value == int(value):
                 continue
 
             # 跳过过于小或过于大的异常值（可能是页码或股票代码）
@@ -329,7 +362,8 @@ class VerifyTool(BaseTool):
 
             results.append({
                 "value": value,
-                "unit": unit,
+                "unit": magnitude_unit,
+                "currency": currency,
                 "raw": raw,
             })
 

@@ -88,21 +88,35 @@
 │   ├── bm25_expansions.json  # BM25 查询扩展词典
 │   └── financial_dict.txt    # BM25 财经自定义词典
 ├── tests/
-│   ├── test_e2e_agent.py      # 端到端集成测试 (NEW)
-│   ├── test_agent_core.py     # Agent 核心循环测试 (NEW)
-│   ├── test_agent_tools.py    # 工具集测试 (NEW)
-│   ├── test_agent_memory.py   # 三层记忆系统测试 (NEW)
-│   ├── test_reflector.py      # 反思验证测试 (NEW)
-│   ├── run_all.py             # 全量测试一键脚本 (NEW)
-│   ├── test_memory_leak_fixes.py    # 内存泄漏修复测试 (NEW)
-│   ├── test_memory_isolation_demo.py  # 会话隔离验证测试 (NEW)
-│   ├── test_agent_memory_multiturn.py # 多轮追问测试 (NEW)
-│   ├── test_agent_memory_interrupt.py # 中断恢复测试 (NEW)
-│   ├── test_agent_memory_concurrent.py # 并发安全测试 (NEW)
-│   ├── test_boundary_checklist.py     # 边界测试 (NEW)
+│   ├── test_e2e_agent.py              # 端到端集成测试
+│   ├── test_agent_core.py             # Agent 核心循环测试
+│   ├── test_agent_tools.py            # 工具集测试
+│   ├── test_agent_memory.py           # 三层记忆系统测试
+│   ├── test_reflector.py              # 反思验证测试
+│   ├── run_all.py                     # 全量测试一键脚本
+│   ├── test_memory_leak_fixes.py      # 内存泄漏修复测试
+│   ├── test_memory_isolation_demo.py  # 会话隔离验证测试
+│   ├── test_agent_memory_multiturn.py # 多轮追问测试
+│   ├── test_agent_memory_interrupt.py # 中断恢复测试
+│   ├── test_agent_memory_concurrent.py # 并发安全测试
+│   ├── test_boundary_checklist.py     # 边界测试
+│   ├── test_agent_boundary_verify.py  # Agent 边界验证测试
+│   ├── test_agent_mock_boundary.py    # Mock 边界测试
+│   ├── test_agent_logging_verify.py   # 日志验证测试
+│   ├── test_integration_web_logging.py # Web 日志集成测试
+│   ├── test_planner_quick.py          # 规划器快速测试
+│   ├── test_reflector_quick.py        # 反思快速测试
+│   ├── test_retrieve_tool_quick.py    # 检索工具快速测试
+│   ├── test_calculator_tool_quick.py  # 计算器工具快速测试
+│   ├── test_compare_tool_quick.py     # 对比工具快速测试
+│   ├── test_chart_tool_quick.py       # 图表工具快速测试
+│   ├── test_verify_tool_quick.py      # 验证工具快速测试
+│   ├── mock_agent_test.py             # Mock Agent 测试
+│   ├── demo_agent_memory.py           # 记忆演示脚本
 │   ├── test_document_integration.py   # 企业文档接入测试
 │   ├── tdd_all_optimizations.py       # 全量管道回归测试
-│   └── integration_test.py            # 集成测试
+│   ├── integration_test.py            # 集成测试
+│   └── README.md                      # 测试说明文档
 ├── docs/                     # 项目文档
 │   ├── 快速上手指南_新开发者.md      # 新开发者入门，含架构详解、调试排错
 │   ├── 企业文档接入开发指南.md      # 新增/修改/删除企业文档的完整操作指南
@@ -118,14 +132,21 @@
 ├── snippets/                 # 独立工具代码片段
 │   ├── small_to_big_chunker.py       # Small-to-Big 分块算法演示
 │   └── coverage_guarantee.py         # 覆盖率保障逻辑
+├── diagram/                  # 架构图和可视化图表
+│   ├── agent-architecture/   # Agent 架构图
+│   ├── fallback-comparison/  # 降级策略对比图
+│   └── memory-leak-fix-comparison/  # 内存优化对比图
+├── data/
+│   ├── charts/               # 生成的图表文件 (PNG)
+│   └── stock_data/databases/
+│       ├── chunked_reports/  # 分块数据 (12 份 JSON)
+│       └── vector_dbs/       # 向量数据库 (按公司分库)
+│           ├── 中芯国际/
+│           ├── 中国移动/
+│           ├── 中国联通/
+│           └── 中国电信/
 ├── env                       # 环境变量配置模板（复制为 .env 后填入密钥）
-├── data/stock_data/databases/
-│   ├── chunked_reports/      # 分块数据 (12 份 JSON)
-│   └── vector_dbs/           # 向量数据库 (按公司分库)
-│       ├── 中芯国际/
-│       ├── 中国移动/
-│       ├── 中国联通/
-│       └── 中国电信/
+├── CHANGELOG.md              # 版本变更日志
 ```
 
 ## 快速开始
@@ -275,3 +296,7 @@ curl -X POST http://localhost:8000/api/query \
 | [系统设计决策记录](docs/系统设计决策记录.md) | 关键技术约束与架构决策 |
 
 > 更多技术博客文章（避坑指南、架构优化、测试报告等）见 _local/blog/ 文件夹，同步发布至知乎专栏
+
+## 更新日志
+
+详见 [CHANGELOG.md](CHANGELOG.md) 了解版本迭代历史。

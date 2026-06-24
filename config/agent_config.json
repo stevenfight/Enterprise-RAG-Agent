@@ -17,7 +17,7 @@
         "enable_verification": true,
         "enable_hallucination_check": true,
         "auto_correct": true,
-        "hallucination_threshold": 0.7
+        "hallucination_threshold": 0.05
     },
     "tools": [
         "retrieve_tool",

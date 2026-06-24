@@ -32,7 +32,7 @@ TEST_STATUS = {
     "TC-R08": "GREEN",    # test_auto_correct_disabled
     "TC-R01-ext": "GREEN",  # 幻觉检测逻辑验证: 不匹配
     "TC-R02-ext": "GREEN",  # 幻觉检测逻辑验证: 匹配
-    "TC-R-config": "GREEN", # Reflector spec hallucination_threshold=0.7
+    "TC-R-config": "GREEN", # Reflector spec hallucination_threshold=0.05
 }
 
 passed = 0
@@ -238,7 +238,18 @@ claim_test = "营收为1500亿元"
 source_test = "营业收入1250.38亿元"
 claim_nums = extract_number(claim_test)
 source_nums = extract_number(source_test)
+print(f"  [日志] 从 claim 提取数值: {claim_nums}")
+print(f"  [日志] 从 source 提取数值: {source_nums}")
+
+# 逐对打印差异，方便排查失败原因
+for c in claim_nums:
+    for s in source_nums:
+        diff = abs(c - s)
+        rel_err = diff / s if s != 0 else float('inf')
+        print(f"  [日志] |{c} - {s}| = {diff:.2f}, 相对误差 = {rel_err:.4f}")
+
 match = any(abs(c - s) < 0.01 for c in claim_nums for s in source_nums)
+print(f"  [日志] 阈值 0.01 下匹配结果: {match}")
 
 check("TC-R01-ext", "幻觉检测逻辑验证: 1500 vs 1250.38 判定不匹配",
       not match, detail="检测到数值1500不在来源1250.38中" if not match else "")
@@ -251,7 +262,7 @@ check("TC-R02-ext", "幻觉检测逻辑验证: 1250.38 vs 1250.38 判定匹配",
       match2, detail="" if match2 else "数值未匹配")
 
 # 配置项验证
-check("TC-R-config", "Reflector spec 定义 hallucination_threshold=0.7",
+check("TC-R-config", "Reflector spec 定义 hallucination_threshold=0.05",
       True, detail="配置项已定义")
 
 

@@ -139,6 +139,11 @@ def _load_agent_config() -> dict:
         "temperature": 0.3,
         "model": "qwen-max",
         "max_retries": 1,
+        # reflector 默认配置
+        "enable_verification": True,
+        "enable_hallucination_check": True,
+        "auto_correct": True,
+        "hallucination_threshold": 0.05,
     }
     config_path = project_root / "config" / "agent_config.json"
     logger.info("[config_loader] 开始加载 Agent 配置 | 路径=%s", config_path)
@@ -154,22 +159,32 @@ def _load_agent_config() -> dict:
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
         agent_cfg = config.get("agent", {})
+        reflector_cfg = config.get("reflector", {})
 
         if not agent_cfg:
             logger.warning("[config_loader] agent 配置节为空 | 使用默认配置")
 
         result = {}
         for key, default_val in default_config.items():
-            val = agent_cfg.get(key, default_val)
+            # reflector 开头的 key 从 reflector 配置节读取
+            if key in ("enable_verification", "enable_hallucination_check",
+                       "auto_correct", "hallucination_threshold"):
+                val = reflector_cfg.get(key, default_val)
+                source = "文件[reflector]" if key in reflector_cfg else "默认"
+            else:
+                val = agent_cfg.get(key, default_val)
+                source = "文件[agent]" if key in agent_cfg else "默认"
             result[key] = val
-            source = "文件" if key in agent_cfg else "默认"
             logger.info("[config_loader] %s=%s | 来源=%s | 默认=%s",
                          key, val, source, default_val)
 
         # 检查是否有未识别的配置项
-        unexpected = set(agent_cfg.keys()) - set(default_config.keys())
-        if unexpected:
-            logger.warning("[config_loader] 未识别的配置项将被忽略 | keys=%s", unexpected)
+        unexpected_agent = set(agent_cfg.keys()) - set(default_config.keys())
+        unexpected_reflector = set(reflector_cfg.keys()) - set(default_config.keys())
+        if unexpected_agent:
+            logger.warning("[config_loader] 未识别的 agent 配置项将被忽略 | keys=%s", unexpected_agent)
+        if unexpected_reflector:
+            logger.warning("[config_loader] 未识别的 reflector 配置项将被忽略 | keys=%s", unexpected_reflector)
 
         logger.info("[config_loader] 配置加载完成 | 有效项=%d/%d",
                      len(result), len(default_config))
@@ -344,11 +359,19 @@ async def lifespan(app: FastAPI):
     logger.info("[api_service] Agent 工具注册完成: %d 个工具", len(agent_registry._tools))
 
     agent_planner = TaskPlanner()
-    agent_reflector = AnswerReflector()
-    logger.info("[api_service] Agent 规划器 + 反思器 初始化完成")
 
     # 从 config 文件加载 Agent 配置参数
     ag_cfg = _load_agent_config()
+
+    agent_reflector = AnswerReflector(
+        enable_verification=ag_cfg["enable_verification"],
+        enable_hallucination_check=ag_cfg["enable_hallucination_check"],
+        auto_correct=ag_cfg["auto_correct"],
+        hallucination_threshold=ag_cfg["hallucination_threshold"],
+    )
+    logger.info("[api_service] Agent 规划器 + 反思器 初始化完成, reflector 配置: %s",
+                {k: ag_cfg[k] for k in ("enable_verification", "enable_hallucination_check",
+                                         "auto_correct", "hallucination_threshold")})
 
     # AgentMemory 不再全局共享，改为每个 conversation_id 独立持有
     # 此处传入一个占位 AgentMemory, 每次请求时切换到对应会话的记忆
