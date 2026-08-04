@@ -149,6 +149,7 @@ class CompareTool(BaseTool):
 
         优先匹配完整句式（如 "营业收入为 1250 亿元"），回退到正则匹配。
         """
+        import re as re_mod
         keywords = self.METRIC_KEYWORDS.get(metric, [metric])
 
         logger.info("[CompareTool] 数值提取开始: metric='%s', 关键词=%s, 候选段数=%d",
@@ -156,33 +157,54 @@ class CompareTool(BaseTool):
 
         for idx, r in enumerate(results):
             text = r.get("parent_text", "")
+            # 清理 HTML 标签以便后续匹配
+            text_clean = re_mod.sub(r'<[^>]*>', '', text)
             snippet_preview = text[:80].replace("\n", " ")
             logger.info("[CompareTool]   候选段 #%d: '%s...'", idx + 1, snippet_preview)
 
-            # 优先匹配完整句式
+            # 优先匹配完整句式（同时检查原始文本和清理后文本）
             for kw in keywords:
                 patterns = [
-                    r"%s[约达为]+\s*[\d,，.]+[\s]*(?:亿[元]?|万[元]?|元[，, ])" % kw,
-                    r"%s[是]?\s*[\d,，.]+[\s]*(?:亿[元]?|万[元]?|元[，, ])" % kw,
+                    r"%s[约达到是为稳健增长，]+\s*(?:人民币\s*)?[\d,，.]+[\s]*(?:亿[元]?|万[元]?|元[，, ])" % kw,
+                    r"%s\s*([\d]{1,3}(?:[,，][\d]{3})*(?:\.[\d]+)?)" % kw,
                     r"[\d,，.]+\s*(?:亿[元]?)\s*[，,].*%s" % kw,
                 ]
                 for pattern_idx, p in enumerate(patterns):
-                    match = re.search(p, text)
+                    # 先在清理后文本中匹配
+                    match = re_mod.search(p, text_clean)
+                    if match:
+                        raw_match = match.group(0).strip()
+                        logger.info("[CompareTool]   数值提取成功(clean): kw='%s', pattern=#%d, match='%s'",
+                                     kw, pattern_idx + 1, raw_match[:60])
+                        return raw_match
+                    # 在原始文本中匹配
+                    match = re_mod.search(p, text)
                     if match:
                         raw_match = match.group(0).strip()
                         logger.info("[CompareTool]   数值提取成功: kw='%s', pattern=#%d, match='%s'",
                                      kw, pattern_idx + 1, raw_match[:60])
                         return raw_match
 
-            # 回退：关键词附近找数字
+            # 回退：关键词附近找数字（从关键词位置向后搜索，避免匹配到前置的其他数字）
             for kw in keywords:
-                idx_kw = text.find(kw)
+                # 优先在清理后的文本中查找
+                idx_kw = text_clean.find(kw)
+                search_text = text_clean
+                if idx_kw < 0:
+                    idx_kw = text.find(kw)
+                    search_text = text
                 if idx_kw >= 0:
-                    snippet = text[max(0, idx_kw - 50): idx_kw + len(kw) + 100]
+                    snippet = search_text[idx_kw: idx_kw + len(kw) + 150]
                     num_match = re.search(r"[\d,，.]+\s*(?:亿[元]?|万[元]?)", snippet)
                     if num_match:
                         raw_match = "%s: %s" % (kw, num_match.group(0))
                         logger.info("[CompareTool]   数值提取(回退): kw='%s', match='%s'", kw, raw_match[:60])
+                        return raw_match
+                    # 次选：无单位数字（HTML 表格中的裸数字，千分位感知匹配）
+                    num_match = re.search(r"[\d]{1,3}(?:[,，][\d]{3})+(?:\.[\d]+)?", snippet)
+                    if num_match:
+                        raw_match = "%s: %s" % (kw, num_match.group(0))
+                        logger.info("[CompareTool]   数值提取(回退-无单位): kw='%s', match='%s'", kw, raw_match[:60])
                         return raw_match
 
         logger.info("[CompareTool]   数值提取失败: 未在 %d 个候选段中找到与 '%s' 匹配的数值",
@@ -253,8 +275,12 @@ class CompareTool(BaseTool):
             return ToolResult(success=False, error=error)
 
         companies = kwargs["companies"]
+        # 容错：LLM 可能把 companies 传为逗号分隔字符串
+        if isinstance(companies, str):
+            companies = [c.strip() for c in companies.split(",") if c.strip()]
+            logger.info("[CompareTool] companies 从字符串转换为列表: %s", companies)
         metric = kwargs["metric"]
-        year = kwargs.get("year", "2024")
+        year = str(kwargs.get("year", "2024"))  # 容错：LLM 可能传 int
         top_n = min(kwargs.get("top_n", 3), 5)
 
         logger.info("[CompareTool] ====== 对比分析开始 ======")

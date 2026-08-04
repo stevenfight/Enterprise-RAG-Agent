@@ -34,3 +34,7 @@ python-dotenv
 
 # 数据校验（FastAPI 已依赖，显式声明确保版本）
 pydantic
+
+# 在线追踪与评测（可选）
+langsmith
+openevals

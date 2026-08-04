@@ -15,7 +15,7 @@ import hashlib
 from pathlib import Path
 from dotenv import load_dotenv
 
-from utils import get_api_key
+from src.utils import get_api_key
 
 
 def scan_pdf_files(pdf_dir):

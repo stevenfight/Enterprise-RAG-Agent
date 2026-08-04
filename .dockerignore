@@ -1,0 +1,68 @@
+# ===== Docker 构建忽略文件 =====
+# 这些文件/目录不会被复制进 Docker 镜像，减小镜像体积
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 虚拟环境
+env/
+venv/
+.venv/
+env.bak/
+
+# Git
+.git/
+.gitignore
+
+# 前端依赖和构建缓存
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 本地文档和临时文件
+_local/
+*.log
+*.tmp
+*.temp
+
+# 敏感文件（通过 docker-compose env_file 注入）
+.env
+.env.local
+.env.*.local
+
+# 测试和调试
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Openspec（文档，不需要打包）
+openspec/
+
+# Markdown 文档
+*.md
+!requirements.txt
+
+# License
+LICENSE
+
+# PDF 大文件（通过 Volume 挂载，不打包进镜像）
+pdf_reports/
+data/stock_data/pdf_reports/
+
+# 向量索引备份
+data/stock_data/databases/vector_dbs_v1_backup/

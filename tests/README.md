@@ -64,7 +64,18 @@ TEST_STATUS = {
 | `test_agent_tools.py` | tools/* (5个工具) | 12 | 12 GREEN / 0 RED |
 | `test_agent_memory.py` | agent_memory.py (三层记忆) | 7 | 7 GREEN / 0 RED |
 | `test_reflector.py` | reflector.py (反思验证) | 11 | 11 GREEN / 0 RED |
-| **合计** | | **40** | **全部 GREEN** |
+| **合计（后端）** | | **40** | **全部 GREEN** |
+
+### 前端组件测试 (Phase 2 新增)
+
+> 前端测试位于 `frontend/src/components/*/__tests__/`，使用 Vitest + React Testing Library + jsdom。
+
+| 文件 | 对应模块 | 用例数 | 当前状态 |
+|------|---------|:-----:|:------:|
+| `charts/__tests__/ChartContainer.test.tsx` | ChartContainer (ECharts 交互图表) | 22 | 22 GREEN |
+| `chat/__tests__/ThoughtChainDrawer.test.tsx` | ThoughtChainDrawer (思维链抽屉) | 17 | 17 GREEN |
+| `dag/__tests__/DagFlow.test.tsx` | DagFlow (DAG 流程图) | 8 | 8 GREEN |
+| **合计（前端）** | | **47** | **全部 GREEN** |
 
 详细用例清单见: `openspec/changes/rag-to-agent/specs/test-cases.md`
 
@@ -84,4 +95,8 @@ python tests/test_reflector.py        # 11 用例，当前: 全部 GREEN
 
 # 一键运行所有 Agent 测试 (Windows PowerShell)
 python tests/test_agent_tools.py; python tests/test_agent_core.py; python tests/test_agent_memory.py; python tests/test_reflector.py
+
+# 前端组件测试
+cd frontend && npm test               # 47 用例，当前: 全部 GREEN
+cd frontend && npm run test:watch     # 监视模式
 ```

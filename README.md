@@ -1,7 +1,7 @@
 # 企业知识库智能问答系统 (RAG-Agent)
 
-> **当前状态**: RAG-Agent 智能体架构开发完成。管道模式 (Streamlit + FastAPI) 和 Agent 模式 (ReAct + 工具调用 + 自我反思) 均可用。
-> 开发进度: 72/72 项任务 (100%), TDD 187 GREEN / 0 RED (100%)。
+> **当前状态**: RAG-Agent 智能体架构开发完成 + 现代化前端 (Phase 2 已完成) + Docker 容器化部署 + API 鉴权安全加固 (v5.1)。管道模式 (Streamlit + FastAPI) 和 Agent 模式 (ReAct + 工具调用 + 自我反思) 均可用。
+> 开发进度: 112/112 SDD 任务 (100%), 后端 179 + 前端 48 = 227 TDD GREEN。
 
 > 基于 RAG 技术的企业年报智能 Agent 系统，从管道 RAG 进化而来，支持 ReAct 自主推理 + 工具调用。
 > 原始 RAG 项目：[enterprise-rag-financial-reports](https://github.com/stevenfight/enterprise-rag-financial-reports)
@@ -37,12 +37,20 @@
 - **对比查询四层保底**：公平分配 + 替换策略 + 保底重新检索 + 营收数据保底补充，解决多公司对比数据缺失问题
 - **指令细分化 Prompt**：针对 financial_data / trend / comparison / business_analysis 设计专用 Prompt
 - **双界面**：Streamlit Web 界面 + FastAPI REST API
-- **Agent 智能体模式**：ReAct 自主推理 + 5 个工具调用 + 自我反思修正 (NEW)
-- **三层记忆系统**：工作记忆 / 情景记忆 / 长期记忆，跨会话 JSON 文件持久化，支持多轮追问 (NEW)
-- **企业级内存保护**：会话隔离 + 容量上限 + 存储截断，防 OOM (NEW)
-- **并发安全**：8 场景验证，会话隔离架构保证线程安全 (NEW)
-- **空结果安全阀**：三层防护机制（空结果检测 + 计数器 + 强制降级），防止 LLM 在连续空检索时陷入无效循环 (NEW)
-- **双轨验证**：保留管道模式作为对照组，同批查询同时跑管道与 Agent 对比答案质量，已发现数值幻觉、容量淘汰、任务拆解不完整等 3 个 Agent 推理链缺陷 (NEW)
+- **Agent 智能体模式**：ReAct 自主推理 + 5 个工具调用 + 自我反思修正
+- **三层记忆系统**：工作记忆 / 情景记忆 / 长期记忆，跨会话 JSON 文件持久化，支持多轮追问
+- **企业级内存保护**：会话隔离 + 容量上限 + 存储截断，防 OOM
+- **并发安全**：8 场景验证，会话隔离架构保证线程安全
+- **空结果安全阀**：三层防护机制（空结果检测 + 计数器 + 强制降级），防止 LLM 在连续空检索时陷入无效循环
+- **双轨验证**：保留管道模式作为对照组，同批查询同时跑管道与 Agent 对比答案质量
+- **现代化前端界面**：React 18 + Ant Design 5 独立前端，支持对话首页、会话管理、主题切换
+- **SSE 流式思维链**：Agent 推理过程实时流式传输，侧边抽屉时间线样式展示 Think → Act → Observe 循环
+- **交互式 ECharts 图表**：替换静态 PNG，支持柱状图/折线图/饼图、Tooltip、图例
+- **DAG 任务规划看板**：@antv/g6 v5 可视化 Planner 子任务依赖关系图，支持缩放/拖拽
+- **LangSmith 在线追踪**：ReAct Agent 全链路追踪（11 个节点），未配置 API Key 时自动降级
+- **OpenEvals 离线评测**：LLM-as-Judge 三维度评分（Correctness / Groundedness / Relevance），10 条评测用例
+- **API 鉴权安全**：全端点 API Key 校验 + max_steps 硬上限 + 错误信息脱敏 (v5.1)
+- **Docker 容器化**：前后端双容器编排，docker-compose 一键部署
 
 ## 技术栈
 
@@ -57,12 +65,22 @@
 | 生成 | DashScope Qwen-Max |
 | 意图识别 | DashScope Qwen-Plus |
 | 后端 | FastAPI + Uvicorn |
-| 前端 | Streamlit |
+| 前端(主) | React 18 + Ant Design 5 + ECharts + @antv/g6 (Phase 2 已完成) |
+| 前端(备) | Streamlit |
 
 ## 项目结构
 
 ```
-├── app_streamlit.py          # Streamlit 界面入口 (管道 + Agent)
+├── app_streamlit.py          # Streamlit 界面入口 (管道 + Agent, 备用)
+│   ├── frontend/     # 现代化前端（React + Ant Design, Phase 2 已完成）
+│   │   ├── src/
+│   │   │   ├── components/chat/   # 对话组件（MessageBubble, ThoughtChainDrawer）
+│   │   │   ├── components/charts/ # ECharts 交互图表容器
+│   │   │   ├── components/dag/    # @antv/g6 DAG 流程图组件
+│   │   │   ├── pages/             # ChatPage, ChartsPage, DagBoardPage
+│   │   │   ├── services/          # API 对接（SSE 流式 + REST）
+│   │   │   └── stores/            # Zustand 状态管理
+│   │   └── package.json
 ├── src/
 │   ├── api_service.py        # FastAPI REST API (管道 + Agent 端点)
 │   ├── pdf_mineru.py         # PDF 解析 (MinerU API)
@@ -116,6 +134,11 @@
 │   ├── test_document_integration.py   # 企业文档接入测试
 │   ├── tdd_all_optimizations.py       # 全量管道回归测试
 │   ├── integration_test.py            # 集成测试
+│   ├── eval_langsmith.py              # LangSmith 在线评测脚本 (v5.0)
+│   ├── eval_openevals.py              # OpenEvals 离线评测脚本 (v5.0)
+│   ├── eval_datasets/                 # 评测数据集 (v5.0)
+│   │   ├── generation_queries.json    # 生成评测（10 条用例）
+│   │   └── retrieval_queries.json     # 检索评测
 │   └── README.md                      # 测试说明文档
 ├── docs/                     # 项目文档
 │   ├── 快速上手指南_新开发者.md      # 新开发者入门，含架构详解、调试排错
@@ -124,11 +147,12 @@
 │   └── 系统设计决策记录.md          # 关键技术约束与架构决策
 ├── openspec/                 # SDD 规范驱动开发文档
 │   └── changes/
-│       ├── long-term-memory-persistence/  # 第六轮迭代：长期记忆 JSON 持久化
-│       ├── react-empty-result-safety/  # 第五轮迭代：空结果安全阀（三层防护 + NameError 修复）
-│       ├── rag-to-agent/            # 第四轮迭代：Agent 智能体架构
-│       ├── model-upgrade/    # 第一轮迭代：模型升级
-│       └── quality-robustness-enhancement/  # 第二~三轮迭代：健壮性增强
+│       ├── modern-ui/                       # 第六~七轮迭代：现代化前端界面（Phase 1 + Phase 2）
+│       ├── long-term-memory-persistence/    # 第五轮迭代：长期记忆 JSON 持久化
+│       ├── react-empty-result-safety/       # 第四轮迭代：空结果安全阀
+│       ├── rag-to-agent/                    # 第三轮迭代：Agent 智能体架构
+│       ├── quality-robustness-enhancement/  # 第二轮迭代：健壮性增强
+│       └── model-upgrade/                   # 第一轮迭代：模型升级
 ├── snippets/                 # 独立工具代码片段
 │   ├── small_to_big_chunker.py       # Small-to-Big 分块算法演示
 │   └── coverage_guarantee.py         # 覆盖率保障逻辑
@@ -183,12 +207,17 @@ python src/ingestion.py --company 中芯国际 --rebuild
 
 ### 4. 启动服务
 
-**Streamlit 界面**：
+**React 前端（推荐）**：
+```bash
+cd frontend && npm install && npm run dev
+```
+打开 http://localhost:5173，侧边栏开启 **Agent 深度推理** 即可使用 ReAct 推理。
+关闭开关自动降级为管道模式。SSE 流式传输展示完整推理过程。
+
+**Streamlit 界面（备用）**：
 ```bash
 streamlit run app_streamlit.py
 ```
-打开后，在侧边栏打开 **Agent 推理模式** 开关即可使用 ReAct 自主推理。
-如果关闭此开关，系统自动降级为管道模式。
 
 **FastAPI 接口**：
 ```bash
@@ -206,20 +235,32 @@ curl http://localhost:8000/api/health
 # Agent 智能体查询 (推荐)
 curl -X POST http://localhost:8000/api/agent/query \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{"query": "中芯国际2024年营收是多少？", "max_steps": 3}'
-
+```bash
 # 完整问答
 curl -X POST http://localhost:8000/api/query \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{"query": "中国移动2024年营收是多少？"}'
-
+```bash
 # 仅检索
 curl -X POST http://localhost:8000/api/retrieve \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{"query": "中国移动2024年营收"}'
 
 # 公司列表
 curl http://localhost:8000/api/companies
+
+# SSE 流式 Agent 推理 (Phase 2 新增)
+curl -N "http://localhost:8000/api/agent/stream?query=中国移动2024年营收&max_steps=5"
+
+# 图表列表 (Phase 2 新增)
+curl http://localhost:8000/api/charts/list
+
+# Agent 任务规划 (Phase 2 新增)
+curl "http://localhost:8000/api/agent/plan?query=对比三大运营商2024年营收"
 ```
 
 ## 性能指标
@@ -234,7 +275,7 @@ curl http://localhost:8000/api/companies
 | 支持公司数 | 4 家 (中芯国际/中国移动/中国联通/中国电信) |
 | 对比查询覆盖率 | 95%+ (四层保底机制) |
 | 查询改写准确率 | 多轮指代消解成功率 > 90% |
-| 回归测试通过率 | 135 PASS, 0 FAIL (100%) |
+| 回归测试通过率 | 179/179 PASS (后端), 48/48 PASS (前端), 227/227 总计 (100%) |
 
 ## 核心架构
 
@@ -265,11 +306,13 @@ curl http://localhost:8000/api/companies
 # Agent 智能体查询
 curl -X POST http://localhost:8000/api/agent/query \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{"query": "中芯国际2024年营收和净利润是多少？", "conversation_id": "session-1"}'
-
+```bash
 # 管道模式查询 (降级方案)
 curl -X POST http://localhost:8000/api/query \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{"query": "中国移动2024年营收是多少？"}'
 ```
 
@@ -278,11 +321,15 @@ curl -X POST http://localhost:8000/api/query \
 | 迭代 | 变更 ID | 核心内容 |
 |------|---------|---------|
 | 第一轮 | model-upgrade | 模型升级 (Embedding v3 / gte-rerank-v2 / qwen-max)、检索权重自适应、指令细分化 Prompt |
-| 第二轮 | quality-robustness-enhancement | 代码去重、API 超时控制、对话记忆、BM25 财经词典、表格文本预处理 |
-| 第三轮 | quality-robustness-enhancement | 对比查询优化（候选截断保护、营收数据保底）、查询改写上下文注入、检索日志增强 |
-| 第四轮 | rag-to-agent | Agent 智能体架构（ReAct 推理循环 + 5 工具系统 + 三层记忆 + 反思验证）、企业级内存保护、并发安全（8 场景）、全量回归测试（135 PASS） |
-| 第五轮 | react-empty-result-safety | 空结果安全阀：三层防护机制（_is_empty_result 检测 + empty_result_count 计数器 + forced_stop 强制降级）、修复 _generate_forced_answer NameError、26 项边界测试覆盖 |
-| 第六轮 | long-term-memory-persistence | 长期记忆 JSON 文件持久化：每 session 独立 JSON 文件，情景记忆同步写入磁盘，进程重启后可恢复历史上下文，27 项测试全量通过 |
+| 第二轮 | quality-robustness-enhancement | 代码去重、API 超时控制、对话记忆、BM25 财经词典、表格预处理、对比查询四层保底、查询改写注入 |
+| 第三轮 | rag-to-agent | Agent 智能体架构（ReAct 推理循环 + 5 工具系统 + 三层记忆 + 反思验证）、企业级内存保护、并发安全（8 场景）、全量回归测试（135 PASS） |
+| 第四轮 | react-empty-result-safety | 空结果安全阀：三层防护机制（_is_empty_result 检测 + empty_result_count 计数器 + forced_stop 强制降级）、修复 _generate_forced_answer NameError、26 项边界测试覆盖 |
+| 第五轮 | long-term-memory-persistence | 长期记忆 JSON 文件持久化：每 session 独立 JSON 文件，情景记忆同步写入磁盘，进程重启后可恢复历史上下文，27 项测试全量通过 |
+| 第六轮 | modern-ui (Phase 1) | 现代化前端基础界面：React 18 + Ant Design 5 + Vite 独立前端，对话首页、会话管理、主题切换、API 对接层，48 条前端 TDD 测试 |
+| 第七轮 | modern-ui (Phase 2) | Agent 可视化 + 交互图表：SSE 流式思维链抽屉、ECharts 交互图表（替换静态 PNG）、@antv/g6 DAG 任务规划看板、chart_tool 同步输出 JSON，47 条前端 TDD 测试 |
+| 第八轮 | docker-containerization | Docker 容器化部署 |
+| 第九轮 | langsmith-openevals-integration | LangSmith 在线追踪（11 节点）+ OpenEvals 离线评测（10 条用例，通过率 80%）+ Prompt 规则迭代优化 |
+| 第十轮 | p0-critical-fixes | 5 个 P0 关键缺陷修复：empty_result_count 归零 Bug + run_stream 推理链 + memory 配置生效 + per-request Agent 并发安全 + API 鉴权中间件 (v5.1)|
 
 详见 openspec/changes/ 目录下的各轮迭代设计文档
 

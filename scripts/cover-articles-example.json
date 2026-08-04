@@ -1,0 +1,36 @@
+[
+  {
+    "number": "11",
+    "series": "工程实践系列",
+    "title": "部署全链路：从演练 Bug 到 Docker 容器化",
+    "main_title": "部署全链路",
+    "subtitle": "从演练 Bug 到 Docker 容器化",
+    "card1_line1": "部署演练",
+    "card1_line2": "发现真实 Bug",
+    "card2_line1": "179/179",
+    "card2_line2": "测试全绿",
+    "card3_line1": "Docker",
+    "card3_line2": "容器化部署",
+    "card4_line1": "交付验收",
+    "card4_line2": "Checklist",
+    "footer": "《企业级 RAG Agent 实战》知乎专栏 · 工程实践系列",
+    "slug": "deployment"
+  },
+  {
+    "number": "12",
+    "series": "工程实践系列",
+    "title": "API 鉴权与安全加固实战",
+    "main_title": "API 鉴权与安全",
+    "subtitle": "从零构建企业级 API 安全体系",
+    "card1_line1": "API Key",
+    "card1_line2": "鉴权中间件",
+    "card2_line1": "并发安全",
+    "card2_line2": "per-request 隔离",
+    "card3_line1": "max_steps",
+    "card3_line2": "硬上限截断",
+    "card4_line1": "错误脱敏",
+    "card4_line2": "信息保护",
+    "footer": "《企业级 RAG Agent 实战》知乎专栏 · 工程实践系列",
+    "slug": "api-auth"
+  }
+]

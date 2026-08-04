@@ -1,0 +1,44 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "backend": "cd .. && python -m uvicorn src.api_service:app --host 0.0.0.0 --port 8000 --log-level info",
+    "start": "powershell -Command \"Start-Process powershell -ArgumentList '-NoExit', '-Command', 'cd ..; python -m uvicorn src.api_service:app --host 0.0.0.0 --port 8000 --log-level info' ; Start-Process powershell -ArgumentList '-NoExit', '-Command', 'cd frontend; npm run dev'\""
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.2.5",
+    "@antv/g6": "^5.1.1",
+    "antd": "^6.4.5",
+    "axios": "^1.18.1",
+    "dayjs": "^1.11.21",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.0.6",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.18.0",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.9",
+    "jsdom": "^29.1.1",
+    "oxlint": "^1.69.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.9"
+  }
+}

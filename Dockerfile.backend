@@ -1,0 +1,45 @@
+# ===== 后端 FastAPI 服务 Docker 镜像 =====
+# 基于 Python 3.11 官方精简镜像
+
+FROM python:3.11-slim
+
+# 设置工作目录（容器内所有操作在此目录执行）
+WORKDIR /app
+
+# ----- 系统依赖安装 -----
+# faiss-cpu 需要 C++ 编译器和数学库
+# 先换国内 Debian 镜像源，避免 deb.debian.org 网络超时
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        libopenblas-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# ----- Python 依赖安装 -----
+# 先单独复制 requirements.txt，利用 Docker 层缓存：
+# 只要 requirements.txt 不变，pip install 就不会重新执行
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    -r requirements.txt
+
+# ----- 项目代码复制 -----
+# 复制所有业务代码和配置（.dockerignore 会自动排除不需要的文件）
+COPY src/ ./src/
+COPY config/ ./config/
+COPY app_streamlit.py .
+
+# ----- 创建数据目录挂载点 -----
+# 实际数据通过 docker-compose volume 从宿主机挂载进来
+RUN mkdir -p /app/data/stock_data/databases/vector_dbs \
+    && mkdir -p /app/data/charts
+
+# ----- 暴露端口 -----
+# 8000 = FastAPI 服务端口
+EXPOSE 8000
+
+# ----- 启动命令 -----
+# --host 0.0.0.0 让容器外可以访问
+CMD ["python", "-m", "uvicorn", "src.api_service:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]

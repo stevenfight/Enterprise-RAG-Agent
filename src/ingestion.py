@@ -28,9 +28,9 @@ import faiss
 import numpy as np
 import tiktoken
 
-from utils import get_api_key
+from src.utils import get_api_key
 
-from retrieval import preprocess_table_text
+from .retrieval import preprocess_table_text
 
 ENCODING = tiktoken.get_encoding("cl100k_base")
 MAX_INPUT_TOKENS = 2048

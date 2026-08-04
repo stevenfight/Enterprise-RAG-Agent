@@ -1,0 +1,293 @@
+/* -*- coding: utf-8 -*- */
+/**
+ * 全局样式 - 马卡龙配色 + 玻璃拟态
+ * 企业级财务年报分析智能 RAG-Agent 前端
+ */
+
+/* 基础重置 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  font-family: 'Source Han Sans CN', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100%;
+}
+
+/* ============================================================
+   自定义滚动条 - 马卡龙风格
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #D4C5E9, #B8A9C9);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #C4B5D9, #A898B9);
+}
+
+/* 财务数字等宽字体 */
+.mono {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas',
+    monospace;
+}
+
+/* 消息气泡滚动区域 */
+.chat-scroll-area {
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+/* ============================================================
+   玻璃拟态工具类
+   ============================================================ */
+
+/* 亮色玻璃拟态 */
+.glass-light {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 24px rgba(184, 169, 201, 0.1);
+}
+
+/* 暗色玻璃拟态 */
+.glass-dark {
+  background: rgba(37, 34, 54, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+}
+
+/* 马卡龙渐变背景 */
+.macaron-bg {
+  background: linear-gradient(135deg, #FBF7F2 0%, #F5EEF8 50%, #F0F5F8 100%);
+}
+
+/* 侧边栏渐变背景 */
+.sidebar-gradient-light {
+  background: linear-gradient(180deg, #FFF9F5 0%, #F8F4FA 50%, #F5F8FA 100%);
+}
+
+/* 卡片悬浮效果 */
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(184, 169, 201, 0.15);
+}
+
+/* ============================================================
+   动画关键帧
+   ============================================================ */
+
+/* 加载骨架屏动画 - 马卡龙色系 */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #F0EBF5 25%,
+    #E8E3EF 50%,
+    #F0EBF5 75%
+  );
+  background-size: 200px 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* 柔和脉冲效果 */
+@keyframes macaron-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(184, 169, 201, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(184, 169, 201, 0);
+  }
+}
+
+.macaron-pulse {
+  animation: macaron-pulse 2s ease-in-out infinite;
+}
+
+/* 渐入动画 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 渐变流动动画 */
+@keyframes gradientFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.gradient-flow {
+  background-size: 200% 200%;
+  animation: gradientFlow 4s ease infinite;
+}
+
+/* ============================================================
+   代码块样式
+   ============================================================ */
+pre {
+  margin: 8px 0 !important;
+  border-radius: 10px !important;
+  font-size: 13px !important;
+}
+
+code {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace !important;
+  font-size: 13px !important;
+}
+
+/* ============================================================
+   Markdown 表格样式 - 马卡龙适配
+   ============================================================ */
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 13px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid #E8E3EF;
+  padding: 8px 14px;
+  text-align: left;
+}
+
+.markdown-body th {
+  background: linear-gradient(180deg, #F8F4FA, #F0EBF5);
+  font-weight: 600;
+  color: #3D3554;
+}
+
+.markdown-body tr:hover {
+  background-color: rgba(184, 169, 201, 0.06);
+}
+
+/* 图片样式 */
+.markdown-body img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 8px 0;
+  box-shadow: rgba(184, 169, 201, 0.2) 0px 2px 8px;
+}
+
+/* 链接样式 */
+.markdown-body a {
+  color: #5BAA98;
+  text-decoration: underline;
+}
+
+/* ============================================================
+   侧边栏折叠过渡
+   ============================================================ */
+.sider-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================
+   Ant Design 组件微调
+   ============================================================ */
+
+/* 菜单项圆角增强 */
+.ant-menu-item {
+  border-radius: 10px !important;
+  margin: 2px 8px !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* 按钮过渡增强 */
+.ant-btn {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* 输入框聚焦光影 */
+.ant-input:focus,
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused {
+  box-shadow: 0 0 0 2px rgba(184, 169, 201, 0.2) !important;
+}
+
+/* 卡片圆角 */
+.ant-card {
+  border-radius: 14px !important;
+}
+
+/* 标签圆角 */
+.ant-tag {
+  border-radius: 6px !important;
+}
+
+/* 下拉菜单圆角 */
+.ant-dropdown-menu {
+  border-radius: 12px !important;
+}
+
+/* 弹出层圆角 */
+.ant-popover-inner,
+.ant-tooltip-inner {
+  border-radius: 10px !important;
+}
+
+/* 模态框圆角 */
+.ant-modal-content {
+  border-radius: 16px !important;
+}
+
+/* 消息提示圆角 */
+.ant-message .ant-message-notice-content {
+  border-radius: 12px !important;
+}

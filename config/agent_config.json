@@ -1,7 +1,7 @@
 {
     "_comment": "RAG-Agent 行为配置文件",
     "agent": {
-        "max_steps": 5,
+        "max_steps": 10,
         "llm_timeout": 60,
         "tool_timeout": 30,
         "temperature": 0.3,
@@ -25,5 +25,15 @@
         "compare_tool",
         "chart_tool",
         "verify_tool"
-    ]
+    ],
+    "monitoring": {
+        "enabled": true,
+        "project_name": "financial-rag-agent",
+        "trace_level": "detailed"
+    },
+    "api": {
+        "_comment": "API 鉴权与安全配置",
+        "key": "no-key-needed",
+        "max_steps_hard_limit": 15
+    }
 }

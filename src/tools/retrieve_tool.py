@@ -127,7 +127,7 @@ class RetrieveTool(BaseTool):
             logger.info("[RetrieveTool] 首次调用，延迟加载 HybridRetriever...")
 
             # 延迟导入：避免工具注册时加载重型依赖
-            from retrieval import HybridRetriever
+            from ..retrieval import HybridRetriever
 
             vector_db_dir = self._resolve_vector_db_dir()
             self._retriever = HybridRetriever(vector_db_dir, api_key=self._api_key)

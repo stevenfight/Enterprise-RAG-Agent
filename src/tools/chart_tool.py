@@ -23,9 +23,11 @@ Agent 用法示例:
 对应 TDD: tests/test_agent_tools.py (TC-T08 ~ TC-T09)
 """
 
+import json
 import logging
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -94,7 +96,7 @@ class ChartTool(BaseTool):
     name = "chart"
     description = (
         "生成财务数据可视化图表。支持柱状图(bar)、折线图(line)、饼图(pie)、横向柱状图(hbar)。"
-        "返回生成的 PNG 图片文件路径。"
+        "返回结果中包含 url 字段，请在 Final Answer 中用 Markdown 图片语法 ![标题](url) 展示图表。"
     )
     parameters = {
         "type": "object",
@@ -223,6 +225,22 @@ class ChartTool(BaseTool):
         logger.info("[ChartTool] ====== 图表生成完成 ======")
         logger.info("[ChartTool] 文件: %s (%.1f KB)", filepath.name, filepath.stat().st_size / 1024)
 
+        # 同时输出结构化 JSON 数据文件，供前端 ECharts 交互式渲染
+        chart_data = {
+            "chart_type": chart_type,
+            "title": title,
+            "xlabel": xlabel,
+            "ylabel": ylabel,
+            "data": data,
+            "labels": labels,
+            "values": [round(float(v), 2) for v in values],
+            "file_name": filepath.name,
+            "generated_at": datetime.now().isoformat(),
+        }
+        json_path = filepath.with_suffix(".json")
+        json_path.write_text(json.dumps(chart_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        logger.info("[ChartTool] JSON 数据文件: %s", json_path.name)
+
         return ToolResult(
             success=True,
             data={
@@ -232,7 +250,10 @@ class ChartTool(BaseTool):
                 "relative_path": rel_path,
                 "file_name": filepath.name,
                 "file_size_kb": round(filepath.stat().st_size / 1024, 1),
-                "message": "图表已生成: %s" % filepath.name,
+                "url": "/api/charts/%s" % filepath.name,
+                "json_url": "/api/charts/%s" % json_path.name,
+                "message": "图表已生成，可通过 URL 访问: /api/charts/%s" % filepath.name,
+                "chart_data": chart_data,  # 结构化数据，供前端直接使用
             }
         )
 

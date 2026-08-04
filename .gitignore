@@ -4,9 +4,11 @@
 .env.*.local
 .env.production
 .env.development
+.env.docker
 
 # 虚拟环境
 env/
+/env
 venv/
 .venv/
 env.bak/
@@ -28,6 +30,12 @@ __pycache__/
 data/stock_data/databases/vector_dbs/
 data/stock_data/databases/vector_dbs_v1_backup/
 
+# 分块数据（含原始研报内容，版权问题，不上传）
+data/stock_data/databases/chunked_reports/
+
+# 生成的图表（运行时生成，不上传）
+data/charts/
+
 # IDE 配置
 .idea/
 .vscode/
@@ -46,6 +54,9 @@ build/
 htmlcov/
 .tox/
 
+# 评测运行时生成报告
+tests/eval_datasets/
+
 # 系统文件
 .DS_Store
 Thumbs.db
@@ -60,29 +71,20 @@ data/stock_data/debug_data/
 # 临时文件
 *.tmp
 *.temp
-*.swp
-*.swo
-*~
-
-# IDE 和编辑器配置
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# 操作系统文件
-.DS_Store
-Thumbs.db
-Desktop.ini
-
-# 构建产物
-dist/
-build/
-*.egg-info/
 
 # ===== 个人本地文档（不上传 Git）=====
 _local/
 
 # 根目录临时调试脚本（以 _ 前缀标记）
 /_*.py
+
+# Trae IDE skills（不上传）
+.trae/
+
+# Python 备份文件
+*.bak
+*.py.bak
+
+# Node.js 依赖（不上传）
+node_modules/
+frontend/node_modules/

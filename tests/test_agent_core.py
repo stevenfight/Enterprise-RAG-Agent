@@ -22,7 +22,7 @@
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # ============================================================
 # 测试状态登记表 (开发过程中逐步改为 "GREEN")
@@ -102,7 +102,7 @@ _AGENT_AVAILABLE = False
 _AGENT_IMPORT_ERROR = ""
 
 try:
-    from agent_core import ReActAgent
+    from src.agent_core import ReActAgent
     _AGENT_AVAILABLE = True
 except ImportError as e:
     _AGENT_IMPORT_ERROR = str(e)
@@ -110,7 +110,7 @@ except ImportError as e:
 # 尝试导入工具注册表
 _TOOLS_AVAILABLE = False
 try:
-    from tools import ToolRegistry, BaseTool, ToolResult
+    from src.tools import ToolRegistry, BaseTool, ToolResult
     _TOOLS_AVAILABLE = True
 except ImportError:
     pass
@@ -150,7 +150,7 @@ def test_a01():
     if not _AGENT_AVAILABLE:
         return False, "Agent 模块未实现"
 
-    from agent_core import ReActAgent
+    from src.agent_core import ReActAgent
     agent = ReActAgent.__new__(ReActAgent)
     # 需要验证:
     # 1. ReActAgent 类存在 run 方法
@@ -173,7 +173,7 @@ def test_a02():
     if not _AGENT_AVAILABLE:
         return False, ""
 
-    from agent_core import ReActAgent
+    from src.agent_core import ReActAgent
     # 验证 Agent 有 max_steps 配置属性
     agent = ReActAgent.__new__(ReActAgent)
     has_max_steps = hasattr(agent, '__init__') and callable(getattr(agent, '__init__', None))
@@ -192,7 +192,7 @@ def test_a03():
     if not _AGENT_AVAILABLE:
         return False, ""
 
-    from agent_core import ReActAgent
+    from src.agent_core import ReActAgent
     # 验证 max_steps 默认值为 5
     agent_cls = ReActAgent
     # 检查是否有 max_steps 相关配置
@@ -253,7 +253,7 @@ def test_a06():
     if not _TOOLS_AVAILABLE:
         return False, "ToolRegistry 模块未实现"
 
-    from tools import ToolRegistry
+    from src.tools import ToolRegistry
     registry = ToolRegistry()
     # 验证 get 方法对未注册工具返回 None 或抛出异常
     has_get = hasattr(registry, 'get') and callable(getattr(registry, 'get', None))
@@ -272,7 +272,7 @@ def test_a07():
     if not _TOOLS_AVAILABLE:
         return False, "ToolRegistry 模块未实现"
 
-    from tools import ToolResult
+    from src.tools import ToolResult
     # 验证 ToolResult 包含 success 和 error 字段 (dataclass 检查 __dataclass_fields__)
     result = ToolResult(success=True)
     has_success = hasattr(result, 'success')
@@ -310,7 +310,7 @@ def test_a09():
 
     # 验证 AgentResult 或等效结构包含 reasoning_chain
     # 检查是否定义了结果数据类
-    import agent_core as ac
+    import src.agent_core as ac
     has_result_class = any(
         hasattr(ac, name) and name.lower().find('result') != -1
         for name in dir(ac)
@@ -330,7 +330,7 @@ def test_a10():
     if not _TOOLS_AVAILABLE:
         return False, "ToolRegistry 模块未实现"
 
-    from tools import ToolRegistry
+    from src.tools import ToolRegistry
     registry = ToolRegistry()
     # 验证 list_all 返回空列表
     has_list = hasattr(registry, 'list_all') and callable(getattr(registry, 'list_all', None))
@@ -350,7 +350,7 @@ def test_s_markers():
     if not _AGENT_AVAILABLE:
         return False, "Agent 模块未实现"
 
-    from agent_core import ReActAgent
+    from src.agent_core import ReActAgent
     agent = ReActAgent.__new__(ReActAgent)
     if not hasattr(agent, '_is_empty_result'):
         return False, "_is_empty_result 方法不存在"
@@ -388,7 +388,7 @@ def test_n_signature():
         return False, "Agent 模块未实现"
 
     import inspect
-    from agent_core import ReActAgent
+    from src.agent_core import ReActAgent
     sig = inspect.signature(ReActAgent._generate_forced_answer)
     params = list(sig.parameters.keys())
     return 'reasoning_chain' in params, f"参数列表: {params}"
