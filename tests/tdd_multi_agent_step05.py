@@ -18,12 +18,27 @@ import queue
 import unittest
 from unittest.mock import MagicMock
 
+import pytest
+
 from src.agent_core import AgentResult, ReActAgent
 from src.agent_registry import AgentCapability, AgentRegistry
 from src.shared_memory import SharedMemory
 from src.tools import BaseTool, ToolResult
 from src.tools.delegate_tool import DelegateTool
 from src.orchestrator_agent import OrchestratorAgent
+
+
+# ============================================================
+# 网络连通性前置检查
+# ============================================================
+
+def _check_connectivity():
+    """检查 dashscope API 网络连通性，不通则 pytest.skip"""
+    try:
+        import requests
+        requests.get("https://dashscope.aliyuncs.com", timeout=3)
+    except Exception:
+        pytest.skip("网络不通，无法访问 dashscope.aliyuncs.com")
 
 
 # ============================================================
@@ -289,6 +304,7 @@ class TestDelegateTool(unittest.TestCase):
 
     def test_tc53_04_delegate_data_agent_retrieval(self):
         """TC-53-04: DelegateTool.run() 委托 DataAgent 执行检索 (需要 API Key，无 Key 时 skip)"""
+        _check_connectivity()
         if not os.environ.get("DASHSCOPE_API_KEY"):
             self.skipTest("需要 DASHSCOPE_API_KEY 环境变量")
 
@@ -459,6 +475,7 @@ class TestOrchestratorAgent(unittest.TestCase):
 
     def test_tc54_04_run_multi_agent_chain(self):
         """TC-54-04: OrchestratorAgent.run() 多 Agent 链路 (需要 API Key，无 Key 时 skip)"""
+        _check_connectivity()
         if not os.environ.get("DASHSCOPE_API_KEY"):
             self.skipTest("需要 DASHSCOPE_API_KEY 环境变量")
 

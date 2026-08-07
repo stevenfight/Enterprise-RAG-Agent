@@ -20,6 +20,8 @@ import time
 import unittest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from src.agent_core import AgentResult, ReActAgent
 from src.agent_registry import AgentCapability, AgentRegistry
 from src.shared_memory import SharedMemory
@@ -27,6 +29,19 @@ from src.tools import BaseTool, ToolResult, ToolRegistry
 from src.tools.delegate_tool import DelegateTool
 from src.tools.calculator_tool import CalculatorTool
 from src.tools.retrieve_tool import RetrieveTool
+
+
+# ============================================================
+# 网络连通性前置检查
+# ============================================================
+
+def _check_connectivity():
+    """检查 dashscope API 网络连通性，不通则 pytest.skip"""
+    try:
+        import requests
+        requests.get("https://dashscope.aliyuncs.com", timeout=3)
+    except Exception:
+        pytest.skip("网络不通，无法访问 dashscope.aliyuncs.com")
 
 
 # ============================================================
@@ -314,6 +329,7 @@ class TestCalcAgent(unittest.TestCase):
 
     def test_tc61_05_full_calculation_chain(self):
         """TC-61-05: CalcAgent.run() 完整计算链路 (需要 API Key，无 Key 时 skip)"""
+        _check_connectivity()
         if not os.environ.get("DASHSCOPE_API_KEY"):
             self.skipTest("需要 DASHSCOPE_API_KEY 环境变量")
 
@@ -395,6 +411,7 @@ class TestCompareAgent(unittest.TestCase):
 
     def test_tc62_05_full_comparison_chain(self):
         """TC-62-05: CompareAgent.run() 完整对比链路 (需要 API Key，无 Key 时 skip)"""
+        _check_connectivity()
         if not os.environ.get("DASHSCOPE_API_KEY"):
             self.skipTest("需要 DASHSCOPE_API_KEY 环境变量")
 
@@ -465,6 +482,7 @@ class TestChartAgent(unittest.TestCase):
 
     def test_tc63_05_full_chart_chain(self):
         """TC-63-05: ChartAgent.run() 完整图表链路 (需要 API Key，无 Key 时 skip)"""
+        _check_connectivity()
         if not os.environ.get("DASHSCOPE_API_KEY"):
             self.skipTest("需要 DASHSCOPE_API_KEY 环境变量")
 
@@ -544,6 +562,7 @@ class TestVerifyAgent(unittest.TestCase):
 
     def test_tc64_05_full_verify_chain(self):
         """TC-64-05: VerifyAgent.run() 完整审核链路 (需要 API Key，无 Key 时 skip)"""
+        _check_connectivity()
         if not os.environ.get("DASHSCOPE_API_KEY"):
             self.skipTest("需要 DASHSCOPE_API_KEY 环境变量")
 
