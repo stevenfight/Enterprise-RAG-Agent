@@ -6,7 +6,24 @@
         "tool_timeout": 30,
         "temperature": 0.3,
         "max_retries": 1,
-        "model": "qwen-max"
+        "model": "qwen-max",
+        "models": {
+            "_comment": "按 Agent 角色分配模型，未指定时回退到 agent.model",
+            "orchestrator": "qwen-max",
+            "data": "qwen-turbo",
+            "calc": "qwen-plus",
+            "compare": "qwen-max",
+            "chart": "qwen-max",
+            "verify": "qwen-plus",
+            "router": "qwen-turbo"
+        }
+    },
+    "multi_agent": {
+        "_comment": "多 Agent 模式容错与超时配置（步骤 0.1 仅定义配置项，使用逻辑在后续步骤实现）",
+        "worker_max_retries": 1,
+        "worker_timeout": 30,
+        "orchestrator_timeout": 120,
+        "continue_on_worker_failure": true
     },
     "memory": {
         "working_memory_limit": 10,

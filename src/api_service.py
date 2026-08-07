@@ -41,6 +41,7 @@ from .tools.chart_tool import ChartTool
 from .tools.verify_tool import VerifyTool
 from .planner import TaskPlanner
 from .reflector import AnswerReflector
+from .orchestrator_agent import OrchestratorAgent
 
 logger = logging.getLogger("api_service")
 logger.setLevel(logging.INFO)
@@ -202,8 +203,20 @@ def _load_agent_config() -> dict:
                      "***" if result["api_key"] != "no-key-needed" else "no-key-needed",
                      result["api_max_steps_hard_limit"])
 
+        # ---- 新增：读取多 Agent 模型分配配置 ----
+        result["models"] = agent_cfg.get("models", {})
+        if result["models"]:
+            logger.info("[config_loader] models 配置已加载: %s", list(result["models"].keys()))
+
+        # ---- 新增：读取多 Agent 容错与超时配置 ----
+        multi_agent_cfg = config.get("multi_agent", {})
+        result["multi_agent"] = multi_agent_cfg
+        if multi_agent_cfg:
+            logger.info("[config_loader] multi_agent 配置已加载: %s", list(multi_agent_cfg.keys()))
+
         # 检查是否有未识别的配置项
-        unexpected_agent = set(agent_cfg.keys()) - set(default_config.keys())
+        # models 是 agent 节内的嵌套配置，已被单独读取，不视为未识别项
+        unexpected_agent = set(agent_cfg.keys()) - set(default_config.keys()) - {"models"}
         unexpected_reflector = set(reflector_cfg.keys()) - set(default_config.keys())
         if unexpected_agent:
             logger.warning("[config_loader] 未识别的 agent 配置项将被忽略 | keys=%s", unexpected_agent)
@@ -323,9 +336,19 @@ class HealthResponse(BaseModel):
 class AgentQueryRequest(BaseModel):
     """Agent 查询请求"""
     query: str = Field(..., description="查询文本")
+    company_name: Optional[str] = Field(None, description="限定公司名（可选）")
     max_steps: int = Field(5, description="Agent 最大推理步数", ge=1, le=100)
     temperature: float = Field(0.3, description="LLM 温度", ge=0.0, le=2.0)
     conversation_id: Optional[str] = Field(None, description="对话ID (可选, 不提供则自动生成)")
+    mode: str = Field("auto", description="模式: auto / single / multi")
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, v: str) -> str:
+        """验证 mode 取值必须在 auto/single/multi 中"""
+        if v not in ("auto", "single", "multi"):
+            raise ValueError(f"mode 必须是 auto / single / multi，当前值: {v}")
+        return v
 
 
 class AgentStepInfo(BaseModel):
@@ -421,6 +444,68 @@ def _init_globals():
         logger.warning("[api_service] API Key 使用默认值, 请尽快修改!")
     else:
         logger.info("[api_service] API Key 已配置")
+
+    # ---- 新增：LLMProvider 初始化 ----
+    from src.llm_provider import DashScopeProvider
+    from src.utils import get_api_key
+    api_key_for_agent = get_api_key()
+    llm_provider = DashScopeProvider(api_key=api_key_for_agent)
+    _shared_state["llm_provider"] = llm_provider
+    logger.info("[api_service] DashScopeProvider 初始化完成")
+
+    # ---- 新增：QueryRouter 初始化（步骤 0.3） ----
+    from src.router import QueryRouter
+    # DashScopeProvider 已在上方导入，此处复用同一 import 创建 router 独立实例
+    router_llm = DashScopeProvider(api_key=api_key_for_agent)
+    query_router = QueryRouter(turbo_llm=router_llm)
+    _shared_state["query_router"] = query_router
+    logger.info("[api_service] QueryRouter 初始化完成")
+
+    # ---- 步骤 2.1：AgentRegistry 初始化（多 Agent 组件） ----
+    from src.agent_registry import AgentRegistry, AgentCapability
+    from src.shared_memory import SharedMemory
+
+    agent_registry = AgentRegistry()
+    agent_registry.register(AgentCapability(
+        name="DataAgent",
+        description="从向量数据库精确检索财务数据，支持指定公司名称",
+        tools=["retrieve"],
+        max_parallel=3,
+        llm_model="qwen-turbo",
+    ))
+    _shared_state["agent_registry"] = agent_registry
+    _shared_state["has_multi_agent"] = True
+
+    # ---- 阶段三：注册其余 Worker Agent 能力 ----
+    agent_registry.register(AgentCapability(
+        name="CalcAgent",
+        description="财务计算专家：执行增长率/CAGR/利润率计算，输入来自上游数据",
+        tools=["calculator", "retrieve"],
+        max_parallel=2,
+        llm_model="qwen-plus",
+    ))
+    agent_registry.register(AgentCapability(
+        name="CompareAgent",
+        description="财务对比分析专家：多公司横向对比，输出 Markdown 表格",
+        tools=["compare", "retrieve"],
+        max_parallel=2,
+        llm_model="qwen-max",
+    ))
+    agent_registry.register(AgentCapability(
+        name="ChartAgent",
+        description="图表渲染专家：从上游数据提取结构化数值并生成图表",
+        tools=["chart"],
+        max_parallel=2,
+        llm_model="qwen-max",
+    ))
+    agent_registry.register(AgentCapability(
+        name="VerifyAgent",
+        description="财务数据审核专家：验证数字准确性和来源支撑关系",
+        tools=["verify", "retrieve"],
+        max_parallel=2,
+        llm_model="qwen-plus",
+    ))
+    logger.info("[api_service] AgentRegistry 注册完成: %d 个 Worker", len(agent_registry.list_all()))
 
     logger.info("[api_service] FastAPI 应用启动完成")
     logger.info("=" * 60)
@@ -630,13 +715,15 @@ async def api_query(request: QueryRequest):
 # Agent 模式 API 端点
 # ============================================================
 
-def _create_per_request_agent(memory: AgentMemory, max_steps: int, temperature: float) -> ReActAgent:
+def _create_per_request_agent(memory: AgentMemory, max_steps: int, temperature: float,
+                               llm_provider: Optional[Any] = None) -> ReActAgent:
     """为每个请求创建独立的 Agent 实例（并发安全）
 
     Args:
         memory: 会话独立的 AgentMemory 实例
         max_steps: 请求的 max_steps（会被硬上限截断）
         temperature: LLM 温度
+        llm_provider: LLM 提供者实例（可选，用于多 Agent 模式）
 
     Returns:
         新创建的 ReActAgent 实例
@@ -655,7 +742,252 @@ def _create_per_request_agent(memory: AgentMemory, max_steps: int, temperature: 
         model=ag_cfg["model"],
         llm_timeout=ag_cfg["llm_timeout"],
         max_retries=ag_cfg["max_retries"],
+        llm_provider=llm_provider,
+        prompt_name="default",
     )
+
+
+async def _handle_multi_agent_query(
+    request: AgentQueryRequest,
+    cm: ConversationManager,
+    conversation_id: str,
+    route_result: Optional[Any] = None,
+) -> AgentQueryResponse:
+    """处理多 Agent 查询请求（阶段四提取为独立函数）
+
+    支持 mode="multi" 显式调用和 auto 模式下 router 自动分派。
+
+    Args:
+        request: Agent 查询请求（含 mode/company_name）
+        cm: 会话管理器
+        conversation_id: 会话ID
+        route_result: 路由结果（auto 模式下由 router 提供，multi 模式下为 None）
+
+    Returns:
+        AgentQueryResponse 响应对象
+    """
+    from src.shared_memory import SharedMemory
+    from src.tools.delegate_tool import DelegateTool
+
+    shared_memory = SharedMemory()
+    shared_memory.set_task_context("query", request.query)
+    if route_result and route_result.category:
+        shared_memory.set_task_context("companies", route_result.category.company_names)
+    # 传递 company_name（阶段四新增）
+    if request.company_name:
+        shared_memory.set_task_context("company_name", request.company_name)
+
+    agent_registry = _shared_state.get("agent_registry")
+    delegate_tool = DelegateTool(
+        agent_registry=agent_registry,
+        shared_memory=shared_memory,
+    )
+    orchestrator = OrchestratorAgent(
+        delegate_tool=delegate_tool,
+        agent_registry=agent_registry,
+        llm_provider=_shared_state.get("llm_provider"),
+        shared_memory=shared_memory,
+    )
+
+    # 执行多 Agent 推理（阶段四新增 company_name 传递）
+    result = orchestrator.run(
+        query=request.query,
+        company_name=request.company_name,
+        conversation_history=cm.get_context_string(max_turns=3),
+    )
+
+    # Reflector 反思（使用 SharedMemory 聚合的来源）
+    reflection = None
+    reflector = _shared_state.get("reflector")
+    if reflector and result.answer:
+        sources = shared_memory.get_all_sources()
+        ref_result = reflector.verify(result.answer, sources, request.query)
+        reflection = {
+            "score": ref_result.overall_confidence,
+            "issues": ref_result.suggestions,
+            "corrected_answer": ref_result.corrected_answer if ref_result.corrected_answer else None,
+        }
+
+    # 构建响应
+    response = AgentQueryResponse(
+        success=result.success,
+        answer=result.answer,
+        total_steps=result.total_steps,
+        total_elapsed_ms=result.total_elapsed_ms,
+        forced_stop=result.forced_stop,
+        error=result.error,
+        reasoning_chain=result.reasoning_chain if result.reasoning_chain else [],
+        reflection=reflection,
+    )
+    logger.info("[api_service] 多 Agent 执行完成: success=%s, workers=%d, total_tokens=%d",
+                 result.success, len(shared_memory.agent_outputs),
+                 getattr(result, "total_tokens", 0))
+
+    # 记录对话历史
+    cm.add_message("user", request.query)
+    cm.add_message("assistant", result.answer)
+    return response
+
+
+async def _stream_single_agent(
+    agent: ReActAgent,
+    query: str,
+    company_name: Optional[str],
+    cm: ConversationManager,
+):
+    """单 Agent 流式 SSE 事件生成器
+
+    事件序列: connected → thought → action → observation → answer → done
+    注意：router 决策已在上层 event_generator() 完成，此函数不重复查询。
+    """
+    import asyncio as _asyncio
+
+    # 发送 connected 事件
+    yield f"data: {json.dumps({'type': 'connected', 'timestamp': int(time.time() * 1000)}, ensure_ascii=False)}\n\n"
+    await _asyncio.sleep(0)
+
+    try:
+        for event in agent.run_stream(query, company_name=company_name):
+            event_json = json.dumps(event, ensure_ascii=False, default=str)
+            yield f"data: {event_json}\n\n"
+            await _asyncio.sleep(0)
+    except Exception as e:
+        logger.error("[api_service] _stream_single_agent 异常: %s", str(e))
+        yield f"data: {json.dumps({'type': 'error', 'content': str(e)}, ensure_ascii=False)}\n\n"
+
+
+async def _stream_multi_agent(
+    query: str,
+    company_name: Optional[str],
+    cm: ConversationManager,
+):
+    """多 Agent 流式 SSE 事件生成器（阶段四提取为独立函数）
+
+    事件序列: connected → orchestrator_start → delegating
+              → worker_step(N次) → workers_done
+              → answer_chunk(N次) → answer → reflection → done
+    """
+    import asyncio as _asyncio
+    import queue
+    import threading
+    from src.shared_memory import SharedMemory
+    from src.tools.delegate_tool import DelegateTool
+
+    shared_memory = SharedMemory()
+    shared_memory.set_task_context("query", query)
+    if company_name:
+        shared_memory.set_task_context("company_name", company_name)
+
+    agent_registry = _shared_state.get("agent_registry")
+    event_queue = queue.Queue()
+
+    delegate_tool = DelegateTool(
+        agent_registry=agent_registry,
+        shared_memory=shared_memory,
+        event_queue=event_queue,
+    )
+    orchestrator = OrchestratorAgent(
+        delegate_tool=delegate_tool,
+        agent_registry=agent_registry,
+        llm_provider=_shared_state.get("llm_provider"),
+        shared_memory=shared_memory,
+    )
+
+    # ---- 事件1: connected ----
+    yield f"data: {json.dumps({'type': 'connected', 'timestamp': int(time.time() * 1000)}, ensure_ascii=False)}\n\n"
+    await _asyncio.sleep(0)
+
+    # ---- 事件2: orchestrator_start ----
+    agent_list = agent_registry.list_all() if agent_registry else []
+    yield f"data: {json.dumps({'type': 'orchestrator_start', 'registered_agents': agent_list, 'timestamp': int(time.time() * 1000)}, ensure_ascii=False)}\n\n"
+
+    # ---- 事件3: delegating（阶段四新增）----
+    yield f"data: {json.dumps({'type': 'delegating', 'batch': 0, 'agents': agent_list, 'timestamp': int(time.time() * 1000)}, ensure_ascii=False)}\n\n"
+
+    # 在独立线程中执行 Orchestrator
+    final_result = [None]
+    orchestrator_error = [None]
+
+    def _run_orchestrator():
+        try:
+            final_result[0] = orchestrator.run(
+                query=query,
+                company_name=company_name,  # 阶段四新增
+                conversation_history=cm.get_context_string(max_turns=3),
+            )
+        except Exception as e:
+            orchestrator_error[0] = str(e)
+            logger.error("[api_service] Orchestrator 执行异常: %s", str(e))
+
+    orchestrator_thread = threading.Thread(target=_run_orchestrator, daemon=True)
+    orchestrator_thread.start()
+
+    # 轮询 Worker 步骤事件
+    orchestrator_done = False
+    while not orchestrator_done:
+        try:
+            while True:
+                event = event_queue.get_nowait()
+                yield f"data: {json.dumps(event, ensure_ascii=False, default=str)}\n\n"
+        except queue.Empty:
+            pass
+
+        orchestrator_thread.join(timeout=0.1)
+        orchestrator_done = not orchestrator_thread.is_alive()
+        await _asyncio.sleep(0.05)
+
+    # 收集剩余事件
+    try:
+        while True:
+            event = event_queue.get_nowait()
+            yield f"data: {json.dumps(event, ensure_ascii=False, default=str)}\n\n"
+    except queue.Empty:
+        pass
+
+    # ---- 事件4: workers_done（阶段四新增）----
+    worker_count = len(shared_memory.agent_outputs)
+    yield f"data: {json.dumps({'type': 'workers_done', 'worker_count': worker_count, 'timestamp': int(time.time() * 1000)}, ensure_ascii=False)}\n\n"
+
+    # 判断执行结果
+    if orchestrator_error[0]:
+        yield f"data: {json.dumps({'type': 'error', 'content': orchestrator_error[0]}, ensure_ascii=False)}\n\n"
+    elif final_result[0]:
+        result = final_result[0]
+
+        # ---- 新增事件: answer_chunk（按句子拆分）----
+        if result.answer:
+            sentences = re.split(r'([。\n；;])', result.answer)
+            for i in range(0, len(sentences), 2):
+                chunk = sentences[i]
+                if i + 1 < len(sentences):
+                    chunk += sentences[i + 1]
+                if chunk.strip():
+                    yield f"data: {json.dumps({'type': 'answer_chunk', 'content': chunk.strip()}, ensure_ascii=False)}\n\n"
+
+        # ---- 事件: answer ----
+        yield f"data: {json.dumps({'type': 'answer', 'content': result.answer, 'workers': worker_count, 'total_tokens': shared_memory.get_total_tokens()}, ensure_ascii=False, default=str)}\n\n"
+
+        # ---- 新增事件: reflection（独立事件，阶段四新增）----
+        reflector = _shared_state.get("reflector")
+        if reflector and result.answer:
+            sources = shared_memory.get_all_sources()
+            ref_result = reflector.verify(result.answer, sources, query)
+            reflection_event = {
+                "type": "reflection",
+                "score": ref_result.overall_confidence,
+                "issues": ref_result.suggestions,
+                "corrected_answer": ref_result.corrected_answer if ref_result.corrected_answer else None,
+                "timestamp": int(time.time() * 1000),
+            }
+            yield f"data: {json.dumps(reflection_event, ensure_ascii=False, default=str)}\n\n"
+
+    # ---- 事件: done ----
+    yield f"data: {json.dumps({'type': 'done', 'timestamp': int(time.time() * 1000)}, ensure_ascii=False)}\n\n"
+
+    # 记录对话历史
+    cm.add_message("user", query)
+    if final_result[0]:
+        cm.add_message("assistant", final_result[0].answer)
 
 
 @app.post("/api/agent/query", response_model=AgentQueryResponse,
@@ -663,8 +995,8 @@ def _create_per_request_agent(memory: AgentMemory, max_steps: int, temperature: 
 async def api_agent_query(request: AgentQueryRequest):
     logger.info("=" * 60)
     logger.info("[api_service] 收到 /api/agent/query 请求")
-    logger.info("[api_service] Agent 查询: '%s', max_steps=%d, temperature=%.2f",
-                 request.query, request.max_steps, request.temperature)
+    logger.info("[api_service] Agent 查询: '%s', max_steps=%d, temperature=%.2f, mode=%s",
+                 request.query, request.max_steps, request.temperature, request.mode)
 
     if not _shared_state.get("agent_initialized"):
         logger.error("[api_service] Agent 未初始化，无法处理请求")
@@ -677,11 +1009,43 @@ async def api_agent_query(request: AgentQueryRequest):
         cm.link_memory(AgentMemory())
     per_request_memory = cm.agent_memory  # 会话独立的 memory
 
+    # ---- mode 路由（阶段四新增）----
+    effective_mode = request.mode  # auto / single / multi
+
+    # mode="multi": 直接走多 Agent 链路，不通过 router
+    if effective_mode == "multi":
+        logger.info("[api_service] mode=multi，直接执行多 Agent 链路")
+        return await _handle_multi_agent_query(request, cm, conversation_id)
+
+    # mode="auto": 通过 router 自动判断
+    if effective_mode == "auto":
+        from src.router import RouteResult
+        router = _shared_state.get("query_router")
+        route_result: Optional[RouteResult] = None
+        if router:
+            conv_context = cm.get_context_string(max_turns=3)
+            route_result = router.route(request.query, context=conv_context)
+            logger.info(
+                "[api_service] 路由决策: mode=%s, trace=%s, reasoning=%s",
+                route_result.mode, route_result.trace, route_result.reasoning,
+            )
+
+            if route_result.mode == "multi_agent":
+                logger.info("[api_service] 路由为 multi_agent，执行多 Agent 链路")
+                return await _handle_multi_agent_query(
+                    request, cm, conversation_id,
+                    route_result=route_result,
+                )
+
+    # mode="single" 或 auto 下非 multi_agent: 走单 Agent 流程（现有逻辑不变）
+    # ===== 以下为原有单 Agent 代码 =====
+
     # 为每个请求创建独立 Agent 实例（并发安全）
     agent = _create_per_request_agent(
         memory=per_request_memory,
         max_steps=request.max_steps,
         temperature=request.temperature,
+        llm_provider=_shared_state.get("llm_provider"),
     )
     logger.info("[api_service] Agent 实例已创建 (per-request): max_steps=%d, temperature=%.2f",
                  agent.max_steps, agent.temperature)
@@ -769,9 +1133,10 @@ async def api_agent_query(request: AgentQueryRequest):
         raise HTTPException(status_code=500, detail="Agent 推理过程发生内部错误")
 
 
-@app.get("/api/agent/stream", summary="Agent SSE 流式推理 (Phase 2)")
+@app.get("/api/agent/stream", summary="Agent SSE 流式推理 (Phase 4)")
 async def api_agent_stream(
     query: str,
+    mode: str = "auto",
     company_name: Optional[str] = None,
     max_steps: int = 5,
     temperature: float = 0.3,
@@ -780,9 +1145,9 @@ async def api_agent_stream(
     """Agent 流式推理 SSE 端点
 
     使用 Server-Sent Events (SSE) 协议实时推送 Agent 推理的中间步骤。
-    事件类型: thought / action / observation / answer / error / done
 
     - **query**: 查询文本 (必填)
+    - **mode**: 推理模式 auto/single/multi (默认 auto)
     - **company_name**: 指定公司名 (可选)
     - **max_steps**: 最大推理步数 (默认5, 范围1-20)
     - **temperature**: LLM 温度 (默认0.3)
@@ -790,7 +1155,7 @@ async def api_agent_stream(
     """
     logger.info("=" * 60)
     logger.info("[api_service] 收到 /api/agent/stream 请求")
-    logger.info("[api_service] SSE 查询: '%s', max_steps=%d", query, max_steps)
+    logger.info("[api_service] SSE 查询: '%s', max_steps=%d, mode=%s", query, max_steps, mode)
 
     if not _shared_state.get("agent_initialized"):
         logger.error("[api_service] Agent 未初始化，无法处理 SSE 请求")
@@ -803,33 +1168,49 @@ async def api_agent_stream(
         cm.link_memory(AgentMemory())
     per_request_memory = cm.agent_memory
 
-    # 为每个请求创建独立 Agent 实例（并发安全）
-    agent = _create_per_request_agent(
+    # ---- 预创建 Agent 实例（仅在非 multi 模式下使用）----
+    single_agent = _create_per_request_agent(
         memory=per_request_memory,
         max_steps=max_steps,
         temperature=temperature,
+        llm_provider=_shared_state.get("llm_provider"),
     )
-    logger.info("[api_service] SSE Agent 实例已创建 (per-request): max_steps=%d", agent.max_steps)
+    logger.info("[api_service] SSE Agent 实例已创建 (per-request): max_steps=%d", single_agent.max_steps)
 
     async def event_generator():
-        """异步事件生成器，将 Agent 的同步 yield 转为异步 SSE 流"""
-        import asyncio
-        try:
-            # 立即发送初始连接确认事件，避免浏览器 EventSource 因长时间无数据而超时断开
-            yield f"data: {json.dumps({'type': 'connected', 'timestamp': int(time.time() * 1000)}, ensure_ascii=False)}\n\n"
-            await asyncio.sleep(0)  # 让出事件循环，确保初始事件被发送
+        """异步事件生成器，根据 mode 分派到对应流式函数（阶段四重构）"""
+        import asyncio as _asyncio
 
-            for event in agent.run_stream(query, company_name=company_name):
-                event_json = json.dumps(event, ensure_ascii=False, default=str)
-                yield f"data: {event_json}\n\n"
-                await asyncio.sleep(0)  # 每步让出事件循环，避免阻塞
-        except Exception as e:
-            logger.error("[api_service] SSE 流异常: %s", str(e))
-            error_event = json.dumps({
-                "type": "error",
-                "content": "流式推理过程发生内部错误",
-            }, ensure_ascii=False)
-            yield f"data: {error_event}\n\n"
+        effective_mode = mode
+
+        # mode="multi": 直接走多 Agent 流式
+        if effective_mode == "multi":
+            logger.info("[api_service] SSE mode=multi，执行多 Agent 流式链路")
+            async for event in _stream_multi_agent(query, company_name, cm):
+                yield event
+            return
+
+        # mode="auto": 通过 router 自动判断
+        if effective_mode == "auto":
+            router = _shared_state.get("query_router")
+            if router:
+                conv_context = cm.get_context_string(max_turns=3)
+                route_result = router.route(query, context=conv_context)
+                logger.info(
+                    "[api_service] SSE 路由决策: mode=%s, trace=%s",
+                    route_result.mode, route_result.trace,
+                )
+                yield f"data: {json.dumps({'type': 'router_decision', **route_result.to_dict()}, ensure_ascii=False, default=str)}\n\n"
+
+                if route_result.mode == "multi_agent":
+                    logger.info("[api_service] SSE 路由为 multi_agent")
+                    async for event in _stream_multi_agent(query, company_name, cm):
+                        yield event
+                    return
+
+        # mode="single" 或 auto 下非 multi_agent: 单 Agent 流式
+        async for event in _stream_single_agent(single_agent, query, company_name, cm):
+            yield event
 
     logger.info("[api_service] SSE 流已建立连接")
 

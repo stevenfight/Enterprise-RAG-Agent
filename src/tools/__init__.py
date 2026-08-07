@@ -190,11 +190,28 @@ class ToolRegistry:
                 error=f"工具 '{name}' 执行异常: {str(e)}"
             )
 
+    @staticmethod
+    def _format_param_desc(v: dict) -> str:
+        """格式化单个参数描述，支持嵌套 items.properties 递归展示
+
+        当参数为数组结构（含 items.properties）时，展开子字段说明，
+        使 delegate 等工具的 tasks[].agent/task/company_name 对 LLM 可见。
+        """
+        desc = v.get("description", "")
+        items = v.get("items")
+        if isinstance(items, dict) and isinstance(items.get("properties"), dict):
+            sub = ", ".join(
+                f"{k}({ToolRegistry._format_param_desc(sv)})"
+                for k, sv in items["properties"].items()
+            )
+            return f"{desc}（每项含: {sub}）" if desc else f"每项含: {sub}"
+        return desc
+
     def get_tool_descriptions(self) -> str:
         """生成 LLM 可用的工具描述文本
 
         Returns:
-            格式化后的工具列表说明
+            格式化的工具列表说明
         """
         if not self._tools:
             logger.info("[ToolRegistry] 生成工具描述: 无可用工具")
@@ -206,7 +223,7 @@ class ToolRegistry:
             if tool.parameters and "properties" in tool.parameters:
                 props = tool.parameters["properties"]
                 param_desc = ", ".join(
-                    f"{k}({v.get('description', '')})" for k, v in props.items()
+                    f"{k}({self._format_param_desc(v)})" for k, v in props.items()
                 )
             lines.append(f"- {tool.name}: {tool.description}" +
                          (f" [参数: {param_desc}]" if param_desc else ""))

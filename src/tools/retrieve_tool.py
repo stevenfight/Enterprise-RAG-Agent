@@ -17,6 +17,7 @@ Agent 通过此工具从企业年报向量数据库中检索财务数据。
 
 import logging
 import sys
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -72,6 +73,9 @@ class RetrieveTool(BaseTool):
         "required": ["query"],
     }
 
+    # 类级别锁，保护多线程首次初始化 _retriever
+    _init_lock = threading.Lock()
+
     def __init__(self, api_key: Optional[str] = None):
         """初始化检索工具
 
@@ -118,20 +122,23 @@ class RetrieveTool(BaseTool):
         return self._vector_db_dir
 
     def _get_retriever(self):
-        """延迟初始化 HybridRetriever
+        """延迟初始化 HybridRetriever（线程安全，double-check locking）
 
         只在第一次调用检索时加载 retrieval 模块及其重型依赖
         （jieba, faiss, dashscope 等），避免启动时全部加载。
+        多线程首次调用时通过 _init_lock 保证只初始化一次。
         """
         if self._retriever is None:
-            logger.info("[RetrieveTool] 首次调用，延迟加载 HybridRetriever...")
+            with self._init_lock:
+                if self._retriever is None:
+                    logger.info("[RetrieveTool] 首次调用，延迟加载 HybridRetriever...")
 
-            # 延迟导入：避免工具注册时加载重型依赖
-            from ..retrieval import HybridRetriever
+                    # 延迟导入：避免工具注册时加载重型依赖
+                    from ..retrieval import HybridRetriever
 
-            vector_db_dir = self._resolve_vector_db_dir()
-            self._retriever = HybridRetriever(vector_db_dir, api_key=self._api_key)
-            logger.info("[RetrieveTool] HybridRetriever 实例化完成")
+                    vector_db_dir = self._resolve_vector_db_dir()
+                    self._retriever = HybridRetriever(vector_db_dir, api_key=self._api_key)
+                    logger.info("[RetrieveTool] HybridRetriever 实例化完成")
 
         return self._retriever
 

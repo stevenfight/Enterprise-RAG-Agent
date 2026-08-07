@@ -35,6 +35,7 @@
 | v4.0 | docker-deployment | Docker 容器化部署 | 已完成 |
 | v5.0 | langsmith-openevals-integration | 接入 LangSmith + OpenEvals 能力评测监控 | 实施中（评测通过率 80%，待归档）|
 | v5.1 | p0-critical-fixes | P0 关键缺陷修复（empty_result_count + run_stream推理链 + memory配置 + 并发安全 + API鉴权）| 规划中 |
+| v6.0 | multi-agent-step01 | 多 Agent 升级步骤 0.1：基础能力搭建（LLMProvider 抽象层 + StepCallback + WorkerToolFactory + AgentResult 扩展 + Prompt 外部化）| 实施中 |
 
 ## 项目结构
 
