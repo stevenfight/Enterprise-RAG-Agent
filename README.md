@@ -13,6 +13,15 @@
 
 ---
 
+## 分支说明
+
+| 分支 | 版本 | 说明 |
+|------|------|------|
+| `main` | V2.0 | 多Agent协同版，支持 Orchestrator + Worker 并行调度 + 反思验证 |
+| [`v1-rag-agent`](https://github.com/stevenfight/Enterprise-RAG-Agent/tree/v1-rag-agent) | V1.0 | 轻量级 RAG Agent，适合快速部署（只读归档） |
+
+---
+
 > **项目定位**：RAG+Agent 混合架构的 POC（概念验证）完整实现，重点展示检索链路的精度优化与 Agent 工具编排的工程化设计。
 
 ## 生产环境部署须知
