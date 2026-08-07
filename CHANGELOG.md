@@ -18,6 +18,7 @@
   - `/api/health`, `/docs`, `/openapi.json`, `/redoc` 白名单豁免鉴权
   - `max_steps` 硬上限 15，防止客户端拉高 token 消耗
   - 鉴权失败返回 401，错误信息脱敏
+  - TDD 测试: 20/20 全部通过（SP0-01~05）
 
 ### 新增
 

@@ -61,8 +61,8 @@
 
 ## 阶段七: 文档与收尾
 
-- [ ] 7.1 更新 `CHANGELOG.md` - 记录 v5.1 P0 修复
-- [ ] 7.2 更新 `openspec/project.md` - 演进路线新增 v5.1
-- [ ] 7.3 运行全量 TDD 回归测试
+- [x] 7.1 更新 `CHANGELOG.md` - 记录 v5.1 P0 修复
+- [x] 7.2 更新 `openspec/project.md` - 演进路线新增 v5.1
+- [x] 7.3 运行全量 TDD 回归测试 (209 passed, 5 skipped, 6 SSL-failed[pre-existing])
 - [ ] 7.4 更新服务器 LangBot 数据库 `api_keys` 字段
-- [ ] 7.5 更新 TDD `tdd-p0-fixes.md` - 所有 TC-P0 用例标绿
+- [x] 7.5 更新 TDD `tdd-p0-fixes.md` - 所有 TC-P0 用例标绿
