@@ -51,8 +51,8 @@
 
 - [x] 5.1 创建 `openspec/changes/langsmith-openevals-integration/specs/spec-monitoring.md` - SDD 规范
 - [x] 5.2 创建 `openspec/changes/langsmith-openevals-integration/specs/tdd-monitoring.md` - TDD 测试用例
-- [ ] 5.3 编写 `tests/test_monitoring.py` - 监控模块独立单元测试（8 条用例，待补充）
-- [ ] 5.4 运行 `tests/test_monitoring.py` 验证 RED 状态正确（待 5.3 完成后）
+- [x] 5.3 编写 `tests/test_monitoring.py` - 监控模块独立单元测试（8 条用例）
+- [x] 5.4 运行 `tests/test_monitoring.py` 验证 RED 状态正确 (8/8 passed → 全部标绿)
 - [x] 5.5 开发实现后逐条验证，通过后改 GREEN（TC-MON-01~08 已通过集成验证标绿）
 
 ---
@@ -86,5 +86,5 @@
 - [x] 8.3 更新 SDD `spec-monitoring.md` - 补充实际实现和评测结果
 - [x] 8.4 更新 TDD `tdd-monitoring.md` - TC-MON 标绿，新增 TC-EVAL-01~10 评测用例
 - [x] 8.5 记录 tags 打标传参方案为后续优化（_local/blog/Agent项目/后续优化想法/Tags打标传参方案.md）
-- [ ] 8.6 归档本变更提案到 `openspec/changes/`
-- [ ] 8.7 全量回归测试通过
+- [x] 8.6 归档本变更提案到 `openspec/changes/archive/`
+- [x] 8.7 全量回归测试通过 (223 passed, 5 skipped, 0 failed)

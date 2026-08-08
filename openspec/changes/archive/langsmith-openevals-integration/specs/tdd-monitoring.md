@@ -12,14 +12,14 @@
 
 ```python
 TEST_STATUS_MON = {
-    "TC-MON-01": "GREEN",  # traceable 装饰器在 langsmith 可用时返回真实装饰器
-    "TC-MON-02": "GREEN",  # traceable 装饰器在 langsmith 不可用时返回透传
-    "TC-MON-03": "GREEN",  # is_available 在 API Key 配置时返回 True
-    "TC-MON-04": "GREEN",  # is_available 在 API Key 未配置时返回 False
-    "TC-MON-05": "GREEN",  # get_client 在可用时返回 LangSmith Client 实例
-    "TC-MON-06": "GREEN",  # get_client 不可用时返回 None
-    "TC-MON-07": "GREEN",  # traceable 透传装饰器不改变函数行为
-    "TC-MON-08": "GREEN",  # get_client 重复调用返回同一单例
+    "TC-MON-01": "<span style=\"color:green\">GREEN</span>",  # traceable 装饰器在 langsmith 可用时返回真实装饰器
+    "TC-MON-02": "<span style=\"color:green\">GREEN</span>",  # traceable 装饰器在 langsmith 不可用时返回透传
+    "TC-MON-03": "<span style=\"color:green\">GREEN</span>",  # is_available 在 API Key 配置时返回 True
+    "TC-MON-04": "<span style=\"color:green\">GREEN</span>",  # is_available 在 API Key 未配置时返回 False
+    "TC-MON-05": "<span style=\"color:green\">GREEN</span>",  # get_client 在可用时返回 LangSmith Client 实例
+    "TC-MON-06": "<span style=\"color:green\">GREEN</span>",  # get_client 不可用时返回 None
+    "TC-MON-07": "<span style=\"color:green\">GREEN</span>",  # traceable 透传装饰器不改变函数行为
+    "TC-MON-08": "<span style=\"color:green\">GREEN</span>",  # get_client 重复调用返回同一单例
 }
 ```
 
