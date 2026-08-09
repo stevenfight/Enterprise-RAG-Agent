@@ -8,7 +8,9 @@ OrchestratorAgent - 多 Agent 任务调度器
 对应方案：多Agent升级方案 步骤 2.4
 """
 
+import json
 import logging
+import os
 import sys
 from typing import Any, Optional
 
@@ -62,6 +64,12 @@ class OrchestratorAgent(ReActAgent):
         self.agent_registry = agent_registry
         self.shared_memory = shared_memory
 
+        # 低优修复: 参数校验
+        if delegate_tool is None:
+            raise ValueError("delegate_tool 不能为 None")
+        if agent_registry is None:
+            raise ValueError("agent_registry 不能为 None")
+
         # Orchestrator 只注册 delegate 工具
         tool_registry = ToolRegistry()
         tool_registry.register(delegate_tool)
@@ -78,6 +86,19 @@ class OrchestratorAgent(ReActAgent):
             max_steps=10,
             llm_timeout=120,
         )
+
+        # M7: 从配置文件读取参数，优先配置文件，其次构造函数参数
+        try:
+            cfg_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'agent_config.json')
+            if os.path.exists(cfg_path):
+                with open(cfg_path, 'r', encoding='utf-8') as f:
+                    cfg = json.load(f).get("multi_agent", {})
+                    self.model = cfg.get("orchestrator_model", self.model)
+                    self.temperature = cfg.get("orchestrator_temperature", self.temperature)
+                    self.llm_timeout = cfg.get("orchestrator_timeout", self.llm_timeout)
+        except Exception:
+            pass  # 配置不可用则使用构造函数默认值
+
         logger.info("[OrchestratorAgent] 初始化完成: agents=%s",
                      agent_registry.list_all())
 

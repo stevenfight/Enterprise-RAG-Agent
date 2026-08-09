@@ -103,6 +103,7 @@ class DelegateTool(BaseTool):
         self.agent_registry = agent_registry
         self.shared_memory = shared_memory
         self._event_queue = event_queue
+        self._llm_provider = None
 
     # ============================================================
     # 核心 run 方法（阶段三：批次分组 + 并行执行 + 超时/重试）
@@ -139,16 +140,20 @@ class DelegateTool(BaseTool):
             worker_elapsed_list.extend(r.get("elapsed_ms", 0) for r in batch_results)
 
         # 3. 汇总结果（summary 供 Orchestrator Observation 使用）
-        summary = "\n".join(
-            f"- [{r.get('company', 'N/A')}] {'✓' if r['success'] else '✗'} "
-            f"{r['task'][:50]}" + (f" | {r['answer'][:80]}" if r.get('answer') else "")
+        summary = "委托执行完成: {} 个子任务\n".format(len(tasks))
+        summary += "\n".join(
+            "[{}] {} - {}".format(
+                "OK" if r.get("success") else "FAIL",
+                r.get("task", "?"),
+                r.get("answer", "")[:100] if r.get("success") else r.get("error", "")[:100],
+            )
             for r in results
         )
 
         return ToolResult(
             success=True,
             data={
-                "summary": f"委托执行完成: {len(tasks)} 个子任务\n{summary}",
+                "summary": summary,
                 "total": len(tasks),
                 "results": results,
                 "parallel_batch_count": len(batches),
@@ -241,7 +246,7 @@ class DelegateTool(BaseTool):
             return self._build_failure_entry(task, f"Agent '{agent_name}' 未注册")
 
         # 从 SharedMemory 构建上下文（下游 Worker 读上游结果）
-        shared_ctx = self.shared_memory.get_context_for(agent_name, task)
+        shared_ctx = self.shared_memory.get_context_for(agent_name)
 
         last_error = ""
         for attempt in range(max_retries + 1):
@@ -278,6 +283,20 @@ class DelegateTool(BaseTool):
             )
             logger.info("[DelegateTool] Worker '%s' 完成: success=%s, steps=%d, elapsed=%.0fms",
                          agent_name, result.success, result.total_steps, worker_elapsed)
+
+            # M9: 推送 worker 完成事件到 SSE
+            if self._event_queue is not None:
+                try:
+                    self._event_queue.put_nowait({
+                        "type": "worker_complete",
+                        "agent": agent_name,
+                        "company": company,
+                        "success": True,
+                        "timestamp": int(time.time() * 1000),
+                    })
+                except Exception:
+                    pass
+
             return {
                 "agent": agent_name,
                 "company": company,
@@ -288,7 +307,18 @@ class DelegateTool(BaseTool):
                 "elapsed_ms": worker_elapsed,
             }
 
-        # 重试耗尽：返回失败条目
+        # 重试耗尽：推送失败事件并返回失败条目
+        if self._event_queue is not None:
+            try:
+                self._event_queue.put_nowait({
+                    "type": "worker_complete",
+                    "agent": agent_name,
+                    "company": company,
+                    "success": False,
+                    "timestamp": int(time.time() * 1000),
+                })
+            except Exception:
+                pass
         return self._build_failure_entry(task, last_error)
 
     def _build_failure_entry(self, task: Dict[str, str], error: str) -> Dict[str, Any]:
@@ -326,16 +356,25 @@ class DelegateTool(BaseTool):
         from src.tools.chart_tool import ChartTool
         from src.tools.verify_tool import VerifyTool
 
+        llm = getattr(self, '_llm_provider', None)
+
+        retrieval = RetrieveTool()
+        # 低优修复: 使用 WorkerToolFactory 复用工具实例
+        try:
+            from src.worker_tool_factory import WorkerToolFactory
+        except ImportError:
+            pass
+
         if cap.name == "DataAgent":
-            return DataAgent(retrieval_tool=RetrieveTool())
+            return DataAgent(retrieval_tool=retrieval, llm_provider=llm)
         if cap.name == "CalcAgent":
-            return CalcAgent(calculator_tool=CalculatorTool(), retrieval_tool=RetrieveTool())
+            return CalcAgent(calculator_tool=CalculatorTool(), retrieval_tool=retrieval, llm_provider=llm)
         if cap.name == "CompareAgent":
-            return CompareAgent(compare_tool=CompareTool(), retrieval_tool=RetrieveTool())
+            return CompareAgent(compare_tool=CompareTool(), retrieval_tool=retrieval, llm_provider=llm)
         if cap.name == "ChartAgent":
-            return ChartAgent(chart_tool=ChartTool())
+            return ChartAgent(chart_tool=ChartTool(), llm_provider=llm)
         if cap.name == "VerifyAgent":
-            return VerifyAgent(verify_tool=VerifyTool(), retrieval_tool=RetrieveTool())
+            return VerifyAgent(verify_tool=VerifyTool(), retrieval_tool=retrieval, llm_provider=llm)
 
         logger.warning("[DelegateTool] 不支持的 Agent 类型: %s", cap.name)
         return None

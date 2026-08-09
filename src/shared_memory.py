@@ -84,13 +84,15 @@ class SharedMemory:
 
     def get_agent_result(self, agent_name: str) -> Optional[Any]:
         """获取指定 Worker 的执行结果"""
-        return self.agent_outputs.get(agent_name)
+        with self._lock:
+            return self.agent_outputs.get(agent_name)
 
     def get_all_agent_results(self) -> Dict[str, Any]:
         """获取所有 Worker 的执行结果"""
-        return dict(self.agent_outputs)
+        with self._lock:
+            return dict(self.agent_outputs)
 
-    def get_context_for(self, agent_name: str, task: dict = None) -> str:
+    def get_context_for(self, agent_name: str) -> str:
         """为下游 Agent 构建上下文文本
 
         不同 Worker 角色返回不同格式：
@@ -100,21 +102,21 @@ class SharedMemory:
 
         Args:
             agent_name: 下游 Agent 名称（如 "ChartAgent"）
-            task: 当前子任务信息（如 {"company_name": "中芯国际"}）
 
         Returns:
             上下文文本
         """
-        lines = []
-        for name, result in self.agent_outputs.items():
-            answer = getattr(result, "answer", "")
-            if answer:
-                lines.append(f"[{name} 结果]\n{answer}")
+        with self._lock:
+            lines = []
+            for name, result in self.agent_outputs.items():
+                answer = getattr(result, "answer", "")
+                if answer:
+                    lines.append(f"[{name} 结果]\n{answer}")
 
-        if not lines:
-            return "（无上游结果）"
+            if not lines:
+                return "（无上游结果）"
 
-        return "\n\n".join(lines)
+            return "\n\n".join(lines)
 
     # ---- 聚合方法 ----
 
@@ -124,25 +126,28 @@ class SharedMemory:
         AgentResult.sources 在步骤 0.1 中新增，
         存储 retrieve 工具返回的来源信息（含 source/content/pages/company_name 字段）
         """
-        sources = []
-        for name, result in self.agent_outputs.items():
-            result_sources = getattr(result, "sources", [])
-            if result_sources:
-                sources.extend(result_sources)
-        logger.info("[SharedMemory] 来源聚合: %d 个 Worker, %d 条来源",
-                     len(self.agent_outputs), len(sources))
-        return sources
+        with self._lock:
+            sources = []
+            for name, result in self.agent_outputs.items():
+                result_sources = getattr(result, "sources", [])
+                if result_sources:
+                    sources.extend(result_sources)
+            logger.info("[SharedMemory] 来源聚合: %d 个 Worker, %d 条来源",
+                         len(self.agent_outputs), len(sources))
+            return sources
 
     def get_total_tokens(self) -> int:
         """聚合所有 Worker 的 Token 用量"""
-        return sum(
-            getattr(result, "total_tokens", 0)
-            for result in self.agent_outputs.values()
-        )
+        with self._lock:
+            return sum(
+                getattr(result, "total_tokens", 0)
+                for result in self.agent_outputs.values()
+            )
 
     def get_execution_log(self) -> List[Dict[str, Any]]:
         """获取执行流水日志"""
-        return list(self.execution_log)
+        with self._lock:
+            return list(self.execution_log)
 
     def clear(self) -> None:
         """清空所有共享数据（每次新查询时调用）"""

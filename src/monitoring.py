@@ -23,6 +23,7 @@ LangSmith 监控模块
 import logging
 import os
 import sys
+import threading
 
 logger = logging.getLogger("monitoring")
 logger.setLevel(logging.INFO)
@@ -108,6 +109,7 @@ logger.info(
 
 # ---- Client 单例 ----
 _client = None
+_client_lock = threading.Lock()
 
 
 def get_client():
@@ -123,18 +125,20 @@ def get_client():
     if not LANGSMITH_ENABLED:
         return None
     if _client is None:
-        try:
-            _client = _LangSmithClient(
-                api_key=LANGSMITH_API_KEY,
-                api_url=LANGSMITH_ENDPOINT,
-            )
-            logger.info(
-                "[monitoring] LangSmith Client 初始化成功, project=%s, endpoint=%s",
-                LANGSMITH_PROJECT, LANGSMITH_ENDPOINT
-            )
-        except Exception as e:
-            logger.error("[monitoring] LangSmith Client 初始化失败: %s", str(e))
-            return None
+        with _client_lock:
+            if _client is None:  # 双重检查
+                try:
+                    _client = _LangSmithClient(
+                        api_key=LANGSMITH_API_KEY,
+                        api_url=LANGSMITH_ENDPOINT,
+                    )
+                    logger.info(
+                        "[monitoring] LangSmith Client 初始化成功, project=%s, endpoint=%s",
+                        LANGSMITH_PROJECT, LANGSMITH_ENDPOINT
+                    )
+                except Exception as e:
+                    logger.error("[monitoring] LangSmith Client 初始化失败: %s", str(e))
+                    return None
     return _client
 
 

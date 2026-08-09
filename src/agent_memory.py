@@ -73,6 +73,7 @@ class AgentMemory:
         logger.info("[AgentMemory] 初始化记忆系统: working_limit=%d, episodic_limit=%d, long_term=%s",
                     working_memory_limit, episodic_memory_turns, enable_long_term)
 
+        # 注意: AgentMemory 不是线程安全的。每个 Worker Agent 应持有独立实例。
         if self.enable_long_term:
             self._init_long_term_memory()
             logger.info("[AgentMemory] 长期记忆知识库已初始化，共 %d 个分类",

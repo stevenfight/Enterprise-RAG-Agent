@@ -191,7 +191,7 @@ class ToolRegistry:
             )
 
     @staticmethod
-    def _format_param_desc(v: dict) -> str:
+    def _format_param_desc(v: dict, _depth: int = 0) -> str:
         """格式化单个参数描述，支持嵌套 items.properties 递归展示
 
         当参数为数组结构（含 items.properties）时，展开子字段说明，
@@ -200,10 +200,14 @@ class ToolRegistry:
         desc = v.get("description", "")
         items = v.get("items")
         if isinstance(items, dict) and isinstance(items.get("properties"), dict):
-            sub = ", ".join(
-                f"{k}({ToolRegistry._format_param_desc(sv)})"
-                for k, sv in items["properties"].items()
-            )
+            parts = []
+            for sk, sv in items["properties"].items():
+                if _depth >= 3:  # 低优修复: 递归深度限制
+                    parts.append("    - ... (嵌套过深, 已截断)")
+                    continue
+                sub_desc = ToolRegistry._format_param_desc(sv, _depth + 1)
+                parts.append(f"      子字段 {sk}: {sub_desc}")
+            sub = ", ".join(parts)
             return f"{desc}（每项含: {sub}）" if desc else f"每项含: {sub}"
         return desc
 
