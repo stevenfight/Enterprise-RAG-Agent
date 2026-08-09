@@ -9,12 +9,12 @@
 
 ## Phase 2: Docker 配置文件
 
-- [ ] 2.1 创建 `.dockerignore` -- 排除不需要打包的文件（node_modules, __pycache__, .git, _local 等）
-- [ ] 2.2 创建 `.env.docker` -- Docker 环境下的环境变量模板
-- [ ] 2.3 创建 `Dockerfile.backend` -- 后端 FastAPI 镜像
-- [ ] 2.4 创建 `Dockerfile.frontend` -- 前端 React 镜像（多阶段构建）
-- [ ] 2.5 创建 `nginx.conf` -- Nginx 静态文件 + API 代理配置
-- [ ] 2.6 创建 `docker-compose.yml` -- 前后端服务编排
+- [x] 2.1 创建 `.dockerignore` -- 排除不需要打包的文件（node_modules, __pycache__, .git, _local 等）
+- [x] 2.2 创建 `.env.docker` -- Docker 环境下的环境变量模板
+- [x] 2.3 创建 `Dockerfile.backend` -- 后端 FastAPI 镜像
+- [x] 2.4 创建 `Dockerfile.frontend` -- 前端 React 镜像（多阶段构建）
+- [x] 2.5 创建 `nginx.conf` -- Nginx 静态文件 + API 代理配置
+- [x] 2.6 创建 `docker-compose.yml` -- 前后端服务编排
 
 ## Phase 3: 版本记录
 
@@ -23,9 +23,9 @@
 
 ## Phase 4: 验证
 
-- [ ] 4.1 验证 `.dockerignore` 排除规则是否正确
-- [ ] 4.2 验证 `docker compose build` 能否成功构建
-- [ ] 4.3 验证 `docker compose up` 能否正常启动
-- [ ] 4.4 验证前端页面能否访问
-- [ ] 4.5 验证 API 健康检查 `/api/health` 返回正常
-- [ ] 4.6 验证 API 问答 `/api/query` 功能正常
+- [x] 4.1 验证 `.dockerignore` 排除规则是否正确
+- [x] 4.2 验证 `docker compose build` 能否成功构建 (backend + frontend)
+- [x] 4.3 验证 `docker compose up` 能否正常启动
+- [x] 4.4 验证前端页面能否访问
+- [x] 4.5 验证 API 健康检查 `/api/health` 返回正常
+- [x] 4.6 验证多Agent API `/api/agent/query` (mode=multi) 功能正常 (orchestrator → delegate → DataAgent 完整链路通过)
