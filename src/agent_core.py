@@ -131,6 +131,7 @@ class ReActAgent:
         self._step_callback = step_callback
         self._sources: List[Dict[str, Any]] = []
         self._total_tokens: int = 0
+        self._token_limit_reached: bool = False  # H4: token 超限标志
 
         # 硬编码默认 Prompt（使用 $variable 语法，string.Template 兼容）
         self._default_system_prompt = (
@@ -165,6 +166,11 @@ class ReActAgent:
                     "prompt_name=%s, has_provider=%s, has_callback=%s",
                     model, max_steps, tool_registry.list_all(),
                     prompt_name, llm_provider is not None, step_callback is not None)
+
+    def __repr__(self) -> str:
+        """可读的字符串表示，便于日志调试"""
+        tools = self.tool_registry.list_all() if self.tool_registry else []
+        return f"ReActAgent(model={self.model}, tools={tools}, prompt={self._prompt_name})"
 
     # ============================================================
     # 核心 run 方法
@@ -243,7 +249,11 @@ class ReActAgent:
             # 调用 LLM
             llm_response = self._call_llm(messages)
             if llm_response is None:
-                logger.error("[ReActAgent] LLM 调用失败，终止推理")
+                if self._token_limit_reached:
+                    logger.warning("[ReActAgent] Token 超限，终止推理 (已%d步, %d条消息)",
+                                   step + 1, len(messages))
+                else:
+                    logger.error("[ReActAgent] LLM 调用失败，终止推理")
                 elapsed = (time.time() - start_time) * 1000
                 return AgentResult(
                     answer="",
@@ -251,7 +261,7 @@ class ReActAgent:
                     reasoning_chain=reasoning_chain,
                     total_steps=step + 1,
                     total_elapsed_ms=elapsed,
-                    error="LLM 调用失败",
+                    error="Token 超限" if self._token_limit_reached else "LLM 调用失败",
                     sources=self._sources,
                     total_tokens=self._total_tokens,
                 )
@@ -315,7 +325,7 @@ class ReActAgent:
             )
 
             reasoning_chain.append({
-                "step_number": step + 1,
+                "step": step + 1,           # M11: 统一为 step (原为 step_number)
                 "thought": thought,
                 "action": action,
                 "action_input": action_input,
@@ -413,10 +423,21 @@ class ReActAgent:
 
         reasoning_chain: list = []  # 流式模式累积推理链，用于强制答案生成
 
+        # M12: 空结果检查和工具重复调用检测
+        tools_called = set()
+        empty_result_count = 0
+
         try:
             for step in range(self.max_steps):
                 step_start = time.time()
                 logger.info("[ReActAgent][stream] --- 步骤 %d/%d 开始 ---", step + 1, self.max_steps)
+
+                # M12: 空结果检查和工具重复调用检测
+                steps_done = len(reasoning_chain)
+                if steps_done > 0:
+                    logger.info("[ReActAgent][stream] 步骤摘要: 已完成%d步", steps_done)
+                if empty_result_count >= 2:
+                    logger.warning("[ReActAgent][stream] 连续%d次空结果, 可能导致无效循环", empty_result_count)
 
                 # 调用 LLM
                 llm_response = self._call_llm(messages)
@@ -506,6 +527,15 @@ class ReActAgent:
                 logger.info("[ReActAgent][stream] 执行行动: action=%s", action)
                 observation = self._execute_action(action, action_input)
 
+                # M12: 记录工具调用类型，检测空结果
+                tools_called.add(action)
+                is_empty = self._is_empty_result(observation)
+                if is_empty:
+                    empty_result_count += 1
+                    logger.warning("[ReActAgent][stream] 工具 '%s' 返回空结果 (累计%d次)", action, empty_result_count)
+                else:
+                    empty_result_count = 0
+
                 step_elapsed = (time.time() - step_start) * 1000
                 self.memory.add(
                     thought=thought,
@@ -535,7 +565,9 @@ class ReActAgent:
                     "step": step + 1,
                     "thought": thought,
                     "action": action,
-                    "observation": observation[:500] if observation else observation,
+                    "action_input": action_input,
+                    "observation": observation,
+                    "elapsed_ms": step_elapsed,
                 })
             elapsed_ms = (time.time() - start_time) * 1000
             logger.warning("[ReActAgent][stream] ===== 达到最大步数，强制生成答案 =====")
@@ -667,6 +699,9 @@ class ReActAgent:
 
         Returns:
             LLM 生成的文本，失败返回 None
+
+        Token 超限处理 (H4): 检测 context-too-long 错误并设置 self._token_limit_reached，
+        由外层 ReAct 循环据此提前终止，避免无限重试。
         """
         logger.info("[ReActAgent] 调用 LLM: model=%s, messages=%d 条", self.model, len(messages))
 
@@ -685,6 +720,12 @@ class ReActAgent:
                            response.usage.input_tokens + response.usage.output_tokens)
                 return response.content
             else:
+                err_msg = str(response.error or "").lower()
+                if any(kw in err_msg for kw in ("context length", "too long", "token limit",
+                                                 "maximum context", "exceeded", "context_length_exceeded")):
+                    self._token_limit_reached = True
+                    logger.warning("[ReActAgent] Token 超限检测 (Provider): %s | 消息数=%d",
+                                   response.error, len(messages))
                 logger.error("[ReActAgent] LLM 调用失败 (Provider): %s", response.error)
                 return None
         else:
@@ -710,6 +751,12 @@ class ReActAgent:
                         logger.info("[ReActAgent] LLM 调用成功: 返回 %d 字符", len(content))
                     return content
                 else:
+                    err_msg = str(getattr(resp, "message", "") or resp.code or "").lower()
+                    if any(kw in err_msg for kw in ("context length", "too long", "token limit",
+                                                     "maximum context", "exceeded", "context_length_exceeded")):
+                        self._token_limit_reached = True
+                        logger.warning("[ReActAgent] Token 超限检测 (dashscope): %s | 消息数=%d",
+                                       resp.message, len(messages))
                     logger.error("[ReActAgent] LLM 调用失败: status=%s, message=%s",
                                resp.status_code, resp.message)
                     return None

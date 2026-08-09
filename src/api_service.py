@@ -532,6 +532,9 @@ async def lifespan(app: FastAPI):
     agent_planner = None
     agent_reflector = None
     logger.info("[api_service] RAGGenerator + QueryProcessor + Agent 实例已释放")
+    # M6 修复: 清理 _shared_state 中的组件
+    _shared_state.clear()
+    logger.info("[api_service] _shared_state 已清理")
     logger.info("[api_service] FastAPI 应用已关闭")
     logger.info("=" * 60)
 
@@ -789,24 +792,42 @@ async def _handle_multi_agent_query(
         shared_memory=shared_memory,
     )
 
-    # 执行多 Agent 推理（阶段四新增 company_name 传递）
-    result = orchestrator.run(
-        query=request.query,
-        company_name=request.company_name,
-        conversation_history=cm.get_context_string(max_turns=3),
-    )
+    # 执行多 Agent 推理（阶段四新增 company_name 传递，H3 超时保护）
+    _agent_cfg = _load_agent_config()
+    _orchestrator_timeout = _agent_cfg.get("orchestrator_timeout",
+        _agent_cfg.get("multi_agent", {}).get("orchestrator_timeout", 300))
+    loop = asyncio.get_event_loop()
+    try:
+        # run(self, query, conversation_history="", company_name=None, shared_context="")
+        result = await asyncio.wait_for(
+            loop.run_in_executor(None, orchestrator.run,
+                                 request.query,
+                                 cm.get_context_string(max_turns=3),
+                                 request.company_name),
+            timeout=_orchestrator_timeout,
+        )
+    except asyncio.TimeoutError:
+        logger.error("[api_service] 多 Agent 执行超时 (%.1fs), 将回退到单Agent", _orchestrator_timeout)
+        return None
+    except Exception as e:
+        logger.error("[api_service] 多 Agent 执行异常: %s, 将回退到单Agent", str(e))
+        return None
 
     # Reflector 反思（使用 SharedMemory 聚合的来源）
     reflection = None
     reflector = _shared_state.get("reflector")
     if reflector and result.answer:
-        sources = shared_memory.get_all_sources()
-        ref_result = reflector.verify(result.answer, sources, request.query)
-        reflection = {
-            "score": ref_result.overall_confidence,
-            "issues": ref_result.suggestions,
-            "corrected_answer": ref_result.corrected_answer if ref_result.corrected_answer else None,
-        }
+        try:
+            sources = shared_memory.get_all_sources()
+            ref_result = reflector.verify(result.answer, sources, request.query)
+            reflection = {
+                "score": ref_result.overall_confidence,
+                "issues": ref_result.suggestions,
+                "corrected_answer": ref_result.corrected_answer if ref_result.corrected_answer else None,
+            }
+        except Exception as re:
+            logger.warning("[api_service] reflection 异常(非致命): %s", re)
+            reflection = None
 
     # 构建响应
     response = AgentQueryResponse(
@@ -837,7 +858,7 @@ async def _stream_single_agent(
 ):
     """单 Agent 流式 SSE 事件生成器
 
-    事件序列: connected → thought → action → observation → answer → done
+    事件序列: connected → thought → action → observation → answer → reflection → done
     注意：router 决策已在上层 event_generator() 完成，此函数不重复查询。
     """
     import asyncio as _asyncio
@@ -846,14 +867,45 @@ async def _stream_single_agent(
     yield f"data: {json.dumps({'type': 'connected', 'timestamp': int(time.time() * 1000)}, ensure_ascii=False)}\n\n"
     await _asyncio.sleep(0)
 
+    final_answer = ""
+    has_error = False
     try:
         for event in agent.run_stream(query, company_name=company_name):
+            event_type = event.get("type", "")
+            if event_type == "answer":
+                final_answer = event.get("content", "") or event.get("answer", "")
             event_json = json.dumps(event, ensure_ascii=False, default=str)
             yield f"data: {event_json}\n\n"
             await _asyncio.sleep(0)
     except Exception as e:
+        has_error = True
         logger.error("[api_service] _stream_single_agent 异常: %s", str(e))
         yield f"data: {json.dumps({'type': 'error', 'content': str(e)}, ensure_ascii=False)}\n\n"
+
+    # ---- 事件: reflection (阶段四对齐，H1-H2 修复) ----
+    if not has_error and final_answer:
+        reflector = _shared_state.get("reflector")
+        if reflector:
+            try:
+                ref_result = reflector.verify(final_answer, [], query)
+                reflection_event = {
+                    "type": "reflection",
+                    "score": ref_result.overall_confidence,
+                    "issues": ref_result.suggestions,
+                    "corrected_answer": ref_result.corrected_answer if ref_result.corrected_answer else None,
+                    "timestamp": int(time.time() * 1000),
+                }
+                yield f"data: {json.dumps(reflection_event, ensure_ascii=False, default=str)}\n\n"
+            except Exception as re:
+                logger.warning("[api_service] reflection 验证异常(非致命): %s", re)
+
+    # ---- 事件: done (H1 修复: 前端依赖此事件判定流结束) ----
+    yield f"data: {json.dumps({'type': 'done', 'timestamp': int(time.time() * 1000)}, ensure_ascii=False)}\n\n"
+
+    # ---- 对话历史写入 (H2 修复: 确保 single 模式流式请求更新会话记忆) ----
+    cm.add_message("user", query)
+    if final_answer:
+        cm.add_message("assistant", final_answer)
 
 
 async def _stream_multi_agent(
@@ -922,8 +974,11 @@ async def _stream_multi_agent(
     orchestrator_thread = threading.Thread(target=_run_orchestrator, daemon=True)
     orchestrator_thread.start()
 
-    # 轮询 Worker 步骤事件
+    # 轮询 Worker 步骤事件（H3 超时保护）
     orchestrator_done = False
+    _start_ts = time.time()
+    _ss_timeout = _load_agent_config().get("orchestrator_timeout",
+        _load_agent_config().get("multi_agent", {}).get("orchestrator_timeout", 300))
     while not orchestrator_done:
         try:
             while True:
@@ -934,6 +989,11 @@ async def _stream_multi_agent(
 
         orchestrator_thread.join(timeout=0.1)
         orchestrator_done = not orchestrator_thread.is_alive()
+        if not orchestrator_done and (time.time() - _start_ts) > _ss_timeout:
+            logger.error("[api_service] _stream_multi_agent 执行超时 (%.1fs)", _ss_timeout)
+            yield f"data: {json.dumps({'type': 'error', 'content': f'多Agent执行超时({_ss_timeout}s)'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'timestamp': int(time.time() * 1000)}, ensure_ascii=False)}\n\n"
+            return
         await _asyncio.sleep(0.05)
 
     # 收集剩余事件
@@ -1015,7 +1075,14 @@ async def api_agent_query(request: AgentQueryRequest):
     # mode="multi": 直接走多 Agent 链路，不通过 router
     if effective_mode == "multi":
         logger.info("[api_service] mode=multi，直接执行多 Agent 链路")
-        return await _handle_multi_agent_query(request, cm, conversation_id)
+        try:
+            multi_result = await _handle_multi_agent_query(request, cm, conversation_id)
+            if multi_result is not None:
+                return multi_result
+            logger.warning("[api_service] 多Agent执行失败，回退到单Agent")
+        except Exception as e:
+            logger.warning("[api_service] 多Agent异常，回退到单Agent: %s", e)
+        # fallthrough 到单Agent
 
     # mode="auto": 通过 router 自动判断
     if effective_mode == "auto":
@@ -1032,10 +1099,17 @@ async def api_agent_query(request: AgentQueryRequest):
 
             if route_result.mode == "multi_agent":
                 logger.info("[api_service] 路由为 multi_agent，执行多 Agent 链路")
-                return await _handle_multi_agent_query(
-                    request, cm, conversation_id,
-                    route_result=route_result,
-                )
+                try:
+                    multi_result = await _handle_multi_agent_query(
+                        request, cm, conversation_id,
+                        route_result=route_result,
+                    )
+                    if multi_result is not None:
+                        return multi_result
+                    logger.warning("[api_service] auto→multi 执行失败，回退到单Agent")
+                except Exception as e:
+                    logger.warning("[api_service] auto→multi 异常，回退到单Agent: %s", e)
+                # fallthrough 到单Agent
 
     # mode="single" 或 auto 下非 multi_agent: 走单 Agent 流程（现有逻辑不变）
     # ===== 以下为原有单 Agent 代码 =====
@@ -1153,6 +1227,16 @@ async def api_agent_stream(
     - **temperature**: LLM 温度 (默认0.3)
     - **conversation_id**: 会话ID (可选, 用于记忆隔离)
     """
+    # 参数校验 (M5 修复)
+    if not query or not query.strip():
+        raise HTTPException(status_code=400, detail="query 参数不能为空")
+    if max_steps < 1 or max_steps > 100:
+        raise HTTPException(status_code=400, detail="max_steps 必须在 1-100 之间")
+    if temperature < 0.0 or temperature > 2.0:
+        raise HTTPException(status_code=400, detail="temperature 必须在 0.0-2.0 之间")
+    if mode not in ("auto", "single", "multi"):
+        raise HTTPException(status_code=400, detail="mode 必须是 auto/single/multi 之一")
+
     logger.info("=" * 60)
     logger.info("[api_service] 收到 /api/agent/stream 请求")
     logger.info("[api_service] SSE 查询: '%s', max_steps=%d, mode=%s", query, max_steps, mode)
