@@ -1210,7 +1210,7 @@ async def api_agent_query(request: AgentQueryRequest):
         # ---- 4. 构建响应 ----
         chain = [
             AgentStepInfo(
-                step_number=s["step_number"],
+                step_number=s["step"],
                 thought=s.get("thought", ""),
                 action=s.get("action"),
                 action_input=s.get("action_input"),
