@@ -37,7 +37,7 @@ services:
     container_name: rag-frontend
     restart: unless-stopped
     ports:
-      - "80:80"              # 用户浏览器访问 http://localhost
+      - "8081:80"            # 映射到 8081（80 由宿主机 nginx 占用）
     depends_on:
       - backend               # 确保后端先启动
     networks:

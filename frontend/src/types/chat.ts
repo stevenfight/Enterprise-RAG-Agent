@@ -155,3 +155,37 @@ export interface SSEEvent {
   /** 是否因达到步数上限而强制终止 */
   forced_stop?: boolean;
 }
+
+/** 知识库文档 (对应后端 KnowledgeDocument) */
+export interface KnowledgeDocument {
+  filename: string;
+  size: number;
+  size_mb: number;
+  upload_time: string;
+  indexed: boolean;
+}
+
+/** 系统状态数据 (对应后端 SystemStatusResponse) */
+export interface SystemStatusData {
+  model: {
+    name: string;
+    status: string;
+    temperature: number;
+    max_steps: number;
+  };
+  vector_db: {
+    path: string;
+    status: string;
+    company_count: number;
+  };
+  memory: {
+    long_term_enabled: boolean;
+    working_memory_limit: number;
+  };
+  monitoring: {
+    langsmith_available: boolean;
+    langsmith_project: string;
+    langsmith_endpoint: string;
+  };
+  tools: Record<string, boolean>;
+}

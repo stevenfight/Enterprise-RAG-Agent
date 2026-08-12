@@ -1,0 +1,25 @@
+/* -*- coding: utf-8 -*- */
+/**
+ * 响应式适配样式
+ * 移动端断点: 768px
+ */
+
+@media (max-width: 768px) {
+  .ant-layout-sider {
+    position: fixed !important;
+    z-index: 1000;
+    height: 100vh;
+  }
+
+  .ant-table {
+    overflow-x: auto;
+  }
+
+  .ant-card {
+    margin-bottom: 12px !important;
+  }
+
+  .ant-upload-drag {
+    min-height: 120px !important;
+  }
+}

@@ -17,7 +17,9 @@ const apiClient = axios.create({
 // 请求拦截器
 apiClient.interceptors.request.use(
   (config) => {
-    // 可在此注入 conversation_id 等公共参数
+    // API 鉴权 header
+    const apiKey = import.meta.env.VITE_API_KEY || 'no-key-needed';
+    config.headers.Authorization = `Bearer ${apiKey}`;
     return config;
   },
   (error) => {

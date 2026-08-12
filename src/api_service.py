@@ -373,6 +373,40 @@ class AgentQueryResponse(BaseModel):
     error: Optional[str] = None
 
 
+# ==================== 知识库管理 & 系统状态模型 ====================
+
+class KnowledgeDocument(BaseModel):
+    """知识库文档信息"""
+    filename: str
+    size: int
+    size_mb: float
+    upload_time: str
+    indexed: bool
+
+
+class KnowledgeListResponse(BaseModel):
+    """知识库文档列表响应"""
+    documents: list = []
+    total: int = 0
+
+
+class KnowledgeUploadResponse(BaseModel):
+    """上传响应"""
+    success: bool = True
+    filename: str = ""
+    size: int = 0
+    size_mb: float = 0.0
+
+
+class SystemStatusResponse(BaseModel):
+    """系统状态响应"""
+    model: dict = {}
+    vector_db: dict = {}
+    memory: dict = {}
+    monitoring: dict = {}
+    tools: dict = {}
+
+
 # ==================== 生命周期管理 ====================
 
 def _init_globals():
@@ -1818,3 +1852,139 @@ def _stream_response(non_stream_resp: dict):
             "X-Accel-Buffering": "no"
         }
     )
+
+
+# ==================== 知识库管理 & 系统状态 API ====================
+
+from .knowledge_service import get_documents, upload_pdf, delete_pdf
+
+
+@app.get("/api/knowledge/documents",
+         response_model=KnowledgeListResponse,
+         summary="获取知识库文档列表")
+async def api_knowledge_documents():
+    """返回 PDF 文档列表，包含索引状态"""
+    logger.info("[api_service] 收到 /api/knowledge/documents 请求")
+    docs = get_documents()
+    return {"documents": docs, "total": len(docs)}
+
+
+@app.post("/api/knowledge/upload",
+          response_model=KnowledgeUploadResponse,
+          summary="上传 PDF 文档")
+async def api_knowledge_upload(request: Request):
+    """上传 PDF 文件到知识库（最大 50MB）"""
+    logger.info("[api_service] 收到 /api/knowledge/upload 请求")
+    try:
+        # 粗略大小检查（在读取文件内容之前）
+        content_length = request.headers.get("content-length")
+        if content_length:
+            cl = int(content_length)
+            logger.info("[api_service] 上传 Content-Length: %d bytes (%.2f MB)",
+                         cl, cl / 1024 / 1024)
+            if cl > 50 * 1024 * 1024:
+                logger.warning("[api_service] 上传被拒绝: Content-Length 超过 50MB 限制 | Content-Length: %d", cl)
+                raise HTTPException(
+                    status_code=413,
+                    detail="文件过大，最大允许 50 MB")
+        else:
+            logger.info("[api_service] 上传请求无 Content-Length 头")
+
+        form = await request.form()
+        file = form.get("file")
+        if file is None:
+            logger.warning("[api_service] 上传失败: form 中缺少 file 字段")
+            raise HTTPException(status_code=400, detail="缺少文件")
+        content = await file.read()
+        filename = file.filename or "unnamed.pdf"
+        logger.info("[api_service] 文件读取完成 | 文件名: %s | 实际大小: %d bytes",
+                     filename, len(content))
+        result = upload_pdf(content, filename)
+        logger.info("[api_service] 上传处理完成 | 文件名: %s | 大小: %.2f MB",
+                     result["filename"], result["size_mb"])
+        return {"success": True, **result}
+    except ValueError as e:
+        logger.warning("[api_service] 上传参数错误: %s", str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/knowledge/documents/{filename}",
+            summary="删除 PDF 文档")
+async def api_knowledge_delete(filename: str):
+    """删除指定的 PDF 文档"""
+    logger.info("[api_service] 收到 DELETE /api/knowledge/documents/%s",
+                 filename)
+    from urllib.parse import unquote
+    decoded = unquote(filename)
+    if decoded != filename:
+        logger.info("[api_service] 文件名已 URL 解码: %s -> %s",
+                     filename, decoded)
+    filename = decoded
+    if not delete_pdf(filename):
+        logger.warning("[api_service] 删除失败: 文档不存在 | 文件名: %s",
+                        filename)
+        raise HTTPException(status_code=404,
+                            detail=f"文档不存在: {filename}")
+    logger.info("[api_service] 删除成功 | 文件名: %s", filename)
+    return {"success": True, "filename": filename}
+
+
+@app.get("/api/system/status",
+         response_model=SystemStatusResponse,
+         summary="获取系统状态")
+async def api_system_status():
+    """返回系统运行状态（只读监控数据）"""
+    from .monitoring import (LANGSMITH_ENABLED, LANGSMITH_PROJECT,
+                              LANGSMITH_ENDPOINT)
+
+    # --- 模型状态 ---
+    agent_cfg = _load_agent_config()
+    model_status = {
+        "name": agent_cfg.get("model", "qwen-max"),
+        "status": "loaded" if rag_generator is not None else "not_loaded",
+        "temperature": agent_cfg.get("temperature", 0.3),
+        "max_steps": agent_cfg.get("max_steps", 5),
+    }
+
+    # --- 向量数据库状态 ---
+    vb_counts = 0
+    if vector_db_dir.exists():
+        vb_counts = sum(1 for d in vector_db_dir.iterdir() if d.is_dir())
+    vector_db_status = {
+        "path": str(vector_db_dir),
+        "status": "available" if vector_db_dir.exists() else "unavailable",
+        "company_count": vb_counts,
+    }
+
+    # --- 长期记忆状态 ---
+    memory_status = {
+        "long_term_enabled":
+            agent_cfg.get("memory_enable_long_term", False),
+        "working_memory_limit":
+            agent_cfg.get("memory_working_memory_limit", 10),
+    }
+
+    # --- LangSmith 监控状态 ---
+    monitoring_status = {
+        "langsmith_available": LANGSMITH_ENABLED,
+        "langsmith_project": LANGSMITH_PROJECT,
+        "langsmith_endpoint": LANGSMITH_ENDPOINT,
+    }
+
+    # --- 工具列表（当前全部启用，只读） ---
+    tools_status = {
+        "retrieve": True,
+        "calculator": True,
+        "compare": True,
+        "chart": True,
+        "verify": True,
+        "delegate": True,
+    }
+
+    return {
+        "model": model_status,
+        "vector_db": vector_db_status,
+        "memory": memory_status,
+        "monitoring": monitoring_status,
+        "tools": tools_status,
+    }
