@@ -250,9 +250,9 @@ class ChartTool(BaseTool):
                 "relative_path": rel_path,
                 "file_name": filepath.name,
                 "file_size_kb": round(filepath.stat().st_size / 1024, 1),
-                "url": "/api/charts/%s" % filepath.name,
-                "json_url": "/api/charts/%s" % json_path.name,
-                "message": "图表已生成，可通过 URL 访问: /api/charts/%s" % filepath.name,
+                "url": "/api/charts/images/%s" % filepath.name,
+                "json_url": "/api/charts/images/%s" % json_path.name,
+                "message": "图表已生成，可通过 URL 访问: /api/charts/images/%s" % filepath.name,
                 "chart_data": chart_data,  # 结构化数据，供前端直接使用
             }
         )

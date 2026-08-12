@@ -635,10 +635,11 @@ class APIAuthMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(APIAuthMiddleware)
 
-# 静态文件服务：挂载图表图片目录，前端可通过 /api/charts/{filename} 访问
+# 静态文件服务：挂载图表图片目录，前端可通过 /api/charts/images/{filename} 访问
+# 使用 /api/charts/images 子路径，避免与 /api/charts/list 等 API 路由冲突
 _charts_dir = project_root / "data" / "charts"
 _charts_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/api/charts", StaticFiles(directory=str(_charts_dir)), name="charts")
+app.mount("/api/charts/images", StaticFiles(directory=str(_charts_dir)), name="charts")
 
 
 # ==================== API 接口 ====================
@@ -1522,7 +1523,7 @@ async def api_charts_list():
         for json_file in sorted(_charts_dir.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True):
             try:
                 data = json.loads(json_file.read_text(encoding="utf-8"))
-                data["image_url"] = "/api/charts/%s" % json_file.with_suffix(".png").name
+                data["image_url"] = "/api/charts/images/%s" % json_file.with_suffix(".png").name
                 charts.append(data)
             except Exception as e:
                 logger.warning("[api_service] 读取图表 JSON 失败: %s, %s", json_file.name, e)
