@@ -14,6 +14,7 @@ RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debia
     && apt-get install -y --no-install-recommends \
         build-essential \
         libopenblas-dev \
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # ----- Python 依赖安装 -----
