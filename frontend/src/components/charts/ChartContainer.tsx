@@ -32,8 +32,8 @@ export interface ChartData {
   title: string;
   xlabel?: string;
   ylabel?: string;
-  labels: string[];
-  values: number[];
+  labels?: string[];
+  values?: number[];
   image_url?: string;
   columns?: string[];   // table 类型专用
   rows?: string[][];    // table 类型专用
@@ -63,17 +63,22 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
 
   // ---- 挂载 / 数据变更日志 ----
   useEffect(() => {
-    logger(`mount#${mountId}`, `chart_type=${data.chart_type} title="${data.title}" labels=${data.labels.length} values=${data.values.length} height=${height}`);
+    if (data.chart_type === 'table') return;
+    logger(`mount#${mountId}`, `chart_type=${data.chart_type} title="${data.title}" labels=${data.labels?.length ?? 0} values=${data.values?.length ?? 0} height=${height}`);
   }, [data, height, mountId]);
 
   // ---- option 计算 ----
   const option = useMemo(() => {
     const { chart_type, title, xlabel, ylabel, labels, values } = data;
+    // 表格类型不需要 ECharts option
+    if (chart_type === 'table') return {};
+    const safeLabels = labels || [];
+    const safeValues = values || [];
 
     // 防御: 空数据或 labels/values 长度不一致时，截断到最小长度
-    const safeLength = Math.min(labels.length, values.length);
+    const safeLength = Math.min(safeLabels.length, safeValues.length);
 
-    logger('option', `labels=${labels.length} values=${values.length} safeLength=${safeLength} chart_type=${chart_type}`);
+    logger('option', `labels=${safeLabels.length} values=${safeValues.length} safeLength=${safeLength} chart_type=${chart_type}`);
 
     if (safeLength === 0) {
       logger('option', '空数据，返回暂无数据占位option', { title: title || '暂无数据' });
@@ -92,15 +97,15 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
       };
     }
 
-    if (labels.length !== values.length) {
+    if (safeLabels.length !== safeValues.length) {
       logger('option', `labels/values长度不一致，截断到 ${safeLength}`, {
-        labelsLen: labels.length,
-        valuesLen: values.length,
+        labelsLen: safeLabels.length,
+        valuesLen: safeValues.length,
       });
     }
 
-    const safeLabels = labels.slice(0, safeLength);
-    const safeValues = values.slice(0, safeLength);
+    const trimmedLabels = safeLabels.slice(0, safeLength);
+    const trimmedValues = safeValues.slice(0, safeLength);
 
     const baseOption: Record<string, unknown> = {
       title: {
@@ -150,9 +155,9 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
           type: 'pie',
           radius: ['40%', '70%'],
           center: ['50%', '55%'],
-          data: safeLabels.map((name, i) => ({
+          data: trimmedLabels.map((name, i) => ({
             name,
-            value: safeValues[i],
+            value: trimmedValues[i],
           })),
           itemStyle: {
             color: (params: { dataIndex: number }) =>
@@ -175,7 +180,7 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
 
     // hbar: 横向柱状图，x轴和y轴互换
     if (chart_type === 'hbar') {
-      logger('option', `渲染横向柱状图, dataPoints=${safeLength} label种数=${new Set(safeLabels).size}`);
+      logger('option', `渲染横向柱状图, dataPoints=${safeLength} label种数=${new Set(trimmedLabels).size}`);
       return {
         ...baseOption,
         grid: {
@@ -191,14 +196,14 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
         },
         yAxis: {
           type: 'category',
-          data: safeLabels,
+          data: trimmedLabels,
           name: xlabel || '',
           axisLabel: { fontSize: 12, color: '#888' },
           axisTick: { alignWithLabel: true },
         },
         series: [{
           type: 'bar',
-          data: safeValues.map((v, i) => ({
+          data: trimmedValues.map((v, i) => ({
             value: v,
             itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length], borderRadius: [0, 6, 6, 0] },
           })),
@@ -208,12 +213,12 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
       };
     }
 
-    logger('option', `渲染${chart_type}图, dataPoints=${safeLength} label种数=${new Set(safeLabels).size}`);
+    logger('option', `渲染${chart_type}图, dataPoints=${safeLength} label种数=${new Set(trimmedLabels).size}`);
     return {
       ...baseOption,
       xAxis: {
         type: 'category',
-        data: safeLabels,
+        data: trimmedLabels,
         name: xlabel || '',
         axisLabel: { fontSize: 12, color: '#888' },
         axisTick: { alignWithLabel: true },
@@ -225,7 +230,7 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
       },
       series: [chart_type === 'line' ? {
         type: 'line',
-        data: safeValues.map((v, i) => ({
+        data: trimmedValues.map((v, i) => ({
           value: v,
           itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length], borderRadius: 0 },
         })),
@@ -236,7 +241,7 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
         label: { show: true, position: 'top', fontSize: 11, color: '#888', formatter: '{c}' },
       } : {
         type: 'bar',
-        data: safeValues.map((v, i) => ({
+        data: trimmedValues.map((v, i) => ({
           value: v,
           itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length], borderRadius: [6, 6, 0, 0] },
         })),
