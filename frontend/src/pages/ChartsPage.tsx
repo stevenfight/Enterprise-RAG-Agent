@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Card, Radio, Empty, Spin, Typography, message as antMsg } from 'antd';
+import { Card, Radio, Empty, Spin, Typography, message } from 'antd';
 import { BarChartOutlined, LineChartOutlined, PieChartOutlined, AlignLeftOutlined } from '@ant-design/icons';
 import ChartContainer, { type ChartData } from '@/components/charts/ChartContainer';
 
@@ -15,7 +15,6 @@ export default function ChartsPage() {
   const [charts, setCharts] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeType, setActiveType] = useState<string>('all');
-  const [messageApi] = antMsg.useMessage();
 
   useEffect(() => {
     const fetchCharts = async () => {
@@ -25,13 +24,13 @@ export default function ChartsPage() {
         const data = await res.json();
         setCharts(data.charts || []);
       } catch {
-        messageApi.warning('无法加载图表列表，请确认后端服务已启动');
+        message.warning('无法加载图表列表，请确认后端服务已启动');
       } finally {
         setLoading(false);
       }
     };
     fetchCharts();
-  }, [messageApi]);
+  }, []);
 
   const filtered = activeType === 'all'
     ? charts

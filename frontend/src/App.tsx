@@ -7,7 +7,7 @@
 
 import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { App as AntdApp, Spin, Result, Button } from 'antd';
+import { Spin, Result, Button } from 'antd';
 import AppLayout from '@/components/layout/AppLayout';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 import ChatPage from '@/pages/ChatPage';
@@ -50,7 +50,6 @@ export default function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <AntdApp>
         <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<ChatPage />} />
@@ -73,7 +72,6 @@ export default function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>
-        </AntdApp>
       </BrowserRouter>
     </ErrorBoundary>
   );
