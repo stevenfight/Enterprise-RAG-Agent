@@ -656,6 +656,73 @@ _charts_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/api/charts/images", StaticFiles(directory=str(_charts_dir)), name="charts")
 
 
+def _extract_markdown_tables(answer: str, query: str) -> int:
+    """从 LLM 回答中提取 markdown 表格，保存为 chart 条目（chart_type=table）
+
+    返回保存的表格数量。
+    """
+    saved_count = 0
+    # 匹配 markdown 表格：连续的 |...| 行
+    lines = answer.split("\n")
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if not (line.startswith("|") and line.endswith("|")):
+            i += 1
+            continue
+
+        # 找到表格开头
+        header_line = line
+        header_cells = [c.strip() for c in header_line.split("|")[1:-1]]
+        if len(header_cells) < 2:
+            i += 1
+            continue
+
+        # 下一行应该是分隔行
+        if i + 1 >= len(lines):
+            i += 1
+            continue
+        sep_line = lines[i + 1].strip()
+        if not (sep_line.startswith("|") and all(c.strip() in ("---", ":---", "---:", ":---:") for c in sep_line.split("|")[1:-1])):
+            i += 1
+            continue
+
+        # 收集数据行
+        rows = []
+        j = i + 2
+        while j < len(lines):
+            row_line = lines[j].strip()
+            if not (row_line.startswith("|") and row_line.endswith("|")):
+                break
+            row_cells = [c.strip() for c in row_line.split("|")[1:-1]]
+            if len(row_cells) == len(header_cells):
+                rows.append(row_cells)
+            j += 1
+
+        if rows:
+            # 构建文件路径
+            safe_query = re.sub(r'[^\u4e00-\u9fff\w\-]', '_', query[:30]).strip('_')
+            ts = int(time.time() * 1000)
+            file_name = f"table_{safe_query}_{ts}.json"
+            json_path = _charts_dir / file_name
+
+            table_data = {
+                "chart_type": "table",
+                "title": query[:60] + ("..." if len(query) > 60 else ""),
+                "columns": header_cells,
+                "rows": rows,
+                "file_name": file_name,
+                "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            }
+            json_path.write_text(json.dumps(table_data, ensure_ascii=False, indent=2), encoding="utf-8")
+            logger.info("[api_service] 表格已保存到图表模块: %s (%d列 x %d行)", file_name, len(header_cells), len(rows))
+            saved_count += 1
+
+        i = j
+
+    return saved_count
+
+
 # ==================== API 接口 ====================
 
 @app.post("/api/query", response_model=QueryResponse, summary="完整 RAG 问答（检索+生成）")
@@ -747,6 +814,11 @@ async def api_query(request: QueryRequest):
         cm.add_message("assistant", answer)
         logger.info("[api_service] 对话历史已更新，当前轮数: %d",
                      len(cm.messages) // 2)
+
+        # 提取回答中的 markdown 表格，保存到数据图表模块
+        table_count = _extract_markdown_tables(answer, request.query)
+        if table_count > 0:
+            result["table_count"] = table_count  # 告知前端有表格可查看
 
         logger.info("[api_service] /api/query 处理完成，耗时: %.2f 秒", elapsed)
         logger.info("[api_service] 答案长度: %d 字符，来源数: %d",

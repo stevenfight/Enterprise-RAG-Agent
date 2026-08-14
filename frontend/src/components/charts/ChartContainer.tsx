@@ -8,6 +8,7 @@
  */
 
 import { useMemo, useEffect } from 'react';
+import { Table } from 'antd';
 import ReactEChartsCore from 'echarts-for-react/esm/core';
 import * as echarts from 'echarts/core';
 import { BarChart, LineChart, PieChart } from 'echarts/charts';
@@ -34,6 +35,8 @@ export interface ChartData {
   labels: string[];
   values: number[];
   image_url?: string;
+  columns?: string[];   // table 类型专用
+  rows?: string[][];    // table 类型专用
 }
 
 interface ChartContainerProps {
@@ -244,6 +247,52 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
   }, [data]);
 
   // ---- 渲染 ----
+
+  // table 类型：渲染 Ant Design 表格
+  if (data.chart_type === 'table' && data.columns && data.rows) {
+    return (
+      <div style={{
+        borderRadius: 12,
+        padding: '16px 12px 8px',
+        background: '#ffffff',
+        border: '1px solid #e8e3ef',
+        boxShadow: '0 2px 8px rgba(184, 169, 201, 0.1)',
+        marginBottom: 16,
+      }}>
+        <div style={{
+          textAlign: 'center',
+          fontSize: 15,
+          fontWeight: 600,
+          color: '#3D3554',
+          marginBottom: 12,
+        }}>
+          {data.title}
+        </div>
+        <Table
+          dataSource={data.rows.map((row, i) => {
+            const record: Record<string, string> = { _key: String(i) };
+            data.columns!.forEach((col, ci) => {
+              record[col] = row[ci] ?? '-';
+            });
+            return record;
+          })}
+          columns={data.columns.map(col => ({
+            title: col,
+            dataIndex: col,
+            key: col,
+            render: (val: string) => (
+              <span style={{ fontSize: 13 }}>{val}</span>
+            ),
+          }))}
+          rowKey="_key"
+          pagination={data.rows.length > 15 ? { pageSize: 15, size: 'small' } : false}
+          size="small"
+          bordered
+          style={{ borderRadius: 8 }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div style={{

@@ -59,6 +59,7 @@ export default function ChartsPage() {
             <Radio.Button value="hbar"><AlignLeftOutlined /> 横向柱状图</Radio.Button>
             <Radio.Button value="line"><LineChartOutlined /> 折线图</Radio.Button>
             <Radio.Button value="pie"><PieChartOutlined /> 饼图</Radio.Button>
+            <Radio.Button value="table"><TableOutlined /> 表格</Radio.Button>
           </Radio.Group>
           <Segmented
             options={[
@@ -100,7 +101,8 @@ export default function ChartsPage() {
               <span style={{ fontSize: 12, color: '#B8A9C9' }}>
                 {chart.chart_type === 'bar' ? '柱状图' :
                  chart.chart_type === 'hbar' ? '横向柱状图' :
-                 chart.chart_type === 'line' ? '折线图' : '饼图'}
+                 chart.chart_type === 'line' ? '折线图' :
+                 chart.chart_type === 'table' ? '表格' : '饼图'}
               </span>
             }
           >
