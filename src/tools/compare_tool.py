@@ -103,7 +103,7 @@ class CompareTool(BaseTool):
     def _get_retriever(self):
         if self._retriever is None:
             logger.info("[CompareTool] 首次调用，延迟加载 HybridRetriever...")
-            from retrieval import HybridRetriever
+            from src.retrieval import HybridRetriever
             project_root = Path(__file__).resolve().parent.parent.parent
             vector_db_dir = project_root / "data" / "stock_data" / "databases" / "vector_dbs"
             if not vector_db_dir.exists():
@@ -219,15 +219,13 @@ class CompareTool(BaseTool):
         lines = [
             "## %s年 %s 多公司横向对比" % (year, metric),
             "",
-            "| 公司 | %s | 数据来源 | 页码 |" % metric,
-            "|------|------|---------|------|",
+            "| 公司 | %s |" % metric,
+            "|------|------|",
         ]
         for cn in companies:
             data = company_data.get(cn, {})
             value = data.get("value", "数据缺失")
-            source = data.get("source", "-")
-            pages = data.get("pages", "-")
-            lines.append("| %s | %s | %s | %s |" % (cn, value, source, pages))
+            lines.append("| %s | %s |" % (cn, value))
         lines.append("")
         return "\n".join(lines)
 

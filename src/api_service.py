@@ -683,7 +683,7 @@ def _extract_markdown_tables(answer: str, query: str) -> int:
             i += 1
             continue
         sep_line = lines[i + 1].strip()
-        if not (sep_line.startswith("|") and all(c.strip() in ("---", ":---", "---:", ":---:") for c in sep_line.split("|")[1:-1])):
+        if not (sep_line.startswith("|") and all(re.match(r'^[-:]+$', c.strip()) for c in sep_line.split("|")[1:-1])):
             i += 1
             continue
 
@@ -705,6 +705,18 @@ def _extract_markdown_tables(answer: str, query: str) -> int:
             j += 1
 
         if rows:
+            # 过滤掉"数据来源"和"页码"列（从头和行中移除）
+            exclude_indices = [
+                idx for idx, col in enumerate(header_cells)
+                if col in ('数据来源', '页码', '资料来源') or '数据来源' in col or '页码' in col
+            ]
+            if exclude_indices:
+                header_cells = [c for idx, c in enumerate(header_cells) if idx not in exclude_indices]
+                rows = [
+                    [c for idx, c in enumerate(row) if idx not in exclude_indices]
+                    for row in rows
+                ]
+
             # 构建文件路径
             safe_query = re.sub(r'[^\u4e00-\u9fff\w\-]', '_', query[:30]).strip('_')
             ts = int(time.time() * 1000)
