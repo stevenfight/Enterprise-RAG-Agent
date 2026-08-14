@@ -680,10 +680,21 @@ class HybridRetriever:
 
         return results
 
-    def _merge_results(self, vector_results, bm25_results, intent=None):
+    def _merge_results(self, vector_results, bm25_results, intent=None, metadata=None):
         logger.info("[HybridRetriever] 开始合并向量与 BM25 结果")
         logger.info("[HybridRetriever] 向量结果数: %d, BM25 结果数: %d",
                      len(vector_results), len(bm25_results))
+
+        # 从元数据构建各文件的总页数映射（用于页面位置惩罚）
+        page_max_map = {}
+        if metadata:
+            for item in metadata:
+                sf = item.get("source_file", "")
+                if sf:
+                    item_pages = item.get("pages", [])
+                    if item_pages:
+                        current_max = page_max_map.get(sf, 0)
+                        page_max_map[sf] = max(current_max, max(item_pages))
 
         weights = INTENT_WEIGHTS.get(intent, {"bm25": BM25_WEIGHT, "vector": VECTOR_WEIGHT}) if intent else {"bm25": BM25_WEIGHT, "vector": VECTOR_WEIGHT}
         bm25_w = weights["bm25"]
@@ -760,13 +771,19 @@ class HybridRetriever:
             authority_boost = _compute_source_authority_boost(item)
             # 内容质量惩罚: 对图片引用、免责声明、营销文本等低质量内容进行降权
             quality_penalty = self._compute_content_quality_penalty(item.get("parent_text", ""))
-            hybrid_score = hybrid_score + data_boost + authority_boost - quality_penalty
+            # 页面位置惩罚: 对文档末尾页面进行轻微降权，防止检索过度集中在年报末尾
+            position_penalty = self._compute_page_position_penalty(
+                item.get("pages", []), item.get("source_file", ""), page_max_map
+            )
+            hybrid_score = hybrid_score + data_boost + authority_boost - quality_penalty - position_penalty
             hybrid_score = max(0.0, min(1.0, hybrid_score))
             item["scores"]["hybrid"] = round(hybrid_score, 4)
             if data_boost > 0:
                 item["scores"]["data_boost"] = round(data_boost, 4)
             if authority_boost > 0:
                 item["scores"]["authority_boost"] = round(authority_boost, 4)
+            if position_penalty > 0:
+                item["scores"]["position_penalty"] = round(position_penalty, 4)
 
         sorted_results = sorted(merged.values(), key=lambda x: x["scores"]["hybrid"], reverse=True)
 
@@ -943,6 +960,38 @@ class HybridRetriever:
         return min(max_boost, boost)
 
     @staticmethod
+    def _compute_page_position_penalty(pages, source_file, page_max_map, max_penalty=0.10):
+        """计算页面位置惩罚值
+
+        对文档末尾（最后10%）的页面进行轻微降权，防止检索结果过度集中在
+        年报末尾的财务摘要/补充资料页面，鼓励从正文中获取更丰富的信息。
+
+        Args:
+            pages: 当前块的页码列表
+            source_file: 来源文件名
+            page_max_map: 各文件的总页数映射 {source_file: max_page}
+            max_penalty: 最大惩罚值，默认 0.10
+
+        Returns:
+            float: 惩罚值，范围 [0, max_penalty]
+        """
+        if not pages or source_file not in page_max_map:
+            return 0.0
+        total_pages = page_max_map[source_file]
+        if total_pages <= 1:
+            return 0.0
+        # 取当前块的最大页码
+        max_page = max(pages)
+        # 计算页码在文档中的位置比例（0=开头，1=结尾）
+        position_ratio = (max_page - 1) / (total_pages - 1) if total_pages > 1 else 0.0
+        # 只对最后10%的页面应用惩罚，线性递增
+        if position_ratio < 0.90:
+            return 0.0
+        # 在 90%-100% 区间内线性递增惩罚
+        penalty = max_penalty * (position_ratio - 0.90) / 0.10
+        return round(penalty, 4)
+
+    @staticmethod
     def _compute_content_quality_penalty(text, max_penalty=0.20):
         """计算内容质量惩罚值
 
@@ -1041,7 +1090,7 @@ class HybridRetriever:
         if not vector_results and not bm25_results:
             logger.warning("[HybridRetriever] 公司 '%s' 两种检索均无结果", company_name)
             return []
-        merged = self._merge_results(vector_results, bm25_results, intent=intent)
+        merged = self._merge_results(vector_results, bm25_results, intent=intent, metadata=vr.metadata if vr.metadata else None)
         return merged
 
     def _search_comparison(self, query, mentioned_companies, top_n, extracted_years=None):
@@ -1231,7 +1280,7 @@ class HybridRetriever:
                 logger.warning("[HybridRetriever] 公司 '%s' 两种检索均无结果，跳过", cn)
                 continue
 
-            merged = self._merge_results(vector_results, bm25_results, intent=intent)
+            merged = self._merge_results(vector_results, bm25_results, intent=intent, metadata=vr.metadata if vr.metadata else None)
             all_merged.extend(merged)
 
             logger.info("[HybridRetriever] 公司 '%s' 检索→融合完成: 向量=%d, BM25=%d → 融合=%d | 累计=%d",
