@@ -362,16 +362,73 @@ function formatTime(ts: number): string {
 
 /** Markdown -> HTML 转换 (Phase 2 增强版，支持图片、链接、标题、列表、表格) */
 function formatMarkdown(text: string): string {
-  let html = text;
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let inTable = false;
+  let tableRows: string[] = [];
+  let isHeader = false;
 
-  // 图片语法 ![alt](url) -- 必须在链接之前处理，避免被链接规则吞掉
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // 检测表格行：以 | 开头和结尾
+    if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+      if (!inTable) {
+        inTable = true;
+        tableRows = [];
+        isHeader = true;
+      }
+      const cells = line.trim().split('|').filter(c => c.trim() !== '');
+      // 跳过分隔行（如 |---|---| ）
+      if (cells.every(c => /^[-:]+$/.test(c.trim()))) {
+        isHeader = false;
+        continue;
+      }
+      if (isHeader) {
+        tableRows.push(`<thead><tr>${cells.map(c => `<th style="padding:6px 12px;border:1px solid #ddd;background:#f5f3f9;text-align:left;font-size:13px">${processInline(c.trim())}</th>`).join('')}</tr></thead>`);
+      } else {
+        tableRows.push(`<tr>${cells.map(c => `<td style="padding:6px 12px;border:1px solid #ddd;font-size:13px">${processInline(c.trim())}</td>`).join('')}</tr>`);
+      }
+      continue;
+    }
+
+    // 表格结束，输出表格 HTML
+    if (inTable && tableRows.length > 0) {
+      const bodyRows = tableRows.slice(1).join('');
+      result.push(`<table style="border-collapse:collapse;width:100%;margin:8px 0;border:1px solid #ddd;border-radius:6px;overflow:hidden">${tableRows[0]}<tbody>${bodyRows}</tbody></table>`);
+      inTable = false;
+      tableRows = [];
+      isHeader = false;
+    }
+
+    if (line.trim() === '') {
+      result.push('<br/>');
+      continue;
+    }
+
+    result.push(processLine(line));
+  }
+
+  // 结尾处理未关闭的表格
+  if (inTable && tableRows.length > 0) {
+    const bodyRows = tableRows.slice(1).join('');
+    result.push(`<table style="border-collapse:collapse;width:100%;margin:8px 0;border:1px solid #ddd;border-radius:6px;overflow:hidden">${tableRows[0]}<tbody>${bodyRows}</tbody></table>`);
+  }
+
+  return result.join('\n');
+}
+
+/** 处理单行（非表格行） */
+function processLine(line: string): string {
+  let html = line;
+
+  // 图片语法 ![alt](url) -- 必须在链接之前处理
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, url) => {
     return `<img src="${url}" alt="${alt}" style="max-width:100%;border-radius:8px;margin:8px 0;" />`;
   });
 
   // 链接语法 [text](url)
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
-    // 如果已经是 <img> 标签内的内容则跳过
     if (match.includes('<img')) return match;
     return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#5BAA98;text-decoration:underline;">${text}</a>`;
   });
@@ -381,20 +438,18 @@ function formatMarkdown(text: string): string {
   html = html.replace(/^## (.+)$/gm, '<h3 style="margin:10px 0 6px;font-size:15px;font-weight:700;">$1</h3>');
   html = html.replace(/^# (.+)$/gm, '<h2 style="margin:12px 0 8px;font-size:16px;font-weight:700;">$1</h2>');
 
+  html = processInline(html);
+
+  return html;
+}
+
+/** 处理行内格式：粗体、斜体、代码 */
+function processInline(html: string): string {
   // 粗体 **text**
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-
   // 斜体 *text*
   html = html.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
-
   // 行内代码 `code`
-  html = html.replace(/`(.+?)`/g, `<code style="background:${'rgba(0,0,0,0.06)'};padding:2px 6px;border-radius:3px;font-family:${monoFont};font-size:13px">$1</code>`);
-
-  // 无序列表 - item
-  html = html.replace(/^- (.+)$/gm, '<li style="margin-left:16px;list-style:disc;">$1</li>');
-
-  // 换行
-  html = html.replace(/\n/g, '<br/>');
-
+  html = html.replace(/`(.+?)`/g, `<code style="background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:3px;font-family:${monoFont};font-size:13px">$1</code>`);
   return html;
 }
