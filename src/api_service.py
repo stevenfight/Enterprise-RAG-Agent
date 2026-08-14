@@ -687,7 +687,7 @@ def _extract_markdown_tables(answer: str, query: str) -> int:
             i += 1
             continue
 
-        # 收集数据行
+        # 收集数据行，过滤掉"数据来源"等说明性行
         rows = []
         j = i + 2
         while j < len(lines):
@@ -696,6 +696,11 @@ def _extract_markdown_tables(answer: str, query: str) -> int:
                 break
             row_cells = [c.strip() for c in row_line.split("|")[1:-1]]
             if len(row_cells) == len(header_cells):
+                # 跳过包含"数据来源"、"来源"、"注："等说明性行
+                row_text = ''.join(row_cells)
+                if any(kw in row_text for kw in ('数据来源', '资料来源', '来源:', '注：', '注:', '说明：')):
+                    j += 1
+                    continue
                 rows.append(row_cells)
             j += 1
 
@@ -969,6 +974,8 @@ async def _handle_multi_agent_query(
     # 记录对话历史
     cm.add_message("user", request.query)
     cm.add_message("assistant", result.answer)
+    # 提取表格到数据图表模块
+    _extract_markdown_tables(result.answer or "", request.query)
     return response
 
 
@@ -1051,6 +1058,8 @@ async def _stream_single_agent(
     cm.add_message("user", query)
     if final_answer:
         cm.add_message("assistant", final_answer)
+        # 提取表格到数据图表模块
+        _extract_markdown_tables(final_answer, query)
 
 
 async def _stream_multi_agent(
@@ -1186,6 +1195,8 @@ async def _stream_multi_agent(
     cm.add_message("user", query)
     if final_result[0]:
         cm.add_message("assistant", final_result[0].answer)
+        # 提取表格到数据图表模块
+        _extract_markdown_tables(final_result[0].answer or "", query)
 
 
 @app.post("/api/agent/query", response_model=AgentQueryResponse,
@@ -1328,6 +1339,9 @@ async def api_agent_query(request: AgentQueryRequest):
         logger.info("[api_service] 推理链: %d 步, 答案: %d 字符, 置信度: %.2f",
                      len(chain), len(result.answer),
                      reflection.get("overall_confidence", 0) if reflection else 0)
+
+        # 提取表格到数据图表模块
+        _extract_markdown_tables(result.answer, request.query)
 
         return AgentQueryResponse(
             answer=result.answer,

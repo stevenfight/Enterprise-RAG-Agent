@@ -387,6 +387,21 @@ function formatMarkdown(text: string): string {
       if (isHeader) {
         tableRows.push(`<thead><tr>${cells.map(c => `<th style="padding:6px 12px;border:1px solid #ddd;background:#f5f3f9;text-align:left;font-size:13px">${processInline(c.trim())}</th>`).join('')}</tr></thead>`);
       } else {
+        // 检测"数据来源"等说明性行，结束表格并作为独立段落处理
+        const rowText = cells.join('');
+        if (/数据来源|资料来源|来源[:：]|注[:：]|说明[:：]/.test(rowText)) {
+          // 结束表格
+          if (tableRows.length > 0) {
+            const bodyRows = tableRows.slice(1).join('');
+            result.push(`<table style="border-collapse:collapse;width:100%;margin:8px 0;border:1px solid #ddd;border-radius:6px;overflow:hidden">${tableRows[0]}<tbody>${bodyRows}</tbody></table>`);
+          }
+          inTable = false;
+          tableRows = [];
+          isHeader = false;
+          // 作为独立段落渲染，用灰色小字
+          result.push(`<div style="font-size:12px;color:#999;margin-top:4px">${processInline(cells.map(c => c.trim()).join(' | '))}</div>`);
+          continue;
+        }
         tableRows.push(`<tr>${cells.map(c => `<td style="padding:6px 12px;border:1px solid #ddd;font-size:13px">${processInline(c.trim())}</td>`).join('')}</tr>`);
       }
       continue;
