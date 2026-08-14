@@ -72,5 +72,6 @@ feat: 文档类型标签打标与检索加权(tags + 年报三层防线)
 
 ## 已提交
 
+- 2026-08-14 `57e4b81` ci: 新增GitHub Actions自动构建Docker镜像流水线
 - 2026-08-14 `66e4d6f` fix: Dockerfile.backend 添加 ca-certificates 解决SSL证书验证问题
 - 2026-08-14 `51b0941` feat: 多Agent升级阶段九~十五 + step07/08测试修复
