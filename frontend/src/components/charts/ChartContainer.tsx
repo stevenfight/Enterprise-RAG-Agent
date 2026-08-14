@@ -170,6 +170,41 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
       };
     }
 
+    // hbar: 横向柱状图，x轴和y轴互换
+    if (chart_type === 'hbar') {
+      logger('option', `渲染横向柱状图, dataPoints=${safeLength} label种数=${new Set(safeLabels).size}`);
+      return {
+        ...baseOption,
+        grid: {
+          left: 80,
+          right: 30,
+          top: 50,
+          bottom: 40,
+        },
+        xAxis: {
+          type: 'value',
+          name: ylabel || '',
+          axisLabel: { fontSize: 12, color: '#888' },
+        },
+        yAxis: {
+          type: 'category',
+          data: safeLabels,
+          name: xlabel || '',
+          axisLabel: { fontSize: 12, color: '#888' },
+          axisTick: { alignWithLabel: true },
+        },
+        series: [{
+          type: 'bar',
+          data: safeValues.map((v, i) => ({
+            value: v,
+            itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length], borderRadius: [0, 6, 6, 0] },
+          })),
+          barWidth: '50%',
+          label: { show: true, position: 'right', fontSize: 11, color: '#888', formatter: '{c}' },
+        }],
+      };
+    }
+
     logger('option', `渲染${chart_type}图, dataPoints=${safeLength} label种数=${new Set(safeLabels).size}`);
     return {
       ...baseOption,

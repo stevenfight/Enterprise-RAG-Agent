@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { Card, Radio, Empty, Spin, Typography, message as antMsg } from 'antd';
-import { BarChartOutlined, LineChartOutlined, PieChartOutlined } from '@ant-design/icons';
+import { BarChartOutlined, LineChartOutlined, PieChartOutlined, AlignLeftOutlined } from '@ant-design/icons';
 import ChartContainer, { type ChartData } from '@/components/charts/ChartContainer';
 
 const { Title } = Typography;
@@ -53,6 +53,7 @@ export default function ChartsPage() {
         >
           <Radio.Button value="all">全部 ({charts.length})</Radio.Button>
           <Radio.Button value="bar"><BarChartOutlined /> 柱状图</Radio.Button>
+          <Radio.Button value="hbar"><AlignLeftOutlined /> 横向柱状图</Radio.Button>
           <Radio.Button value="line"><LineChartOutlined /> 折线图</Radio.Button>
           <Radio.Button value="pie"><PieChartOutlined /> 饼图</Radio.Button>
         </Radio.Group>

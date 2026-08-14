@@ -758,7 +758,10 @@ class HybridRetriever:
             data_boost = self._compute_data_richness_boost(item.get("parent_text", ""))
             # 年报来源权威性加成: 年报 + 财务数字的块获得固定加成（第一层检索防线）
             authority_boost = _compute_source_authority_boost(item)
-            hybrid_score = min(1.0, hybrid_score + data_boost + authority_boost)
+            # 内容质量惩罚: 对图片引用、免责声明、营销文本等低质量内容进行降权
+            quality_penalty = self._compute_content_quality_penalty(item.get("parent_text", ""))
+            hybrid_score = hybrid_score + data_boost + authority_boost - quality_penalty
+            hybrid_score = max(0.0, min(1.0, hybrid_score))
             item["scores"]["hybrid"] = round(hybrid_score, 4)
             if data_boost > 0:
                 item["scores"]["data_boost"] = round(data_boost, 4)
@@ -938,6 +941,53 @@ class HybridRetriever:
         if re.search(r'人民币\s*\d[\d,.]*\s*亿', text):
             boost += 0.02
         return min(max_boost, boost)
+
+    @staticmethod
+    def _compute_content_quality_penalty(text, max_penalty=0.20):
+        """计算内容质量惩罚值
+
+        对低质量内容（图片引用、免责声明、营销文本、纯符号等）进行降权，
+        防止这些块因包含大量关键词而在 BM25/向量检索中排名虚高。
+
+        Args:
+            text: 块文本内容
+            max_penalty: 最大惩罚值，默认 0.20
+
+        Returns:
+            float: 惩罚值，范围 [0, max_penalty]
+        """
+        if not text:
+            return max_penalty
+        penalty = 0.0
+        lines = text.split("\n")
+        line_count = max(len(lines), 1)
+
+        # 图片引用比例过高（>30%行为图片引用）
+        image_lines = sum(1 for l in lines if l.strip().startswith("!["))
+        if line_count > 0 and image_lines / line_count > 0.3:
+            penalty += 0.15
+            logger.info("[HybridRetriever] 内容质量惩罚: 图片引用比例过高 (%.1f%%)", 100 * image_lines / line_count)
+
+        # 免责声明/营销文本关键词
+        disclaimer_keywords = ["免责声明", "扫码关注", "扫码使用", "发现报告",
+                               "本报告版权", "研究报告版权", "资料来源：公开资料",
+                               "百万用户查找报告", "智能搜索引擎", "AI语义识别"]
+        if any(kw in text for kw in disclaimer_keywords):
+            penalty += 0.10
+            logger.info("[HybridRetriever] 内容质量惩罚: 包含免责声明/营销文本")
+
+        # 纯符号/空行占比过高（>50%非实质内容）
+        meaningful_lines = sum(1 for l in lines if len(l.strip()) > 10 and not l.strip().startswith("!["))
+        if meaningful_lines / line_count < 0.5 and line_count > 3:
+            penalty += 0.08
+            logger.info("[HybridRetriever] 内容质量惩罚: 实质性内容占比过低 (%.1f%%)", 100 * meaningful_lines / line_count)
+
+        # 文本过短（< 80 字符）
+        if len(text) < 80:
+            penalty += 0.10
+            logger.info("[HybridRetriever] 内容质量惩罚: 文本过短 (%d 字符)", len(text))
+
+        return min(max_penalty, penalty)
 
     @staticmethod
     def _compute_confidence(scores):
