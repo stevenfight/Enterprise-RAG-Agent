@@ -107,15 +107,26 @@ export default function ChartsPage() {
             }
           >
             <Table
-              dataSource={chart.labels.map((label, i) => ({
-                key: i,
-                label,
-                value: chart.values[i] ?? '-',
-              }))}
-              columns={[
-                { title: chart.xlabel || '类别', dataIndex: 'label', key: 'label' },
-                { title: chart.ylabel || '数值', dataIndex: 'value', key: 'value', align: 'right' as const },
-              ]}
+              dataSource={(chart.chart_type === 'table' && chart.columns && chart.rows
+                ? chart.rows.map((row, i) => {
+                    const record: Record<string, string> = { _key: String(i) };
+                    chart.columns!.forEach((col, ci) => { record[col] = row[ci] ?? '-'; });
+                    return record;
+                  })
+                : (chart.labels || []).map((label, i) => ({
+                    key: i,
+                    label,
+                    value: (chart.values || [])[i] ?? '-',
+                  }))
+              )}
+              columns={chart.chart_type === 'table' && chart.columns
+                ? chart.columns.map(col => ({ title: col, dataIndex: col, key: col }))
+                : [
+                    { title: chart.xlabel || '类别', dataIndex: 'label', key: 'label' },
+                    { title: chart.ylabel || '数值', dataIndex: 'value', key: 'value', align: 'right' as const },
+                  ]
+              }
+              rowKey={chart.chart_type === 'table' ? '_key' : 'key'}
               pagination={false}
               size="small"
               bordered
