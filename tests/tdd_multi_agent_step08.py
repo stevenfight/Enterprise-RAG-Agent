@@ -14,9 +14,14 @@ TDD 测试: 多 Agent 升级 - 阶段五 调优（第一轮）
 
 import logging
 import queue
+import sys
 import unittest
 from io import StringIO
+from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+# 将项目根目录加入 sys.path，使直接运行本脚本时 `import src` 可用
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 # ============================================================
@@ -238,6 +243,9 @@ class TestApiServiceLogging(unittest.TestCase):
         mock_result.sources = []
         mock_result.total_steps = 3
         mock_result.total_tokens = 1234
+        mock_result.total_elapsed_ms = 100.0
+        mock_result.forced_stop = False
+        mock_result.error = None
 
         mock_shared_memory = MagicMock()
         mock_shared_memory.agent_outputs = {"DataAgent": MagicMock(), "CalcAgent": MagicMock()}
@@ -262,7 +270,7 @@ class TestApiServiceLogging(unittest.TestCase):
             suggestions=[]
         )
 
-        with patch("src.orchestrator_agent.OrchestratorAgent",
+        with patch("src.api_service.OrchestratorAgent",
                    return_value=mock_orchestrator), \
              patch("src.api_service._shared_state", {
                  "agent_registry": MagicMock(),
@@ -291,6 +299,9 @@ class TestApiServiceLogging(unittest.TestCase):
         mock_result.sources = []
         mock_result.total_steps = 3
         mock_result.total_tokens = 500
+        mock_result.total_elapsed_ms = 100.0
+        mock_result.forced_stop = False
+        mock_result.error = None
 
         mock_shared_memory = MagicMock()
         mock_shared_memory.agent_outputs = {
@@ -318,7 +329,7 @@ class TestApiServiceLogging(unittest.TestCase):
             suggestions=[]
         )
 
-        with patch("src.orchestrator_agent.OrchestratorAgent",
+        with patch("src.api_service.OrchestratorAgent",
                    return_value=mock_orchestrator), \
              patch("src.api_service._shared_state", {
                  "agent_registry": MagicMock(),

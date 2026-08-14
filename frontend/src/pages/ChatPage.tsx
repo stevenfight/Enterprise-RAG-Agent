@@ -18,8 +18,9 @@ import { useTheme } from '@/hooks/useTheme';
 import { queryQuestion, getCompanies, streamAgentQuery } from '@/services/chatService';
 import ChatContainer from '@/components/chat/ChatContainer';
 import ThoughtChainDrawer from '@/components/chat/ThoughtChainDrawer';
-import type { CompanyInfo, SSEEvent, AgentStepInfo, ReasoningStep } from '@/types/chat';
+import type { CompanyInfo, SSEEvent, AgentStepInfo, ReasoningStep, MultiAgentRunState } from '@/types/chat';
 import { createLogger } from '@/utils/logger';
+import { createEmptyAccumulator, applyAgentEvent } from '@/utils/agentEvent';
 
 const logger = createLogger('ChatPage');
 const { Text, Title } = Typography;
@@ -157,9 +158,10 @@ export default function ChatPage() {
         const agentStartTime = Date.now();
         logger.info('Agent SSE 模式启用', { query: content.slice(0, 80), timestamp: new Date().toISOString() });
 
+        let acc = createEmptyAccumulator();
         let fullAnswer = '';
-        const reasoningSteps: AgentStepInfo[] = [];
         let wasForcedStop = false; // 是否因步数上限强制终止
+        let assistantMessageCreated = false; // 是否已创建 assistant 占位消息
 
         // 先关闭之前的 SSE 连接
         if (sseRef.current) {
@@ -175,67 +177,46 @@ export default function ChatPage() {
             conversation_id: currentSessionId,
           },
           (event: SSEEvent) => {
-            switch (event.type) {
-              case 'thought':
-                console.log(
-                  '%c[ChatPage] ON THOUGHT %cStep',
-                  'color: #9B8EC4; font-weight: bold;',
-                  'color: #333;',
-                  { step: event.step, content: (event.content || '').slice(0, 60), reasoningStepsCount: reasoningSteps.length + 1 },
-                );
-                reasoningSteps.push({
-                  step_number: event.step || 0,
-                  thought: event.content || '',
-                  elapsed_ms: 0,
-                });
-                // 实时更新 UI：首个 thought 创建消息，后续追加
-                if (reasoningSteps.length === 1) {
-                  addAssistantMessage('推理中...', [], [...reasoningSteps]);
-                } else {
-                  updateLastAssistantMessage({ reasoningChain: [...reasoningSteps] });
-                }
-                break;
-              case 'action':
-                logger.debug('ON ACTION', { step: event.step, action: event.content, action_input: event.action_input });
-                if (reasoningSteps.length > 0) {
-                  const last = reasoningSteps[reasoningSteps.length - 1];
-                  last.action = event.content || '';
-                  last.action_input = event.action_input || null;
-                  updateLastAssistantMessage({ reasoningChain: [...reasoningSteps] });
-                }
-                break;
-              case 'observation':
-                logger.debug('ON OBSERVATION', { step: event.step, contentLen: event.content?.length ?? 0 });
-                if (reasoningSteps.length > 0) {
-                  const last = reasoningSteps[reasoningSteps.length - 1];
-                  last.observation = event.content || null;
-                  updateLastAssistantMessage({ reasoningChain: [...reasoningSteps] });
-                }
-                break;
-              case 'answer':
-                logger.info('ON ANSWER 最终答案到达', { contentLen: event.content?.length ?? 0, elapsedMs: Date.now() - agentStartTime });
-                fullAnswer = event.content || '';
-                // 实时更新：将内容替换为最终答案
-                updateLastAssistantMessage({ content: fullAnswer, reasoningChain: [...reasoningSteps] });
-                break;
-              case 'error':
-                console.error(
-                  '%c[ChatPage] ON ERROR %cAgent 返回错误',
-                  'color: #ff4d4f; font-weight: bold;',
-                  'color: #333;',
-                  { content: event.content },
-                );
-                logger.error('SSE 错误事件:', event.content);
-                break;
-              case 'done':
-                logger.info('SSE 流完成', { totalSteps: event.total_steps, elapsedMs: event.total_elapsed_ms, reasoningStepsCount: reasoningSteps.length, forcedStop: event.forced_stop });
-                wasForcedStop = event.forced_stop === true;
-                logger.info('SSE 流结束:', {
-                  totalSteps: event.total_steps,
-                  elapsedMs: event.total_elapsed_ms,
-                  reasoningSteps: reasoningSteps.length,
-                });
-                break;
+            acc = applyAgentEvent(acc, event);
+
+            // 首次出现推理步或多 Agent 状态时创建 assistant 占位消息
+            if (!assistantMessageCreated && (acc.reasoningChain.length > 0 || acc.agentRun !== null)) {
+              if (acc.agentRun) {
+                addAssistantMessage('正在编排多 Agent 任务...', [], undefined, acc.agentRun);
+              } else {
+                addAssistantMessage('推理中...', [], [...acc.reasoningChain]);
+              }
+              assistantMessageCreated = true;
+              return;
+            }
+
+            // 同步事件到 store
+            const partial: { content?: string; reasoningChain?: AgentStepInfo[]; agentRun?: MultiAgentRunState } = {};
+            if (acc.agentRun) partial.agentRun = acc.agentRun;
+            if (acc.reasoningChain.length > 0) partial.reasoningChain = acc.reasoningChain;
+
+            if (event.type === 'answer_chunk') {
+              partial.content = acc.answer;
+            } else if (event.type === 'answer') {
+              partial.content = acc.answer;
+              fullAnswer = acc.answer;
+              logger.info('ON ANSWER 最终答案到达', { contentLen: acc.answer.length, elapsedMs: Date.now() - agentStartTime });
+            }
+
+            if (Object.keys(partial).length > 0) {
+              updateLastAssistantMessage(partial);
+            }
+
+            if (event.type === 'error') {
+              logger.error('SSE 错误事件:', event.content);
+            } else if (event.type === 'done') {
+              wasForcedStop = event.forced_stop === true;
+              logger.info('SSE 流完成', {
+                totalSteps: event.total_steps,
+                elapsedMs: event.total_elapsed_ms,
+                reasoningStepsCount: acc.reasoningChain.length,
+                forcedStop: event.forced_stop,
+              });
             }
           },
           (error: Event) => {
@@ -257,7 +238,7 @@ export default function ChatPage() {
         // 等待 SSE 流结束 (answer 事件到达)
         const checkDone = setInterval(() => {
           if (fullAnswer) {
-            logger.info('SSE 收到完整答案', { answerLen: fullAnswer.length, reasoningSteps: reasoningSteps.length, totalElapsedMs: Date.now() - agentStartTime, forcedStop: wasForcedStop });
+            logger.info('SSE 收到完整答案', { answerLen: fullAnswer.length, reasoningSteps: acc.reasoningChain.length, totalElapsedMs: Date.now() - agentStartTime, forcedStop: wasForcedStop });
             clearInterval(checkDone);
             if (sseRef.current) {
               sseRef.current.close();
@@ -267,7 +248,7 @@ export default function ChatPage() {
             // 推理步数达上限时，注入系统警告提示
             if (wasForcedStop) {
               chatStore.getState().addErrorMessage(
-                `推理达到步数上限（${reasoningSteps.length} 步），部分数据可能未检索到。建议细化查询条件后重试。`
+                `推理达到步数上限（${acc.reasoningChain.length} 步），部分数据可能未检索到。建议细化查询条件后重试。`
               );
             }
             setLoading(false);

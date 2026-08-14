@@ -34,6 +34,15 @@ if not logger.handlers:
     logger.addHandler(_handler)
 
 
+# 文档类型中文标签映射
+DOC_TYPE_LABELS = {
+    "annual_report": "年报",
+    "research_report": "研报",
+    "meeting_minutes": "调研纪要",
+    "other": "其他",
+}
+
+
 class RetrieveTool(BaseTool):
     """财报检索工具
 
@@ -160,6 +169,8 @@ class RetrieveTool(BaseTool):
         Returns:
             格式化后的字典，包含 results 数组和查询摘要
         """
+        from ..text_splitter import _classify_doc_type
+
         formatted = []
         for i, r in enumerate(results):
             # 页码格式化: [23, 24, 25] → "第23-25页"
@@ -176,6 +187,9 @@ class RetrieveTool(BaseTool):
                 "company_name": r.get("company_name", "未知"),
                 "source_file": r.get("source_file", "未知"),
                 "pages": pages_str,
+                "doc_type": DOC_TYPE_LABELS.get(
+                    _classify_doc_type(r.get("source_file"), r.get("tags")), "其他"
+                ),
                 "text": r.get("parent_text", ""),
                 "relevance_score": round(r.get("scores", {}).get("rerank", 0.0), 1),
                 "confidence": r.get("scores", {}).get("confidence", "unknown"),

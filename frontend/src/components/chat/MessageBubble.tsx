@@ -246,6 +246,55 @@ export default function MessageBubble({ message, onViewReasoning }: MessageBubbl
           </div>
         )}
 
+        {/* 多 Agent 运行状态 (Phase 10) */}
+        {!isUser && message.agentRun?.isMultiAgent && (
+          <div style={{
+            marginTop: 10,
+            paddingTop: 8,
+            borderTop: `1px solid ${isDark ? '#3A3550' : '#E8E3EF'}`,
+          }}>
+            <Space size={6} style={{ marginBottom: 8 }}>
+              <RobotOutlined style={{ fontSize: 13, color: '#B8A9C9' }} />
+              <Tag color="geekblue" style={{ fontSize: 11, margin: 0, lineHeight: '16px', borderRadius: 4 }}>
+                多 Agent
+              </Tag>
+              <Text style={{ fontSize: 12, color: '#B8A9C9' }}>
+                已注册 {message.agentRun.registeredAgents.length} 个 Worker
+              </Text>
+            </Space>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {message.agentRun.workers.map((worker, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    background: isDark
+                      ? 'rgba(184, 169, 201, 0.08)'
+                      : 'rgba(184, 169, 201, 0.06)',
+                  }}
+                >
+                  <Space size={6}>
+                    <Text style={{ fontSize: 12, color: isDark ? '#ddd' : '#444' }}>{worker.agent}</Text>
+                    <Tag
+                      color={worker.done ? (worker.success === false ? 'red' : 'green') : 'processing'}
+                      style={{ fontSize: 10, margin: 0, lineHeight: '14px', borderRadius: 4 }}
+                    >
+                      {worker.done ? (worker.success === false ? '失败' : '完成') : '运行中'}
+                    </Tag>
+                  </Space>
+                  <Text style={{ fontSize: 11, color: '#B8A9C9' }}>
+                    {worker.steps.length} 步{worker.elapsed_ms != null ? ` · ${(worker.elapsed_ms / 1000).toFixed(1)}s` : ''}
+                  </Text>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 引用来源 */}
         {!isUser && message.sources && message.sources.length > 0 && (
           <div style={{

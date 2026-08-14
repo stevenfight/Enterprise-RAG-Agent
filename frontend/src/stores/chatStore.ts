@@ -9,7 +9,7 @@
  */
 
 import { create } from 'zustand';
-import type { Message, Session, SourceInfo, AgentStepInfo } from '@/types/chat';
+import type { Message, Session, SourceInfo, AgentStepInfo, MultiAgentRunState } from '@/types/chat';
 import { createLogger } from '@/utils/logger';
 
 const logger = createLogger('chatStore');
@@ -78,9 +78,9 @@ interface ChatState {
   /** 添加用户消息 */
   addUserMessage: (content: string) => void;
   /** 添加 AI 消息 */
-  addAssistantMessage: (content: string, sources?: SourceInfo[], reasoningChain?: AgentStepInfo[]) => void;
-  /** 更新最后一条 AI 消息（Phase 2: SSE 流式推理实时追加 reasoningChain） */
-  updateLastAssistantMessage: (partial: { content?: string; reasoningChain?: AgentStepInfo[] }) => void;
+  addAssistantMessage: (content: string, sources?: SourceInfo[], reasoningChain?: AgentStepInfo[], agentRun?: MultiAgentRunState) => void;
+  /** 更新最后一条 AI 消息（Phase 2: SSE 流式推理实时追加 reasoningChain / agentRun） */
+  updateLastAssistantMessage: (partial: { content?: string; reasoningChain?: AgentStepInfo[]; agentRun?: MultiAgentRunState }) => void;
   /** 添加错误消息 */
   addErrorMessage: (error: string) => void;
   /** 设置加载状态 */
@@ -160,7 +160,7 @@ export const chatStore = create<ChatState>((set) => ({
     });
   },
 
-  addAssistantMessage: (content, sources, reasoningChain) => {
+  addAssistantMessage: (content, sources, reasoningChain, agentRun) => {
     const message: Message = {
       id: genId(),
       role: 'assistant',
@@ -168,6 +168,7 @@ export const chatStore = create<ChatState>((set) => ({
       timestamp: Date.now(),
       sources,
       reasoningChain,
+      agentRun,
     };
     set((state) => {
       const sessions = state.sessions.map((s) =>
@@ -211,6 +212,7 @@ export const chatStore = create<ChatState>((set) => ({
               ...messages[i],
               ...(partial.content !== undefined ? { content: partial.content } : {}),
               ...(partial.reasoningChain !== undefined ? { reasoningChain: partial.reasoningChain } : {}),
+              ...(partial.agentRun !== undefined ? { agentRun: partial.agentRun } : {}),
             };
             break;
           }

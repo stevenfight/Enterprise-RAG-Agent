@@ -298,6 +298,7 @@ class RetrieveResultItem(BaseModel):
     company_name: str
     child_id: Optional[str] = None
     parent_key: Optional[str] = None
+    tags: List[str] = []
     scores: dict
 
 
@@ -604,12 +605,25 @@ class APIAuthMiddleware(BaseHTTPMiddleware):
     白名单路径无需鉴权: /api/health, /docs, /openapi.json, /redoc
     """
 
-    # 无需鉴权的路径
-    SKIP_PATHS = {"/api/health", "/docs", "/openapi.json", "/redoc"}
+    # 无需鉴权的路径（精确匹配）
+    SKIP_PATHS = {
+        "/api/health",
+        "/docs",
+        "/openapi.json",
+        "/redoc",
+        # 前端页面内部接口：EventSource / 原生 fetch 无法携带鉴权头
+        "/api/agent/stream",
+        "/api/agent/plan",
+        "/api/charts/list",
+    }
+
+    # 无需鉴权的路径前缀（动态资源，如前端展示的图表图片）
+    SKIP_PREFIXES = ("/api/charts/images/",)
 
     async def dispatch(self, request: Request, call_next):
-        # 健康检查和文档接口无需鉴权
-        if request.url.path in self.SKIP_PATHS:
+        path = request.url.path
+        # 健康检查、文档接口及前端内部接口无需鉴权
+        if path in self.SKIP_PATHS or path.startswith(self.SKIP_PREFIXES):
             return await call_next(request)
 
         # 从模块级变量读取 API Key
@@ -804,6 +818,7 @@ async def _handle_multi_agent_query(
     Returns:
         AgentQueryResponse 响应对象
     """
+    import asyncio
     from src.shared_memory import SharedMemory
     from src.tools.delegate_tool import DelegateTool
 
@@ -885,6 +900,25 @@ async def _handle_multi_agent_query(
     return response
 
 
+def _split_answer_chunks(text: str) -> list:
+    """将完整答案按句拆分，用于 answer_chunk 流式推送（单/多 Agent 复用）
+
+    以句号、换行、中文/英文分号作为切分点，保留分隔符附于前一 chunk。
+    空串返回空列表。
+    """
+    if not text:
+        return []
+    parts = re.split(r'([。\n；;])', text)
+    chunks = []
+    for i in range(0, len(parts), 2):
+        chunk = parts[i]
+        if i + 1 < len(parts):
+            chunk += parts[i + 1]
+        if chunk.strip():
+            chunks.append(chunk.strip())
+    return chunks
+
+
 async def _stream_single_agent(
     agent: ReActAgent,
     query: str,
@@ -909,6 +943,10 @@ async def _stream_single_agent(
             event_type = event.get("type", "")
             if event_type == "answer":
                 final_answer = event.get("content", "") or event.get("answer", "")
+                # answer 前逐句推送 answer_chunk，与多 Agent 保持一致的打字机效果
+                for chunk in _split_answer_chunks(final_answer):
+                    yield f"data: {json.dumps({'type': 'answer_chunk', 'content': chunk}, ensure_ascii=False)}\n\n"
+                    await _asyncio.sleep(0)
             event_json = json.dumps(event, ensure_ascii=False, default=str)
             yield f"data: {event_json}\n\n"
             await _asyncio.sleep(0)
@@ -951,7 +989,7 @@ async def _stream_multi_agent(
     """多 Agent 流式 SSE 事件生成器（阶段四提取为独立函数）
 
     事件序列: connected → orchestrator_start → delegating
-              → worker_step(N次) → workers_done
+              → worker_step(N次) → worker_done(N次)
               → answer_chunk(N次) → answer → reflection → done
     """
     import asyncio as _asyncio
@@ -1039,25 +1077,18 @@ async def _stream_multi_agent(
     except queue.Empty:
         pass
 
-    # ---- 事件4: workers_done（阶段四新增）----
-    worker_count = len(shared_memory.agent_outputs)
-    yield f"data: {json.dumps({'type': 'workers_done', 'worker_count': worker_count, 'timestamp': int(time.time() * 1000)}, ensure_ascii=False)}\n\n"
+    # ---- 完成信号统一由 worker_done 事件承载（每 Worker 一个）----
 
     # 判断执行结果
+    worker_count = len(shared_memory.agent_outputs)
     if orchestrator_error[0]:
         yield f"data: {json.dumps({'type': 'error', 'content': orchestrator_error[0]}, ensure_ascii=False)}\n\n"
     elif final_result[0]:
         result = final_result[0]
 
         # ---- 新增事件: answer_chunk（按句子拆分）----
-        if result.answer:
-            sentences = re.split(r'([。\n；;])', result.answer)
-            for i in range(0, len(sentences), 2):
-                chunk = sentences[i]
-                if i + 1 < len(sentences):
-                    chunk += sentences[i + 1]
-                if chunk.strip():
-                    yield f"data: {json.dumps({'type': 'answer_chunk', 'content': chunk.strip()}, ensure_ascii=False)}\n\n"
+        for chunk in _split_answer_chunks(result.answer or ""):
+            yield f"data: {json.dumps({'type': 'answer_chunk', 'content': chunk}, ensure_ascii=False)}\n\n"
 
         # ---- 事件: answer ----
         yield f"data: {json.dumps({'type': 'answer', 'content': result.answer, 'workers': worker_count, 'total_tokens': shared_memory.get_total_tokens()}, ensure_ascii=False, default=str)}\n\n"
@@ -1615,7 +1646,7 @@ async def api_langbot_chat(request: LangBotRequest):
 
     logger.info("[api_service] LangBot 用户消息: '%s'", user_message)
 
-    if agent is None:
+    if not _shared_state.get("agent_initialized"):
         logger.error("[api_service] Agent 未初始化")
         return LangBotResponse(
             choices=[{"message": {"role": "assistant", "content": "服务暂不可用, 请稍后重试"}}]
@@ -1627,10 +1658,18 @@ async def api_langbot_chat(request: LangBotRequest):
         cm = _ensure_conversation(conversation_id)
         if cm.agent_memory is None:
             cm.link_memory(AgentMemory())
-        agent.memory = cm.agent_memory
+        per_request_memory = cm.agent_memory
+
+        # 每请求创建独立 Agent 实例（并发安全，与 /api/agent/query 一致）
+        per_request_agent = _create_per_request_agent(
+            memory=per_request_memory,
+            max_steps=10,
+            temperature=0.3,
+            llm_provider=_shared_state.get("llm_provider"),
+        )
 
         # 调用 Agent 推理
-        result = agent.run(user_message)
+        result = per_request_agent.run(user_message)
         answer = result.answer if result.answer else "抱歉, 未能找到相关信息。"
 
         logger.info("[api_service] LangBot 查询完成: success=%s, steps=%d, 答案长度=%d",
@@ -1732,7 +1771,7 @@ async def api_openai_chat_completions(request: OpenAIChatRequest):
 
     logger.info("[api_service] OpenAI 用户消息: '%s'", user_message)
 
-    if agent is None:
+    if not _shared_state.get("agent_initialized"):
         logger.error("[api_service] Agent 未初始化")
         err_resp = {
             "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
@@ -1756,10 +1795,18 @@ async def api_openai_chat_completions(request: OpenAIChatRequest):
         cm = _ensure_conversation(conversation_id)
         if cm.agent_memory is None:
             cm.link_memory(AgentMemory())
-        agent.memory = cm.agent_memory
+        per_request_memory = cm.agent_memory
+
+        # 每请求创建独立 Agent 实例（并发安全，与 /api/agent/query 一致）
+        per_request_agent = _create_per_request_agent(
+            memory=per_request_memory,
+            max_steps=10,
+            temperature=0.3,
+            llm_provider=_shared_state.get("llm_provider"),
+        )
 
         # 调用 Agent 推理
-        result = agent.run(user_message)
+        result = per_request_agent.run(user_message)
         answer = result.answer if result.answer else "抱歉, 未能找到相关信息。"
         # 企业微信不支持 Markdown 图片渲染，移除图片语法
         answer = _strip_markdown_images(answer)

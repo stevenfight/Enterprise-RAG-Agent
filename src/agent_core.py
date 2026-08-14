@@ -46,6 +46,46 @@ if not logger.handlers:
     logger.addHandler(_handler)
 
 
+def _extract_json_object(text: str) -> Optional[str]:
+    """从文本中提取第一个完整的 JSON 对象（平衡括号扫描）
+
+    支持任意深度的嵌套 {}，并正确跳过字符串内部的 {} 与转义字符。
+    相比固定深度正则，可正确解析 delegate 工具的嵌套 tasks 数组等复杂结构。
+
+    Args:
+        text: 待扫描文本
+
+    Returns:
+        第一个完整 JSON 对象字符串（从 { 到匹配的 }），未找到返回 None
+    """
+    start = text.find("{")
+    if start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+        else:
+            if ch == '"':
+                in_string = True
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start:i + 1]
+    return None
+
+
 @dataclass
 class AgentResult:
     """Agent 执行结果
@@ -147,9 +187,9 @@ class ReActAgent:
             "规则：\n"
             "1. 每步只能调用一个工具\n"
             "2. 数据不充分时不要贸然回答，继续检索\n"
-            "3. 回答中涉及的数字必须标注来源\n"
+            "3. 回答中涉及的数字必须标注来源及具体页码（格式如「中国移动2024年度报告 第23页」）\n"
             "4. 工具返回空结果时，尝试调整查询角度\n"
-            "5. 【单位换算】检索文档中的财务数据原始单位为「千元」，给出答案时必须转换。千元 ÷ 100,000 = 亿元（如 57,795,570千元 = 577.96亿元），千元 ÷ 10 = 万元。严禁将千元数值直接当作元来换算\n"
+            "5. 【单位换算】检索文档中的财务数据金额单位可能不同（千元/百万元/万元/亿元），必须先看文本标注的单位（如「除特别注明外，金额单位为人民币百万元」）再换算。换算公式：千元 ÷ 100,000 = 亿元；百万元 ÷ 100 = 亿元；万元 ÷ 10,000 = 亿元。严禁忽视标注、一律按千元处理。示例：1,040,759百万元 = 10,407.59亿元（除以 100），而不是 1,040.76亿元\n"
             "6. 【禁止汇率换算】严禁进行任何汇率换算。不同来源可能以不同货币列报（如人民币亿元、美元亿），直接引用检索到的原始货币数值即可，不要自作主张乘以汇率转换。例如：检索到美元数值就直接答美元，检索到人民币数值就直接答人民币，不要试图折算出另一个币种的金额\n"
             "7. 【优先人民币数据】当同一指标存在人民币和美元两种列报时，优先使用人民币数值回答。如果只有美元数值，直接以美元作答，同时注明货币单位\n"
             "8. 【图表展示】当 chart 工具返回结果时，其 url 字段是图表的访问路径。在 Final Answer 中必须使用 Markdown 图片语法展示: ![图表标题](url)。不要使用文件系统路径（如 D:\\xxx 或 xxx\\data\\charts\\xxx.png），只使用 url 字段的值\n"
@@ -255,6 +295,16 @@ class ReActAgent:
                 else:
                     logger.error("[ReActAgent] LLM 调用失败，终止推理")
                 elapsed = (time.time() - start_time) * 1000
+                if self._step_callback:
+                    self._step_callback.on_done(AgentResult(
+                        answer="",
+                        success=False,
+                        total_steps=step + 1,
+                        total_elapsed_ms=elapsed,
+                        error="Token 超限" if self._token_limit_reached else "LLM 调用失败",
+                        sources=self._sources,
+                        total_tokens=self._total_tokens,
+                    ))
                 return AgentResult(
                     answer="",
                     success=False,
@@ -274,6 +324,10 @@ class ReActAgent:
             logger.info("[ReActAgent] 解析结果: thought=%.60s..., action=%s",
                        thought, action)
 
+            # 推送 Thought 步骤事件（多 Agent SSE）
+            if self._step_callback:
+                self._step_callback.on_step("thought", step + 1, thought)
+
             # 检测空解析 (格式错误)
             if not action:
                 logger.warning("[ReActAgent] 解析失败: 未提取到有效 Action, 可能 LLM 格式异常")
@@ -291,6 +345,16 @@ class ReActAgent:
                 self.memory.summarize_to_episodic(query, final_answer)
                 logger.info("[ReActAgent] ===== 推理完成 (Final Answer) =====")
                 logger.info("[ReActAgent] 总步数: %d, 总耗时: %.1fs", step + 1, elapsed_ms / 1000)
+                if self._step_callback:
+                    self._step_callback.on_step("answer", step + 1, final_answer[:500])
+                    self._step_callback.on_done(AgentResult(
+                        answer=final_answer,
+                        success=True,
+                        total_steps=step + 1,
+                        total_elapsed_ms=elapsed_ms,
+                        sources=self._sources,
+                        total_tokens=self._total_tokens,
+                    ))
                 return AgentResult(
                     answer=final_answer,
                     success=True,
@@ -303,7 +367,14 @@ class ReActAgent:
 
             # 执行工具
             logger.info("[ReActAgent] 执行行动: action=%s", action)
+            # 推送 Action 步骤事件（多 Agent SSE）
+            if self._step_callback:
+                self._step_callback.on_step("action", step + 1, action)
             observation = self._execute_action(action, action_input)
+
+            # 推送 Observation 步骤事件（多 Agent SSE）
+            if self._step_callback:
+                self._step_callback.on_step("observation", step + 1, observation[:500] if observation else observation)
 
             # 记录工具调用类型，检测空结果
             tools_called.add(action)
@@ -342,6 +413,18 @@ class ReActAgent:
         elapsed_ms = (time.time() - start_time) * 1000
         logger.warning("[ReActAgent] ===== 达到最大步数 %d，强制生成答案 =====", self.max_steps)
         forced_answer = self._generate_forced_answer(messages, reasoning_chain)
+
+        if self._step_callback:
+            self._step_callback.on_step("answer", self.max_steps, forced_answer[:500])
+            self._step_callback.on_done(AgentResult(
+                answer=forced_answer,
+                success=True,
+                total_steps=self.max_steps,
+                total_elapsed_ms=elapsed_ms,
+                forced_stop=True,
+                sources=self._sources,
+                total_tokens=self._total_tokens,
+            ))
 
         return AgentResult(
             answer=forced_answer,
@@ -806,26 +889,45 @@ class ReActAgent:
         else:
             logger.warning("[ReActAgent] 未解析到 Action")
 
-        # 提取 Action Input（JSON 格式优先，使用平衡括号匹配处理嵌套 {} ）
-        ai_match = re.search(r"Action Input:\s*(\{(?:[^{}]|\{[^{}]*\})*\})", response, re.DOTALL)
-        if ai_match:
-            try:
-                action_input = json.loads(ai_match.group(1))
-                logger.debug("[ReActAgent] 解析到 Action Input (JSON): %s", action_input)
-            except json.JSONDecodeError:
-                action_input = ai_match.group(1).strip()
-                logger.warning("[ReActAgent] Action Input 不是有效 JSON: %.60s", action_input)
-        else:
-            # 回退：尝试从整行提取
-            ai_match = re.search(r"Action Input:\s*(.+?)$", response)
-            if ai_match:
-                raw = ai_match.group(1).strip()
+        # 提取 Action Input（使用平衡括号扫描，支持任意深度嵌套 JSON，如 delegate 的 tasks 数组）
+        ai_pos = response.find("Action Input:")
+        if ai_pos != -1:
+            sub = response[ai_pos + len("Action Input:"):]
+            json_str = _extract_json_object(sub)
+            if json_str is not None:
                 try:
-                    action_input = json.loads(raw)
-                    logger.debug("[ReActAgent] 解析到 Action Input (回退JSON): %s", action_input)
+                    action_input = json.loads(json_str)
+                    logger.debug("[ReActAgent] 解析到 Action Input (JSON): %s", action_input)
                 except json.JSONDecodeError:
-                    action_input = raw
-                    logger.warning("[ReActAgent] Action Input (回退) 不是 JSON: %.60s", raw)
+                    action_input = json_str
+                    logger.warning("[ReActAgent] Action Input 不是有效 JSON: %.60s", action_input)
+            else:
+                # 回退：非 JSON 输入（如纯文本参数）
+                ai_match = re.search(r"Action Input:\s*(.+?)$", response)
+                if ai_match:
+                    action_input = ai_match.group(1).strip()
+                    logger.warning("[ReActAgent] Action Input (回退) 非 JSON: %.60s", action_input)
+
+        # 兼容 Orchestrator 输出 "Action: Final" / "Action: Final Answer" 的终止动作。
+        # 此时 Action 被正则捕获为 "Final"（仅首个词），需归一化为终止动作 "Final Answer"，
+        # 并从 Action Input 中提取真正的答案文本，避免 "Final" 被误当作未注册工具而空转。
+        if action and action.lower() == "final":
+            if isinstance(action_input, dict):
+                answer = (action_input.get("answer") or action_input.get("content")
+                          or action_input.get("final_answer") or "")
+                if answer:
+                    logger.info("[ReActAgent] Action=Final 归一化为 Final Answer（从 JSON 提取）")
+                    return (thought, "Final Answer", answer)
+                answer = json.dumps(action_input, ensure_ascii=False)
+                logger.info("[ReActAgent] Action=Final 无 answer 字段，使用 JSON 文本作为答案")
+                return (thought, "Final Answer", answer)
+            answer = action_input if action_input else ""
+            # 当 LLM 仅输出 "Action: Final" 且未附正文时，答案实际已写在 Thought 中，回退使用 Thought 作为答案
+            if not answer and thought:
+                answer = thought
+                logger.info("[ReActAgent] Action=Final 无正文，回退使用 Thought 作为答案")
+            logger.info("[ReActAgent] Action=Final 归一化为 Final Answer（纯文本）")
+            return (thought, "Final Answer", answer)
 
         return (thought, action, action_input)
 

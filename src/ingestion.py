@@ -96,6 +96,7 @@ def collect_chunks_by_company(chunked_dir):
         data = json.loads(jf.read_text(encoding="utf-8"))
         metainfo = data["metainfo"]
         company_name = metainfo.get("company_name", "").strip()
+        tags = metainfo.get("tags", [])
         if not company_name:
             print(f"  [警告] {jf.name} 缺少 company_name，跳过")
             continue
@@ -127,6 +128,7 @@ def collect_chunks_by_company(chunked_dir):
                     "company_name": company_name,
                     "hash": child_hash,
                     "text": child["text"],
+                    "tags": tags,
                 })
 
     for cn in company_data:
@@ -270,6 +272,7 @@ def build_company_index(company_name, child_chunks, parent_texts, output_dir, ap
             "pages": c["pages"],
             "company_name": c["company_name"],
             "hash": c["hash"],
+            "tags": c.get("tags", []),
         })
 
     metadata_path = company_dir / "metadata.json"

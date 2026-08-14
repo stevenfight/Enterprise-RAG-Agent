@@ -60,6 +60,90 @@ TEST_SUITES = [
         "category": "agent-tdd",
         "requires_llm": False,
     },
+    {
+        "name": "Agent TDD - 多Agent步骤0.1 (基础能力搭建)",
+        "file": "tdd_multi_agent_step01.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
+        "name": "Agent TDD - 多Agent步骤0.2 (Prompt 配置化)",
+        "file": "tdd_multi_agent_step02.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
+        "name": "Agent TDD - 多Agent阶段一 (Worker Agent 实现)",
+        "file": "tdd_multi_agent_step03.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
+        "name": "Agent TDD - 多Agent阶段二 (SharedMemory + DelegateTool)",
+        "file": "tdd_multi_agent_step04.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
+        "name": "Agent TDD - 多Agent阶段三 (Orchestrator + 并行调度)",
+        "file": "tdd_multi_agent_step05.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
+        "name": "Agent TDD - 多Agent阶段三 (Reflector 集成)",
+        "file": "tdd_multi_agent_step06.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
+        "name": "Agent TDD - 多Agent阶段四 (API 端点统一 + SSE 事件)",
+        "file": "tdd_multi_agent_step07.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
+        "name": "Agent TDD - 多Agent阶段五 (调优方案)",
+        "file": "tdd_multi_agent_step08.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
+        "name": "Agent TDD - 多Agent阶段九 (启用/运行验证)",
+        "file": "tdd_multi_agent_step09.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
+        "name": "Agent TDD - 多Agent阶段十一 (来源页码标注)",
+        "file": "tdd_multi_agent_step11.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
+        "name": "Agent TDD - 多Agent阶段十二 (SSE 流式进展)",
+        "file": "tdd_multi_agent_step12.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
+        "name": "Agent TDD - 多Agent阶段十三 (SSE 流式一致性)",
+        "file": "tdd_multi_agent_step13.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
+        "name": "Agent TDD - 多Agent阶段十四 (数据来源页码映射修复)",
+        "file": "tdd_multi_agent_step14.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
+    {
+        "name": "Agent TDD - 多Agent阶段十五 (文档类型标签打标与检索加权)",
+        "file": "tdd_multi_agent_step15.py",
+        "category": "agent-tdd",
+        "requires_llm": False,
+    },
 
     # 内存安全 & 并发测试 (不需要 LLM API)
     {

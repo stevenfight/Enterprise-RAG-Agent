@@ -13,10 +13,15 @@ TDD 测试: 步骤 4.1 ~ 4.3 多 Agent 升级 - 阶段四 API 端点统一
 
 import asyncio
 import json
+import sys
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from pydantic import ValidationError
+
+# 将项目根目录加入 sys.path，使直接运行本脚本时 `import src` 可用
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 # ============================================================
@@ -229,10 +234,10 @@ class TestModeRouting(unittest.TestCase):
                                 query="test", mode="multi", company_name="TestCorp",
                             )
                             asyncio.run(svc.api_agent_query(request))
-                            call_kwargs = self.mock_orchestrator.run.call_args
-                            self.assertIsNotNone(call_kwargs)
+                            call_args = self.mock_orchestrator.run.call_args
+                            self.assertIsNotNone(call_args)
                             self.assertEqual(
-                                call_kwargs[1].get('company_name'), "TestCorp",
+                                call_args[0][2], "TestCorp",
                             )
 
     def test_get_stream_mode_parameter(self):
@@ -342,12 +347,12 @@ class TestMultiAgentSSEEvents(unittest.TestCase):
         self.assertIn("delegating", event_types,
                       f"应包含 delegating 事件，实际: {event_types}")
 
-    def test_sse_contains_workers_done_event(self):
-        """TC-72-02: SSE 流中包含 workers_done 事件"""
+    def test_sse_contains_done_event(self):
+        """TC-72-02: SSE 流中包含 done 完成事件"""
         events = self._collect_events()
         event_types = [e.get("type") for e in events]
-        self.assertIn("workers_done", event_types,
-                      f"应包含 workers_done 事件，实际: {event_types}")
+        self.assertIn("done", event_types,
+                      f"应包含 done 事件，实际: {event_types}")
 
     def test_answer_chunk_split_by_sentence(self):
         """TC-72-03: answer_chunk 事件按句子拆分"""

@@ -41,6 +41,45 @@ def count_tokens(text):
     return len(ENCODING.encode(text))
 
 
+# 文档类型标签分类规则：按文件名子串匹配，命中即返回对应标签列表
+TAG_RULES = [
+    ("annual_report", ["年度报告", "年报", "【财报】"]),
+    ("research_report", ["证券", "研报", "研究报"]),
+    ("meeting_minutes", ["调研纪要", "会议纪要", "投资者关系"]),
+]
+
+
+def classify_doc_tags(file_name):
+    """按文件名子串将文档分类为标签列表
+
+    Args:
+        file_name: 文件名（可含扩展名）
+
+    Returns:
+        list[str]: 命中的标签列表，未命中返回 ["other"]
+    """
+    name = file_name or ""
+    for tag, keywords in TAG_RULES:
+        if any(k in name for k in keywords):
+            return [tag]
+    return ["other"]
+
+
+def _classify_doc_type(source_file, tags=None):
+    """判定文档类型：优先使用已有 tags，缺省时回退文件名分类
+
+    Args:
+        source_file: 来源文件名
+        tags: 已打标签列表（可为 None 或空列表）
+
+    Returns:
+        str: 文档类型，如 "annual_report" / "research_report" / "meeting_minutes" / "other"
+    """
+    if tags:
+        return tags[0]
+    return classify_doc_tags(source_file)[0]
+
+
 def load_subset_csv(csv_path):
     csv_path = Path(csv_path)
     mapping = {}
@@ -98,7 +137,7 @@ def build_line_page_map(pdf_path):
     for encoding in ["utf-8", "gbk"]:
         try:
             md_stem = pdf_path.stem
-            md_dir = pdf_path.parent.parent.parent / "debug_data" / "03_reports_markdown"
+            md_dir = pdf_path.parent.parent / "debug_data" / "03_reports_markdown"
             md_file = md_dir / (md_stem + ".md")
             if md_file.exists():
                 md_text = md_file.read_text(encoding=encoding)
@@ -355,6 +394,7 @@ def split_markdown_reports(md_dir, output_dir, subset_csv_path, pdf_dir=None,
                 "sha1": meta["sha1"],
                 "company_name": meta["company_name"],
                 "file_name": md_path.name,
+                "tags": classify_doc_tags(stem + ".pdf"),
             },
             "content": {
                 "parent_chunks": parent_chunks,

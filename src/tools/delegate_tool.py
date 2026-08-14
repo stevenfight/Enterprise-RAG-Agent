@@ -237,6 +237,12 @@ class DelegateTool(BaseTool):
         sub_task = task.get("task", "")
         company = task.get("company_name", "")
 
+        # 构造 Worker 步骤回调（SSE worker_step / worker_done 推送）
+        step_callback = None
+        if self._event_queue is not None:
+            from src.step_callback import StepCallback
+            step_callback = StepCallback(agent_name=agent_name, event_queue=self._event_queue)
+
         logger.info("[DelegateTool] 委托任务: agent=%s, task='%s', company='%s'",
                      agent_name, sub_task[:60], company)
 
@@ -254,6 +260,7 @@ class DelegateTool(BaseTool):
             worker = self._create_agent(cap)
             if worker is None:
                 return self._build_failure_entry(task, f"Agent '{agent_name}' 创建失败")
+            worker._step_callback = step_callback
 
             logger.info("[DelegateTool] 执行 Worker: %s (attempt %d/%d)",
                          agent_name, attempt + 1, max_retries + 1)
@@ -284,18 +291,8 @@ class DelegateTool(BaseTool):
             logger.info("[DelegateTool] Worker '%s' 完成: success=%s, steps=%d, elapsed=%.0fms",
                          agent_name, result.success, result.total_steps, worker_elapsed)
 
-            # M9: 推送 worker 完成事件到 SSE
-            if self._event_queue is not None:
-                try:
-                    self._event_queue.put_nowait({
-                        "type": "worker_complete",
-                        "agent": agent_name,
-                        "company": company,
-                        "success": True,
-                        "timestamp": int(time.time() * 1000),
-                    })
-                except Exception:
-                    pass
+            # 成功路径：worker_done 已由 StepCallback.on_done 在 worker.run() 内推送，
+            # 此处不再重复推送完成事件。
 
             return {
                 "agent": agent_name,
@@ -307,14 +304,15 @@ class DelegateTool(BaseTool):
                 "elapsed_ms": worker_elapsed,
             }
 
-        # 重试耗尽：推送失败事件并返回失败条目
+        # 重试耗尽：推送 worker_done 兜底事件并返回失败条目
         if self._event_queue is not None:
             try:
                 self._event_queue.put_nowait({
-                    "type": "worker_complete",
+                    "type": "worker_done",
                     "agent": agent_name,
-                    "company": company,
                     "success": False,
+                    "total_steps": 0,
+                    "total_elapsed_ms": 0,
                     "timestamp": int(time.time() * 1000),
                 })
             except Exception:

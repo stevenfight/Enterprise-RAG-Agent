@@ -29,6 +29,7 @@ from rank_bm25 import BM25Okapi
 
 from src.utils import get_api_key
 from src.monitoring import traceable
+from src.text_splitter import _classify_doc_type
 
 logger = logging.getLogger("retrieval")
 logger.setLevel(logging.INFO)
@@ -64,6 +65,10 @@ VECTOR_TOP_K = 30
 HYBRID_TOP_K = 20
 RERANK_TOP_N = 5
 
+# 年报来源三层检索防线加成参数
+ANNUAL_REPORT_BOOST_HYBRID = 0.10
+ANNUAL_REPORT_BOOST_RERANK = 1.5
+
 COMPANY_ABBREV_MAP = {
     "中芯国际": ["中芯"],
     "中国电信": ["电信"],
@@ -96,6 +101,27 @@ def preprocess_table_text(text):
         else:
             result.append(line)
     return '\n'.join(result)
+
+
+def _compute_source_authority_boost(result):
+    """计算年报来源权威性加成
+
+    对「年报 + 包含财务数字」的结果给予固定加成，用于在三层检索防线中
+    提升年报财务数据的排名（第一层：Hybrid 融合阶段）。
+
+    Args:
+        result: 检索结果 dict，需含 source_file / tags / parent_text
+
+    Returns:
+        float: 命中返回 ANNUAL_REPORT_BOOST_HYBRID，否则 0.0
+    """
+    doc_type = _classify_doc_type(result.get("source_file"), result.get("tags"))
+    if doc_type != "annual_report":
+        return 0.0
+    text = result.get("parent_text", "")
+    if any(k in text for k in ("亿元", "万元", "%")):
+        return ANNUAL_REPORT_BOOST_HYBRID
+    return 0.0
 
 
 class VectorRetriever:
@@ -203,6 +229,7 @@ class VectorRetriever:
                 "company_name": meta["company_name"],
                 "child_id": meta["child_id"],
                 "parent_key": parent_key,
+                "tags": meta.get("tags", []),
                 "scores": {
                     "vector": round(score, 4),
                 },
@@ -374,6 +401,7 @@ class BM25Retriever:
                 "company_name": meta["company_name"],
                 "child_id": meta["child_id"],
                 "parent_key": parent_key,
+                "tags": meta.get("tags", []),
                 "scores": {
                     "bm25": round(score, 4),
                 },
@@ -521,6 +549,53 @@ class HybridRetriever:
         logger.info("[HybridRetriever] 保底后最终覆盖: %s", ", ".join(final_covered))
         return result[:top_n]
 
+    def _ensure_annual_report_coverage(self, results, all_scored, top_n):
+        """保底机制：结果中无年报来源时，从 all_scored 补入最高分年报块
+
+        第三层检索防线：当最终结果全部为研报/纪要等非年报来源时，
+        确保结果中至少包含一条年报来源，提升财务数据可信度。
+
+        Args:
+            results: 当前 top_n 结果列表
+            all_scored: 全部已重排候选（含 rerank 分数）
+            top_n: 返回条数上限
+
+        Returns:
+            list: 可能补入年报后的结果列表
+        """
+        if not results or not all_scored:
+            return results
+
+        has_annual = any(
+            _classify_doc_type(r.get("source_file"), r.get("tags")) == "annual_report"
+            for r in results
+        )
+        if has_annual:
+            return results
+
+        result_keys = set(r["parent_key"] for r in results)
+        best = None
+        for cand in all_scored:
+            if _classify_doc_type(cand.get("source_file"), cand.get("tags")) != "annual_report":
+                continue
+            if cand["parent_key"] in result_keys:
+                continue
+            if best is None or cand["scores"]["rerank"] > best["scores"]["rerank"]:
+                best = cand
+
+        if not best:
+            return results
+
+        result = list(results)
+        if len(result) >= top_n:
+            lowest_idx = min(range(len(result)), key=lambda i: result[i]["scores"]["rerank"])
+            result[lowest_idx] = best
+        else:
+            result.append(best)
+
+        result.sort(key=lambda x: x["scores"]["rerank"], reverse=True)
+        return result[:top_n]
+
     def _ensure_numeric_data_coverage(self, reranked, all_scored, mentioned_companies):
         """确保每家公司的结果中至少有一条包含数字型财务数据
 
@@ -635,6 +710,7 @@ class HybridRetriever:
                     "pages": r["pages"],
                     "company_name": r["company_name"],
                     "parent_key": pk,
+                    "tags": r.get("tags", []),
                     "scores": {},
                 }
             new_vec = r["scores"].get("vector", 0.0)
@@ -654,6 +730,7 @@ class HybridRetriever:
                     "pages": r["pages"],
                     "company_name": r["company_name"],
                     "parent_key": pk,
+                    "tags": r.get("tags", []),
                     "scores": {},
                 }
             new_bm25 = r["scores"].get("bm25", 0.0)
@@ -679,10 +756,14 @@ class HybridRetriever:
             # 数据丰富度加权: 包含实际财务数字（亿元/万元/百分比等）的块获得微小加成
             # 用于对抗纯描述性脚注块因查询扩展导致的排名虚高
             data_boost = self._compute_data_richness_boost(item.get("parent_text", ""))
-            hybrid_score = min(1.0, hybrid_score + data_boost)
+            # 年报来源权威性加成: 年报 + 财务数字的块获得固定加成（第一层检索防线）
+            authority_boost = _compute_source_authority_boost(item)
+            hybrid_score = min(1.0, hybrid_score + data_boost + authority_boost)
             item["scores"]["hybrid"] = round(hybrid_score, 4)
             if data_boost > 0:
                 item["scores"]["data_boost"] = round(data_boost, 4)
+            if authority_boost > 0:
+                item["scores"]["authority_boost"] = round(authority_boost, 4)
 
         sorted_results = sorted(merged.values(), key=lambda x: x["scores"]["hybrid"], reverse=True)
 
@@ -759,6 +840,13 @@ class HybridRetriever:
             if "rerank" not in cand["scores"]:
                 cand["scores"]["rerank"] = 0.0
 
+        # 年报来源重排加成（第二层检索防线）
+        for cand in scored_candidates:
+            if _classify_doc_type(cand.get("source_file"), cand.get("tags")) == "annual_report":
+                cand["scores"]["rerank"] = round(
+                    cand["scores"]["rerank"] + ANNUAL_REPORT_BOOST_RERANK, 1
+                )
+
         scored_candidates.sort(key=lambda x: x["scores"]["rerank"], reverse=True)
         top_results = scored_candidates[:top_n]
 
@@ -780,6 +868,13 @@ class HybridRetriever:
         for cand in scored_candidates:
             hybrid = cand["scores"].get("hybrid", 0.0)
             cand["scores"]["rerank"] = round(hybrid * 10.0, 1)
+
+        # 年报来源重排加成（第二层检索防线）
+        for cand in scored_candidates:
+            if _classify_doc_type(cand.get("source_file"), cand.get("tags")) == "annual_report":
+                cand["scores"]["rerank"] = round(
+                    cand["scores"]["rerank"] + ANNUAL_REPORT_BOOST_RERANK, 1
+                )
 
         scored_candidates.sort(key=lambda x: x["scores"]["rerank"], reverse=True)
         top_results = scored_candidates[:top_n]
@@ -1130,6 +1225,9 @@ class HybridRetriever:
             search_key_terms = self._extract_key_terms(query, list(coverage_set)) if mentioned_companies else None
             reranked = self._ensure_company_coverage(reranked, all_scored, coverage_set, top_n,
                                                       query=query, key_terms=search_key_terms)
+
+        # 第三层检索防线：确保结果中包含年报来源（若候选中有年报）
+        reranked = self._ensure_annual_report_coverage(reranked, all_scored, top_n)
 
         for r in reranked:
             r["scores"]["confidence"] = self._compute_confidence(r["scores"])

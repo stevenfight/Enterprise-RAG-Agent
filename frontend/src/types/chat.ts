@@ -118,6 +118,7 @@ export interface Message {
   timestamp: number;
   sources?: SourceInfo[];
   reasoningChain?: AgentStepInfo[];
+  agentRun?: MultiAgentRunState;
   error?: string;
 }
 
@@ -140,10 +141,47 @@ export interface ReasoningStep {
   elapsed_ms: number;
 }
 
-/** SSE 流式事件类型 (Phase 2) */
-export type SSEEventType = 'connected' | 'thought' | 'action' | 'observation' | 'answer' | 'error' | 'done';
+/** 多 Agent Worker 单步 (对应 worker_step 事件) */
+export interface MultiAgentWorkerStep {
+  agent: string;
+  step_type: 'thought' | 'action' | 'observation';
+  step: number;
+  content: string;
+}
 
-/** SSE 流式事件 (Phase 2) */
+/** 多 Agent Worker 状态 */
+export interface MultiAgentWorkerStatus {
+  agent: string;
+  steps: MultiAgentWorkerStep[];
+  done: boolean;
+  success?: boolean;
+  elapsed_ms?: number;
+}
+
+/** 多 Agent 运行状态（挂到 Message.agentRun） */
+export interface MultiAgentRunState {
+  isMultiAgent: boolean;
+  registeredAgents: string[];
+  workers: MultiAgentWorkerStatus[];
+}
+
+/** SSE 流式事件类型 (Phase 2 + 多 Agent) */
+export type SSEEventType =
+  | 'connected'
+  | 'thought'
+  | 'action'
+  | 'observation'
+  | 'answer'
+  | 'error'
+  | 'done'
+  | 'orchestrator_start'
+  | 'delegating'
+  | 'worker_step'
+  | 'worker_done'
+  | 'answer_chunk'
+  | 'reflection';
+
+/** SSE 流式事件 (Phase 2 + 多 Agent) */
 export interface SSEEvent {
   type: SSEEventType;
   step?: number;
@@ -154,6 +192,22 @@ export interface SSEEvent {
   total_elapsed_ms?: number;
   /** 是否因达到步数上限而强制终止 */
   forced_stop?: boolean;
+  /** 多 Agent: 已注册的 Worker 能力列表 (orchestrator_start) */
+  registered_agents?: string[];
+  /** 多 Agent: 委派的 Worker 列表 (delegating) */
+  agents?: string[];
+  /** 多 Agent: 委派批次号 (delegating) */
+  batch?: number;
+  /** 多 Agent: Worker 名称 (worker_step / worker_done) */
+  agent?: string;
+  /** 多 Agent: Worker 步骤类型 (worker_step) */
+  step_type?: 'thought' | 'action' | 'observation';
+  /** 多 Agent: Worker 是否成功 (worker_done) */
+  success?: boolean;
+  /** 多 Agent: Worker 数 (answer) */
+  workers?: number;
+  /** 多 Agent: 聚合 Token 用量 (answer) */
+  total_tokens?: number;
 }
 
 /** 知识库文档 (对应后端 KnowledgeDocument) */
