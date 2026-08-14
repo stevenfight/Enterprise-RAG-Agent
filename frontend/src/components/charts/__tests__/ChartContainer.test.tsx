@@ -11,7 +11,7 @@ import type { ChartData } from '@/components/charts/ChartContainer';
 /** Mock echarts-for-react: 捕获 option 引用（保留函数类型属性） */
 let capturedOption: Record<string, unknown> | null = null;
 
-vi.mock('echarts-for-react/lib/core', () => ({
+vi.mock('echarts-for-react/esm/core', () => ({
   default: ({ option, style }: Record<string, unknown>) => {
     capturedOption = option as Record<string, unknown>;
     return (
