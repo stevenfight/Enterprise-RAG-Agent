@@ -1,0 +1,49 @@
+# ===== 服务器自动部署（示例） =====
+# 当 Docker 镜像构建完成后，自动 SSH 登录服务器拉取最新镜像并重启
+#
+# 使用此工作流需要先在 GitHub Secrets 中配置：
+#   Settings → Secrets and variables → Actions → New repository secret
+#   - SSH_HOST: 服务器 IP 地址
+#   - SSH_USER: 服务器用户名
+#   - SSH_KEY:  服务器 SSH 私钥内容
+#
+# 触发条件:
+#   - docker-build.yml 工作流成功完成后自动触发
+#   - 或手动触发
+
+name: Deploy to Server
+
+on:
+  workflow_run:
+    workflows: ["Docker Build & Push"]
+    types:
+      - completed
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  deploy:
+    # 仅当 docker-build 成功时运行（手动触发时也运行）
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 部署到服务器
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+            echo "=== 拉取最新镜像 ==="
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/stevenfight/enterprise-rag-agent/backend:latest
+            docker pull ghcr.io/stevenfight/enterprise-rag-agent/frontend:latest
+            echo "=== 重启容器 ==="
+            cd /opt/enterprise-rag
+            docker compose down
+            docker compose up -d
+            echo "=== 清理旧镜像 ==="
+            docker image prune -f
+            echo "=== 部署完成 ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}" | grep rag

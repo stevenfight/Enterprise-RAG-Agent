@@ -78,6 +78,13 @@ _local/
 # 根目录临时调试脚本（以 _ 前缀标记）
 /_*.py
 
+# 部署脚本（含密钥，不上传）
+deploy.py
+
+# SSH 密钥文件（不上传）
+id_ed25519_*
+*.pem
+
 # Trae IDE skills（不上传）
 .trae/
 
