@@ -27,8 +27,9 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
-  IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
+  # GHCR 要求镜像名全小写，不能直接用 github.repository（含大写）
+  IMAGE_NAME_BACKEND: ${{ github.repository_owner }}/enterprise-rag-agent/backend
+  IMAGE_NAME_FRONTEND: ${{ github.repository_owner }}/enterprise-rag-agent/frontend
 
 jobs:
   build-and-push:
