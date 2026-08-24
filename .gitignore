@@ -95,3 +95,11 @@ id_ed25519_*
 # Node.js 依赖（不上传）
 node_modules/
 frontend/node_modules/
+
+# 本地工具与运行产物（不上传）
+.baoyu-skills/
+.planning/
+frontend/.npm-cache/
+data/long_term_memory/
+/antdx-ui-preview.png
+/debug-regression-environment.md
