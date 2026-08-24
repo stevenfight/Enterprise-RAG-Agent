@@ -8,7 +8,8 @@
  */
 
 import { useMemo, useEffect } from 'react';
-import { Table } from 'antd';
+import ChartTable from './ChartTable';
+import type { ChartData } from '../../types/chart';
 import ReactEChartsCore from 'echarts-for-react/esm/core';
 import * as echarts from 'echarts/core';
 import { BarChart, LineChart, PieChart } from 'echarts/charts';
@@ -27,25 +28,33 @@ echarts.use([
   CanvasRenderer,
 ]);
 
-export interface ChartData {
-  chart_type: string;
-  title: string;
-  xlabel?: string;
-  ylabel?: string;
-  labels?: string[];
-  values?: number[];
-  image_url?: string;
-  columns?: string[];   // table 类型专用
-  rows?: string[][];    // table 类型专用
-}
-
 interface ChartContainerProps {
   data: ChartData;
   height?: number;
+  /** 暗色模式（用于图表配色与容器背景切换） */
+  dark?: boolean;
 }
 
 /** 图表主题色 */
 const CHART_COLORS = ['#B8A9C9', '#98D8C8', '#A8D8EA', '#F4B8C8', '#FAD4B8', '#C8B8D8'];
+
+/** 亮色/暗色配色表 */
+const PALETTE = {
+  light: {
+    titleColor: '#3D3554',
+    textColor: '#888',
+    cardBg: '#ffffff',
+    cardBorder: '#e8e3ef',
+    placeholderColor: '#bbb',
+  },
+  dark: {
+    titleColor: '#e8e8e8',
+    textColor: '#8c8c8c',
+    cardBg: '#1f1f1f',
+    cardBorder: '#303030',
+    placeholderColor: '#6b6b6b',
+  },
+};
 
 // ========== 日志工具 ==========
 
@@ -58,8 +67,11 @@ function logger(fnName: string, msg: string, extra?: Record<string, unknown>) {
 
 // ========== 组件 ==========
 
-export default function ChartContainer({ data, height = 360 }: ChartContainerProps) {
+export default function ChartContainer({ data, height = 360, dark = false }: ChartContainerProps) {
   const mountId = useMemo(() => { _mountId += 1; return _mountId; }, []);
+
+  // 当前主题配色
+  const palette = dark ? PALETTE.dark : PALETTE.light;
 
   // ---- 挂载 / 数据变更日志 ----
   useEffect(() => {
@@ -86,13 +98,13 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
         title: {
           text: title || '暂无数据',
           left: 'center',
-          textStyle: { fontSize: 15, color: '#3D3554', fontWeight: 600 },
+          textStyle: { fontSize: 15, color: palette.titleColor, fontWeight: 600 },
         },
         graphic: {
           type: 'text',
           left: 'center',
           top: 'middle',
-          style: { text: '暂无可用数据', fontSize: 14, fill: '#bbb' },
+          style: { text: '暂无可用数据', fontSize: 14, fill: palette.placeholderColor },
         },
       };
     }
@@ -111,7 +123,7 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
       title: {
         text: title,
         left: 'center',
-        textStyle: { fontSize: 15, color: '#3D3554', fontWeight: 600 },
+        textStyle: { fontSize: 15, color: palette.titleColor, fontWeight: 600 },
       },
       tooltip: {
         trigger: chart_type === 'pie' ? 'item' : 'axis',
@@ -137,7 +149,7 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
       legend: {
         show: chart_type !== 'pie',
         bottom: 0,
-        textStyle: { fontSize: 12, color: '#888' },
+        textStyle: { fontSize: 12, color: palette.textColor },
       },
       grid: {
         left: 50,
@@ -192,13 +204,13 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
         xAxis: {
           type: 'value',
           name: ylabel || '',
-          axisLabel: { fontSize: 12, color: '#888' },
+          axisLabel: { fontSize: 12, color: palette.textColor },
         },
         yAxis: {
           type: 'category',
           data: trimmedLabels,
           name: xlabel || '',
-          axisLabel: { fontSize: 12, color: '#888' },
+          axisLabel: { fontSize: 12, color: palette.textColor },
           axisTick: { alignWithLabel: true },
         },
         series: [{
@@ -208,7 +220,7 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
             itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length], borderRadius: [0, 6, 6, 0] },
           })),
           barWidth: '50%',
-          label: { show: true, position: 'right', fontSize: 11, color: '#888', formatter: '{c}' },
+          label: { show: true, position: 'right', fontSize: 11, color: palette.textColor, formatter: '{c}' },
         }],
       };
     }
@@ -220,13 +232,13 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
         type: 'category',
         data: trimmedLabels,
         name: xlabel || '',
-        axisLabel: { fontSize: 12, color: '#888' },
+        axisLabel: { fontSize: 12, color: palette.textColor },
         axisTick: { alignWithLabel: true },
       },
       yAxis: {
         type: 'value',
         name: ylabel || '',
-        axisLabel: { fontSize: 12, color: '#888' },
+        axisLabel: { fontSize: 12, color: palette.textColor },
       },
       series: [chart_type === 'line' ? {
         type: 'line',
@@ -238,7 +250,7 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
         symbol: 'circle',
         symbolSize: 8,
         lineStyle: { width: 3, color: '#B8A9C9' },
-        label: { show: true, position: 'top', fontSize: 11, color: '#888', formatter: '{c}' },
+        label: { show: true, position: 'top', fontSize: 11, color: palette.textColor, formatter: '{c}' },
       } : {
         type: 'bar',
         data: trimmedValues.map((v, i) => ({
@@ -246,21 +258,21 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
           itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length], borderRadius: [6, 6, 0, 0] },
         })),
         barWidth: '50%',
-        label: { show: true, position: 'top', fontSize: 11, color: '#888', formatter: '{c}' },
+        label: { show: true, position: 'top', fontSize: 11, color: palette.textColor, formatter: '{c}' },
       }],
     };
-  }, [data]);
+  }, [data, dark]);
 
   // ---- 渲染 ----
 
   // table 类型：渲染 Ant Design 表格
   if (data.chart_type === 'table' && data.columns && data.rows) {
     return (
-      <div style={{
+      <div data-testid="chart-card" style={{
         borderRadius: 12,
         padding: '16px 12px 8px',
-        background: '#ffffff',
-        border: '1px solid #e8e3ef',
+        background: palette.cardBg,
+        border: `1px solid ${palette.cardBorder}`,
         boxShadow: '0 2px 8px rgba(184, 169, 201, 0.1)',
         marginBottom: 16,
       }}>
@@ -268,43 +280,22 @@ export default function ChartContainer({ data, height = 360 }: ChartContainerPro
           textAlign: 'center',
           fontSize: 15,
           fontWeight: 600,
-          color: '#3D3554',
+          color: palette.titleColor,
           marginBottom: 12,
         }}>
           {data.title}
         </div>
-        <Table
-          dataSource={data.rows.map((row, i) => {
-            const record: Record<string, string> = { _key: String(i) };
-            data.columns!.forEach((col, ci) => {
-              record[col] = row[ci] ?? '-';
-            });
-            return record;
-          })}
-          columns={data.columns.map(col => ({
-            title: col,
-            dataIndex: col,
-            key: col,
-            render: (val: string) => (
-              <span style={{ fontSize: 13 }}>{val}</span>
-            ),
-          }))}
-          rowKey="_key"
-          pagination={data.rows.length > 15 ? { pageSize: 15, size: 'small' } : false}
-          size="small"
-          bordered
-          style={{ borderRadius: 8 }}
-        />
+        <ChartTable data={data} pagination />
       </div>
     );
   }
 
   return (
-    <div style={{
+    <div data-testid="chart-card" style={{
       borderRadius: 12,
       padding: '16px 12px 8px',
-      background: '#ffffff',
-      border: '1px solid #e8e3ef',
+      background: palette.cardBg,
+      border: `1px solid ${palette.cardBorder}`,
       boxShadow: '0 2px 8px rgba(184, 169, 201, 0.1)',
       marginBottom: 16,
     }}>

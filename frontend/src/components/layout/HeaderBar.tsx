@@ -8,12 +8,12 @@ import { Button, Space, Typography, Badge, Tooltip } from 'antd';
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from '@ant-design/icons';
 import { useLocation } from 'react-router-dom';
 import { appStore } from '@/stores/appStore';
 import { useTheme } from '@/hooks/useTheme';
-import { colors } from '@/styles/theme';
-
 const { Text } = Typography;
 
 /** 路由到页面标题的映射 */
@@ -34,7 +34,7 @@ export default function HeaderBar({ systemOnline = false }: HeaderBarProps) {
   const location = useLocation();
   const siderCollapsed = appStore((s) => s.siderCollapsed);
   const toggleSider = appStore((s) => s.toggleSider);
-  const { isDark } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
 
   const title = pageTitleMap[location.pathname] || '企业知识库';
 
@@ -66,8 +66,27 @@ export default function HeaderBar({ systemOnline = false }: HeaderBarProps) {
         </Text>
       </Space>
 
-      {/* 右侧: 系统状态 */}
+      {/* 右侧: 主题切换 + 系统状态 */}
       <Space size={8}>
+        <Tooltip title={isDark ? '切换亮色模式' : '切换暗色模式'}>
+          <Button
+            type="text"
+            icon={isDark ? <SunOutlined /> : <MoonOutlined />}
+            onClick={toggleTheme}
+            aria-label={isDark ? '切换亮色模式' : '切换暗色模式'}
+            style={{
+              fontSize: 16,
+              color: isDark ? '#e8e8e8' : '#595959',
+              transition: 'color 0.3s, transform 0.3s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'rotate(15deg) scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+            }}
+          />
+        </Tooltip>
         <Tooltip title={systemOnline ? '系统已就绪' : '系统离线'}>
           <Badge
             status={systemOnline ? 'success' : 'error'}

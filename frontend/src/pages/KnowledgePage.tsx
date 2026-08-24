@@ -6,15 +6,25 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Typography, Table, Button, Tag, Progress,
-  Modal, message, Empty, Alert, Upload,
+  Alert,
+  Button,
+  Empty,
+  Modal,
+  Progress,
+  Table,
+  Tag,
+  Upload,
+  message,
 } from 'antd';
 import { InboxOutlined, DeleteOutlined } from '@ant-design/icons';
 import { getDocuments, uploadDocument, deleteDocument }
     from '@/services/knowledgeService';
 import type { KnowledgeDocument } from '@/types/chat';
+import type { ColumnsType } from 'antd/es/table';
+import { PageHeader, PageShell } from '@/components/common/PageShell';
+import KnowledgeOverview from '@/components/knowledge/KnowledgeOverview';
+import { DatabaseOutlined } from '@ant-design/icons';
 
-const { Title } = Typography;
 const { Dragger } = Upload;
 
 export default function KnowledgePage() {
@@ -83,7 +93,7 @@ export default function KnowledgePage() {
     });
   };
 
-  const columns = [
+  const columns: ColumnsType<KnowledgeDocument> = [
     {
       title: '文件名', dataIndex: 'filename', key: 'filename',
       ellipsis: true, sorter: (a: KnowledgeDocument, b: KnowledgeDocument) =>
@@ -109,8 +119,8 @@ export default function KnowledgePage() {
         { text: '已索引', value: true },
         { text: '未索引', value: false },
       ],
-      onFilter: (value: boolean, record: KnowledgeDocument) =>
-          record.indexed === value,
+      onFilter: (value, record: KnowledgeDocument) =>
+          record.indexed === Boolean(value),
       render: (v: boolean) => v
           ? <Tag color="green">已索引</Tag>
           : <Tag color="gold">未索引</Tag>,
@@ -128,10 +138,16 @@ export default function KnowledgePage() {
   ];
 
   return (
-    <div style={{ padding: 24 }}>
-      <Title level={3}>知识库管理</Title>
+    <PageShell>
+      <PageHeader
+        title="知识库管理"
+        icon={<DatabaseOutlined />}
+        description="上传、管理和查看财务年报知识库索引状态"
+      />
 
-      <div style={{ marginBottom: 24 }}>
+      <KnowledgeOverview documents={documents} />
+
+      <div className="page-card" style={{ marginBottom: 24, padding: 20 }}>
         <Dragger
           accept=".pdf"
           maxCount={1}
@@ -182,6 +198,6 @@ export default function KnowledgePage() {
           }}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

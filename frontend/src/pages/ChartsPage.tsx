@@ -5,15 +5,20 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Card, Radio, Empty, Spin, Typography, message, Table, Segmented } from 'antd';
+import { Card, Radio, Empty, Spin, message, Segmented } from 'antd';
 import { BarChartOutlined, LineChartOutlined, PieChartOutlined, AlignLeftOutlined, TableOutlined } from '@ant-design/icons';
-import ChartContainer, { type ChartData } from '@/components/charts/ChartContainer';
-
-const { Title } = Typography;
+import ChartContainer from '@/components/charts/ChartContainer';
+import type { ChartData } from '../types/chart';
+import ChartMeta from '@/components/charts/ChartMeta';
+import { PageHeader, PageShell } from '@/components/common/PageShell';
+import { useTheme } from '@/hooks/useTheme';
+import { getCharts } from '@/services/chartService';
+import ChartTable from '@/components/charts/ChartTable';
 
 type ViewMode = 'chart' | 'table';
 
 export default function ChartsPage() {
+  const { isDark } = useTheme();
   const [charts, setCharts] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeType, setActiveType] = useState<string>('all');
@@ -22,10 +27,7 @@ export default function ChartsPage() {
   useEffect(() => {
     const fetchCharts = async () => {
       try {
-        const res = await fetch('/api/charts/list');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        setCharts(data.charts || []);
+        setCharts(await getCharts());
       } catch {
         message.warning('无法加载图表列表，请确认后端服务已启动');
       } finally {
@@ -40,14 +42,15 @@ export default function ChartsPage() {
     : charts.filter(c => c.chart_type === activeType);
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 960, margin: '0 auto' }}>
-      <Title level={4} style={{ color: '#3D3554', marginBottom: 20, fontWeight: 600 }}>
-        <BarChartOutlined style={{ marginRight: 8, color: '#B8A9C9' }} />
-        数据图表中心
-      </Title>
+    <PageShell>
+      <PageHeader
+        title="数据图表中心"
+        icon={<BarChartOutlined />}
+        description="浏览由财务分析生成的交互式图表与数据表格"
+      />
 
       {/* 图表类型筛选 + 视图切换 */}
-      <Card size="small" style={{ marginBottom: 20, borderRadius: 10 }}>
+      <Card size="small" className="page-card" style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <Radio.Group
             value={activeType}
@@ -76,7 +79,7 @@ export default function ChartsPage() {
       {loading ? (
         <div style={{ textAlign: 'center', padding: 80 }}>
           <Spin size="large" />
-          <div style={{ marginTop: 16, color: '#bbb' }}>加载图表数据...</div>
+          <div style={{ marginTop: 16, color: isDark ? '#6b6b6b' : '#bbb' }}>加载图表数据...</div>
         </div>
       ) : filtered.length === 0 ? (
         <Empty
@@ -84,19 +87,19 @@ export default function ChartsPage() {
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           style={{ marginTop: 60 }}
         >
-          {charts.length === 0 && (
-            <div style={{ fontSize: 13, color: '#bbb', marginTop: 8 }}>
-              发送图表相关查询后，生成的图表将在此展示
-            </div>
-          )}
+          <div className="charts-empty-hint">
+            {charts.length === 0 ? '发送图表相关查询后，生成的图表将在此展示' : '可以切换图表类型筛选，或选择图表 / 表格视图'}
+          </div>
         </Empty>
       ) : viewMode === 'table' ? (
-        filtered.map((chart, idx) => (
+        <div className="charts-table-list">
+        {filtered.map((chart, idx) => (
           <Card
             key={idx}
             size="small"
             title={chart.title}
-            style={{ marginBottom: 16, borderRadius: 12 }}
+            className="page-card"
+            style={{ marginBottom: 16 }}
             extra={
               <span style={{ fontSize: 12, color: '#B8A9C9' }}>
                 {chart.chart_type === 'bar' ? '柱状图' :
@@ -106,39 +109,21 @@ export default function ChartsPage() {
               </span>
             }
           >
-            <Table
-              dataSource={(chart.chart_type === 'table' && chart.columns && chart.rows
-                ? chart.rows.map((row, i) => {
-                    const record: Record<string, string> = { _key: String(i) };
-                    chart.columns!.forEach((col, ci) => { record[col] = row[ci] ?? '-'; });
-                    return record;
-                  })
-                : (chart.labels || []).map((label, i) => ({
-                    key: i,
-                    label,
-                    value: (chart.values || [])[i] ?? '-',
-                  }))
-              )}
-              columns={chart.chart_type === 'table' && chart.columns
-                ? chart.columns.map(col => ({ title: col, dataIndex: col, key: col }))
-                : [
-                    { title: chart.xlabel || '类别', dataIndex: 'label', key: 'label' },
-                    { title: chart.ylabel || '数值', dataIndex: 'value', key: 'value', align: 'right' as const },
-                  ]
-              }
-              rowKey={chart.chart_type === 'table' ? '_key' : 'key'}
-              pagination={false}
-              size="small"
-              bordered
-              style={{ borderRadius: 8 }}
-            />
+            <ChartMeta data={chart} />
+            <ChartTable data={chart} />
           </Card>
-        ))
+        ))}
+        </div>
       ) : (
-        filtered.map((chart, idx) => (
-          <ChartContainer key={idx} data={chart} height={360} />
-        ))
+        <div className="charts-grid">
+          {filtered.map((chart, idx) => (
+            <div key={idx} className="charts-grid__item">
+              <ChartMeta data={chart} />
+              <ChartContainer data={chart} height={360} dark={isDark} />
+            </div>
+          ))}
+        </div>
       )}
-    </div>
+    </PageShell>
   );
 }

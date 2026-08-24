@@ -1,5 +1,5 @@
 /** Phase 2 共享常量: 任务类型颜色映射 */
-export const TYPE_COLORS: Record<string, string> = {
+export const TYPE_COLORS = {
   retrieve: '#98D8C8',
   calculate: '#FAD4B8',
   compare: '#A8D8EA',
@@ -8,7 +8,9 @@ export const TYPE_COLORS: Record<string, string> = {
   report: '#B8A9C9',
 };
 
-export const TYPE_NAMES: Record<string, string> = {
+export type DagNodeType = keyof typeof TYPE_COLORS;
+
+export const TYPE_NAMES: Record<DagNodeType, string> = {
   retrieve: '数据检索',
   calculate: '指标计算',
   compare: '多公司对比',

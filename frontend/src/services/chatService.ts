@@ -208,13 +208,3 @@ export function streamAgentQuery(
 
   return es;
 }
-
-/** 将 EventSource readyState 转换为可读文本 */
-function EventSourceReadyStateText(state: number): string {
-  switch (state) {
-    case EventSource.CONNECTING: return 'CONNECTING (0)';
-    case EventSource.OPEN: return 'OPEN (1)';
-    case EventSource.CLOSED: return 'CLOSED (2)';
-    default: return `UNKNOWN (${state})`;
-  }
-}

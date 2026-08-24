@@ -102,6 +102,7 @@ export const colors = {
   // 边框/分割线
   border: '#E8E3EF',
   divider: '#F0EBF5',
+  borderDark: '#3A3550',
 
   // 背景色
   bgLight: LIGHT_BG,
@@ -110,6 +111,10 @@ export const colors = {
   bgDark: DARK_BG,
   bgDarkCard: DARK_CARD,
   bgDarkSidebar: DARK_SIDEBAR,
+
+  // 聊天区域专用背景
+  chatAreaLight: '#FAFAFA',
+  chatAreaDark: DARK_BG,
 };
 
 // 亮色主题配置

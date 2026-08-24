@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons';
 import { chatStore, selectCurrentMessages } from '@/stores/chatStore';
 import { useTheme } from '@/hooks/useTheme';
+import { colors } from '@/styles/theme';
 import { queryQuestion, getCompanies, streamAgentQuery } from '@/services/chatService';
 import ChatContainer from '@/components/chat/ChatContainer';
 import ThoughtChainDrawer from '@/components/chat/ThoughtChainDrawer';
@@ -307,19 +308,22 @@ export default function ChatPage() {
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      {/* 左侧: 配置面板 */}
+      {/* 左侧: 配置面板 - LobeChat 简洁风格 */}
       <div
         style={{
-          width: 260,
-          borderRight: `1px solid ${isDark ? '#303030' : '#f0f0f0'}`,
-          padding: '16px',
+          width: 280,
+          borderRight: 'none',
+          padding: '20px 16px',
           overflow: 'auto',
-          background: isDark ? '#1a1a1a' : '#fafafa',
+          background: isDark ? colors.bgDarkCard : colors.bgCard,
+          boxShadow: isDark
+            ? 'none'
+            : `1px 0 0 0 ${colors.border}, 4px 0 16px rgba(0, 0, 0, 0.02)`,
           flexShrink: 0,
         }}
       >
-        <Title level={5} style={{ marginBottom: 16, color: isDark ? '#e8e8e8' : '#262626' }}>
-          <SearchOutlined style={{ marginRight: 8 }} />
+        <Title level={5} style={{ marginBottom: 20, color: isDark ? '#e8e8e8' : '#1a1a1a', fontSize: 16, fontWeight: 600 }}>
+          <SearchOutlined style={{ marginRight: 8, color: '#B8A9C9' }} />
           检索配置
         </Title>
 
@@ -448,9 +452,9 @@ export default function ChatPage() {
 
         <Divider style={{ margin: '16px 0' }} />
 
-        {/* 示例问题 */}
-        <Title level={5} style={{ marginBottom: 12, color: isDark ? '#e8e8e8' : '#262626' }}>
-          <BulbOutlined style={{ marginRight: 8 }} />
+        {/* 示例问题 - LobeChat 卡片按钮风格 */}
+        <Title level={5} style={{ marginBottom: 12, color: isDark ? '#e8e8e8' : '#1a1a1a', fontSize: 16, fontWeight: 600 }}>
+          <BulbOutlined style={{ marginRight: 8, color: '#98D8C8' }} />
           示例问题
         </Title>
         <Space orientation="vertical" size={8} style={{ width: '100%' }}>
@@ -464,14 +468,24 @@ export default function ChatPage() {
                 setFillInputText(q);
               }}
               style={{
-                borderRadius: 8,
+                borderRadius: 12,
                 fontSize: 13,
                 cursor: 'pointer',
-                border: `1px solid ${isDark ? '#303030' : '#e8e8e8'}`,
+                border: `1px solid ${isDark ? colors.borderDark : colors.border}`,
+                boxShadow: 'none',
+                transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
               }}
-              styles={{ body: { padding: '8px 12px' } }}
+              styles={{
+                body: {
+                  padding: '10px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                },
+              }}
             >
-              <Text style={{ fontSize: 13 }}>{q}</Text>
+              <BulbOutlined style={{ fontSize: 12, color: '#B8A9C9' }} />
+              <Text style={{ fontSize: 13, color: isDark ? '#e8e8e8' : '#3d3554' }}>{q}</Text>
             </Card>
           ))}
         </Space>
@@ -486,6 +500,7 @@ export default function ChatPage() {
           fillInputText={fillInputText}
           onFillInputTextConsumed={() => setFillInputText(undefined)}
           onViewReasoning={handleViewReasoning}
+          quickCommands={EXAMPLE_QUESTIONS}
         />
       </div>
 

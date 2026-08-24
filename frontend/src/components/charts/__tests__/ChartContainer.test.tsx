@@ -6,7 +6,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import ChartContainer from '@/components/charts/ChartContainer';
-import type { ChartData } from '@/components/charts/ChartContainer';
+import type { ChartData } from '../../../types/chart';
 
 /** Mock echarts-for-react: 捕获 option 引用（保留函数类型属性） */
 let capturedOption: Record<string, unknown> | null = null;

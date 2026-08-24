@@ -8,27 +8,24 @@
  */
 
 import { useState, useCallback } from 'react';
-import { Input, Button, Card, Typography, Tag, Space, Spin } from 'antd';
+import {
+  Button,
+  Card,
+  Input,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+} from 'antd';
 import { SearchOutlined, NodeIndexOutlined } from '@ant-design/icons';
 import DagFlow from '@/components/dag/DagFlow';
-import { TYPE_COLORS, TYPE_NAMES } from '@/constants/dag';
+import DagTaskSummary from '@/components/dag/DagTaskSummary';
+import DagExecutionTimeline from '@/components/dag/DagExecutionTimeline';
+import { PageHeader, PageShell } from '@/components/common/PageShell';
+import { TYPE_COLORS, TYPE_NAMES, type DagNodeType } from '../constants/dag';
+import { getAgentPlan, type PlanData } from '@/services/dagService';
 
-const { Title, Text } = Typography;
-
-interface PlanData {
-  nodes: Array<{
-    id: string;
-    label: string;
-    type: string;
-    description: string;
-    tool_name: string;
-    status: string;
-  }>;
-  edges: Array<{ source: string; target: string }>;
-  execution_order: string[][];
-  category: string;
-  message: string;
-}
+const { Text } = Typography;
 
 export default function DagBoardPage() {
   const [query, setQuery] = useState('');
@@ -41,9 +38,7 @@ export default function DagBoardPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/agent/plan?query=${encodeURIComponent(query)}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = await getAgentPlan(query);
       setPlanData(data);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : '请求失败';
@@ -54,14 +49,15 @@ export default function DagBoardPage() {
   }, [query]);
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1000, margin: '0 auto' }}>
-      <Title level={4} style={{ color: '#3D3554', marginBottom: 20, fontWeight: 600 }}>
-        <NodeIndexOutlined style={{ marginRight: 8, color: '#B8A9C9' }} />
-        Agent 任务规划看板
-      </Title>
+    <PageShell>
+      <PageHeader
+        title="Agent 任务规划看板"
+        icon={<NodeIndexOutlined />}
+        description="输入查询语句，查看 Agent 的任务拆解与执行依赖"
+      />
 
       {/* 查询输入 */}
-      <Card size="small" style={{ marginBottom: 20, borderRadius: 10 }}>
+      <Card size="small" className="page-card" style={{ marginBottom: 24 }}>
         <Space.Compact style={{ width: '100%' }}>
           <Input
             value={query}
@@ -95,11 +91,23 @@ export default function DagBoardPage() {
       {/* DAG 图 */}
       {!loading && planData && (
         <>
+          <DagTaskSummary
+            category={planData.category}
+            nodeCount={planData.nodes.length}
+            edgeCount={planData.edges.length}
+            batchCount={planData.execution_order.length}
+            status={planData.message}
+          />
+
           <DagFlow
             nodes={planData.nodes}
             edges={planData.edges}
-            executionOrder={planData.execution_order}
             height={420}
+          />
+
+          <DagExecutionTimeline
+            batches={planData.execution_order}
+            nodeLabels={Object.fromEntries(planData.nodes.map((node) => [node.id, node.label]))}
           />
 
           {/* 图例 */}
@@ -108,7 +116,7 @@ export default function DagBoardPage() {
               <Text style={{ fontSize: 12, color: '#888', fontWeight: 600 }}>图例:</Text>
               {Object.entries(TYPE_COLORS).map(([type, color]) => (
                 <Tag key={type} color={color} style={{ margin: 0 }}>
-                  {TYPE_NAMES[type] || type}
+                  {TYPE_NAMES[type as DagNodeType] || type}
                 </Tag>
               ))}
             </div>
@@ -145,6 +153,6 @@ export default function DagBoardPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

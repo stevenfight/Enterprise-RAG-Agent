@@ -25,13 +25,15 @@ const mockSteps: ReasoningStep[] = [
     step_number: 1,
     thought: '需要先检索三大运营商2024年营收数据',
     action: 'compare',
-    action_input: '{"companies":["中国移动","中国联通","中国电信"],"year":2024}',
+    action_input: { companies: ['中国移动', '中国联通', '中国电信'], year: 2024 },
     observation: shortObs,
+    elapsed_ms: 120,
   },
   {
     step_number: 2,
     thought: '已获取足够数据，可以直接给出结论',
     observation: longObs,
+    elapsed_ms: 240,
   },
 ];
 
@@ -39,7 +41,9 @@ const mockSteps: ReasoningStep[] = [
 const noThoughtSteps: ReasoningStep[] = [
   {
     step_number: 1,
+    thought: '',
     observation: '某观察结果',
+    elapsed_ms: 80,
   },
 ];
 
@@ -49,6 +53,7 @@ const noActionSteps: ReasoningStep[] = [
     step_number: 1,
     thought: '分析完毕',
     observation: '结果',
+    elapsed_ms: 60,
   },
 ];
 
@@ -144,7 +149,7 @@ describe('ThoughtChainDrawer', () => {
 
     it('长 observation 应该显示展开全部按钮', () => {
       render(<ThoughtChainDrawer {...defaultProps} steps={[
-        { step_number: 1, thought: '分析', observation: longObs },
+        { step_number: 1, thought: '分析', observation: longObs, elapsed_ms: 100 },
       ]} />);
       // 长文本 > 80 字符时应该出现"展开全部"
       expect(screen.getByText('展开全部')).toBeInTheDocument();
@@ -152,7 +157,7 @@ describe('ThoughtChainDrawer', () => {
 
     it('点击展开全部后应隐藏该按钮', () => {
       render(<ThoughtChainDrawer {...defaultProps} steps={[
-        { step_number: 1, thought: '分析', observation: longObs },
+        { step_number: 1, thought: '分析', observation: longObs, elapsed_ms: 100 },
       ]} />);
       fireEvent.click(screen.getByText('展开全部'));
       expect(screen.queryByText('展开全部')).toBeNull();

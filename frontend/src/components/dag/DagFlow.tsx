@@ -9,16 +9,18 @@
  *   - execution_order: [[task_id, ...], ...]
  */
 
-import React, { useEffect, useRef, useMemo, useState, useCallback } from 'react';
+import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import { Graph } from '@antv/g6';
-import { TYPE_COLORS } from '@/constants/dag';
+import { Modal, Descriptions, Tag } from 'antd';
+import { TYPE_COLORS, TYPE_NAMES, type DagNodeType } from '../../constants/dag';
 
-interface DagNode {
+export interface DagNode {
   id: string;
   label: string;
-  type: string;
+  type: DagNodeType;
   description: string;
   tool_name: string;
+  tool_params?: Record<string, unknown>;
   status: string;
 }
 
@@ -42,12 +44,32 @@ function dagLogger(fnName: string, msg: string, extra?: Record<string, unknown>)
   console.debug(`[DagFlow][${fnName}] ${msg}${payload}`);
 }
 
+function getStatusColor(status: string) {
+  switch (status.toLowerCase()) {
+    case 'running':
+    case 'executing':
+      return '#B8A9C9';
+    case 'success':
+    case 'completed':
+      return '#52A675';
+    case 'failed':
+    case 'error':
+      return '#D66B6B';
+    case 'skipped':
+      return '#B7B2BF';
+    default:
+      return '#D9CFE8';
+  }
+}
+
 // ========== 组件 ==========
 
 export default function DagFlow({ nodes, edges, height = 420 }: DagFlowProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<Graph | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  // 当前选中的节点（点击节点弹出详情）
+  const [selectedNode, setSelectedNode] = useState<DagNode | null>(null);
 
   const mountId = useMemo(() => { _dagMountId += 1; return _dagMountId; }, []);
 
@@ -118,11 +140,13 @@ export default function DagFlow({ nodes, edges, height = 420 }: DagFlowProps) {
     const g6Nodes = nodes.map(n => ({
       id: n.id,
       data: {
-        label: `${n.id} - ${n.type}`,
-        description: n.description,
+        label: `${n.id} · ${TYPE_NAMES[n.type] || n.type}`,
+        description: n.description && n.description.length > 12 ? `${n.description.slice(0, 12)}...` : n.description,
         type: n.type,
         tool_name: n.tool_name,
+        tool_params: n.tool_params,
         color: TYPE_COLORS[n.type] || '#B8A9C9',
+        statusColor: getStatusColor(n.status),
       },
     }));
 
@@ -149,16 +173,23 @@ export default function DagFlow({ nodes, edges, height = 420 }: DagFlowProps) {
       node: {
         style: {
           size: [180, 56],
-          labelText: '',
+          // 标签使用函数形式动态获取 (G6 v5 样式回调, datum 为节点数据 {id, data})
+          labelText: (datum: { data?: { label?: string } }) => datum.data?.label ?? '',
           labelFill: '#3D3554',
-          labelFontSize: 12,
+          labelFontSize: 13,
           labelFontWeight: 600,
           labelPlacement: 'center',
-          labelOffsetY: 4,
+          labelOffsetY: -6,
+          // 副标签: 任务描述
+          label2Text: (datum: { data?: { description?: string } }) => datum.data?.description ?? '',
+          label2FontSize: 10,
+          label2Fill: '#888',
+          label2OffsetY: 17,
           fill: '#ffffff',
-          stroke: '#B8A9C9',
+          stroke: (datum: { data?: { statusColor?: string } }) => datum.data?.statusColor || '#B8A9C9',
           lineWidth: 2,
           radius: 10,
+          cursor: 'pointer',
           shadowColor: 'rgba(0,0,0,0.06)',
           shadowBlur: 8,
         },
@@ -177,6 +208,17 @@ export default function DagFlow({ nodes, edges, height = 420 }: DagFlowProps) {
     graph.render();
     graphRef.current = graph;
     dagLogger(`mount#${mountId}`, 'G6实例创建并渲染完成');
+
+    // 节点点击 → 弹出任务详情
+      graph.on('node:click', (evt) => {
+      const target = (evt as { target?: { id?: string } }).target;
+      const nodeId = target?.id;
+      dagLogger(`mount#${mountId}`, `节点点击: id=${nodeId}`);
+      const node = nodes.find((n) => n.id === nodeId);
+      if (node) {
+        setSelectedNode(node);
+      }
+    });
 
     return () => {
       if (graphRef.current) {
@@ -218,16 +260,53 @@ export default function DagFlow({ nodes, edges, height = 420 }: DagFlowProps) {
   dagLogger(`mount#${mountId}`, `渲染canvas容器, height=${height}`);
 
   return (
-    <div
-      ref={containerRef}
-      style={{
-        width: '100%',
-        height,
-        borderRadius: 12,
-        background: '#faf8fd',
-        border: '1px solid #e8e3ef',
-        overflow: 'hidden',
-      }}
-    />
+    <>
+      <div
+        ref={containerRef}
+        style={{
+          width: '100%',
+          height,
+          borderRadius: 12,
+          background: '#faf8fd',
+          border: '1px solid #e8e3ef',
+          overflow: 'hidden',
+        }}
+      />
+
+      {/* 交互提示 */}
+      <div style={{ fontSize: 12, color: '#aaa', textAlign: 'center', marginTop: 6 }}>
+        提示: 点击节点可查看任务详情
+      </div>
+
+      {/* 节点详情弹窗 */}
+      <Modal
+        title={selectedNode ? `任务详情 - ${selectedNode.id}` : '任务详情'}
+        open={!!selectedNode}
+        onCancel={() => setSelectedNode(null)}
+        footer={null}
+        width={540}
+      >
+        {selectedNode && (
+          <Descriptions column={1} size="small" bordered>
+            <Descriptions.Item label="任务 ID">{selectedNode.id}</Descriptions.Item>
+            <Descriptions.Item label="任务类型">
+              <Tag color={TYPE_COLORS[selectedNode.type]}>
+                {TYPE_NAMES[selectedNode.type] || selectedNode.type}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="任务描述">{selectedNode.description}</Descriptions.Item>
+            <Descriptions.Item label="使用工具">{selectedNode.tool_name}</Descriptions.Item>
+            <Descriptions.Item label="状态">{selectedNode.status}</Descriptions.Item>
+            {selectedNode.tool_params && (
+              <Descriptions.Item label="工具参数">
+                <pre style={{ margin: 0, fontSize: 12, whiteSpace: 'pre-wrap' }}>
+                  {JSON.stringify(selectedNode.tool_params, null, 2)}
+                </pre>
+              </Descriptions.Item>
+            )}
+          </Descriptions>
+        )}
+      </Modal>
+    </>
   );
 }

@@ -6,16 +6,18 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Typography, Card, Tag, Descriptions, Space, Spin,
+  Card, Descriptions, Space, Spin, Tag, Typography,
 } from 'antd';
 import {
-  CheckCircleOutlined, CloseCircleOutlined,
-  ExclamationCircleOutlined,
+  CheckCircleOutlined, CloseCircleOutlined, ExclamationCircleOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { getSystemStatus } from '@/services/systemService';
 import type { SystemStatusData } from '@/types/chat';
+import { PageHeader, PageShell } from '@/components/common/PageShell';
+import SettingsOverview from '@/components/settings/SettingsOverview';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const TOOL_LABELS: Record<string, string> = {
   retrieve: '检索',
@@ -57,32 +59,38 @@ export default function SettingsPage() {
 
   if (error) {
     return (
-      <div style={{ padding: 24 }}>
-        <Title level={3}>系统设置</Title>
-        <Card>
-          <Text type="danger">
+      <PageShell>
+        <PageHeader
+          title="系统设置"
+          icon={<SettingOutlined />}
+          description="查看当前 Agent、知识库和工具运行状态"
+        />
+        <Card className="page-card">
+          <Typography.Text type="danger">
             <ExclamationCircleOutlined style={{ marginRight: 8 }} />
             {error}
-          </Text>
+          </Typography.Text>
         </Card>
-      </div>
+      </PageShell>
     );
   }
 
   if (!status) return null;
 
   return (
-    <div style={{ padding: 24 }}>
-      <Title level={3}>系统设置</Title>
-      <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
-        当前运行状态（只读监控，修改配置请编辑 config/agent_config.json）
-      </Text>
+    <PageShell>
+      <PageHeader
+        title="系统设置"
+        icon={<SettingOutlined />}
+        description="当前运行状态（只读监控，修改配置请编辑 config/agent_config.json）"
+      />
 
-      <Space direction="vertical"
-             style={{ width: '100%' }} size="middle">
+      <Space direction="vertical" className="page-stack"
+             style={{ width: '100%' }}>
+        <SettingsOverview status={status} />
 
         {/* ===== Agent 当前配置 ===== */}
-        <Card title="Agent 当前配置">
+        <Card title="Agent 当前配置" className="page-card">
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="模型">
               <Tag color="blue">{status.model.name}</Tag>
@@ -103,7 +111,7 @@ export default function SettingsPage() {
         </Card>
 
         {/* ===== 系统健康 ===== */}
-        <Card title="系统健康">
+        <Card title="系统健康" className="page-card">
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="模型状态">
               <Tag color={
@@ -156,7 +164,7 @@ export default function SettingsPage() {
         </Card>
 
         {/* ===== 已注册工具 ===== */}
-        <Card title="已注册工具">
+        <Card title="已注册工具" className="page-card">
           <Descriptions column={1} bordered size="small">
             {Object.entries(TOOL_LABELS).map(([key, label]) => (
               <Descriptions.Item key={key} label={label}>
@@ -171,6 +179,6 @@ export default function SettingsPage() {
           </Descriptions>
         </Card>
       </Space>
-    </div>
+    </PageShell>
   );
 }
