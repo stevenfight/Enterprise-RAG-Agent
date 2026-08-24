@@ -24,7 +24,7 @@
 | `/dag` | 分析流程 | 高级用户查看任务规划与执行批次 |
 | `/settings` | 系统状态 | 查看模型、向量库、记忆和工具状态 |
 
-所有页面在顶栏或页首显示统一的研究上下文：当前公司范围、模式（标准检索/Agent）和系统在线状态。首期在现有 Zustand 前端 Store 中新增会话级 `researchContext`，同步公司范围和模式到各路由；它只在当前浏览器会话中共享，不表示后端已保存研究项目，也不伪造跨设备持久化。
+所有页面在顶栏或页首显示统一的研究上下文：当前公司范围、模式（标准检索/Agent）和系统在线状态。首期在现有 Zustand 前端 Store 中新增会话级 `researchContext`，同步公司范围和模式到各路由；它只在当前应用运行期间共享，刷新页面后按现有前端状态策略重置，不接入 `localStorage`、`sessionStorage` 或后端持久化，也不伪造跨设备研究项目。
 
 ## 3. 首页：研究工作台
 
@@ -51,7 +51,7 @@
 | `ResearchContextBar` | `ChatPage` 的公司选择、Agent 开关、会话状态 | `getCompanies`、本地会话状态 |
 | `ResearchWelcome` | 示例问题和 `ChatContainer` 空状态 | 仅静态研究模板与已有公司列表 |
 | `ResearchAnswerCanvas` | `MessageBubble`、`FinancialKPICards` | 现有问答响应和消息 Store |
-| `EvidencePanel` | `SourceCard` | `SourceInfo.source_file`、`pages`、`scores`；分数标注为“检索匹配度” |
+| `EvidencePanel` | `SourceCard` | 回答级 `SourceInfo.source_file`、`pages`、`scores`；分数标注为“检索匹配度”，不声明 KPI 逐项引用 |
 | `AnalysisTracePanel` | `ThoughtChainDrawer` | 仅展示工具名称、输入摘要、观测摘要、耗时和完成状态 |
 | `ResearchComposer` | `ChatInput` | 保留 Enter/Shift+Enter 与流式禁用逻辑 |
 
@@ -65,6 +65,14 @@
 - 强制停止或缺少证据时的风险提示。
 
 不得把 `thought` 文本作为产品内容展示。现有 `MessageBubble` 内嵌步骤预览和 `ThoughtChainDrawer` 都必须重构：抽屉重命名为“分析过程”，两处均移除内部思维文本区域。
+
+`action_input` 和 `observation` 也不能原样透传到界面。实现时应按工具类型采用允许展示字段清单、长度上限和敏感键名脱敏；密钥、令牌、授权信息、请求头、运行配置、文件绝对路径、堆栈及无法归类的原始输入均不得展示。没有可安全展示的内容时，只显示工具名称、步骤状态和“未提供可展示摘要”。
+
+### 3.3 财务数字与证据语义
+
+- KPI 必须按现有解析结果原样显示 `value` 和 `unit`；首期不得在前端换算单位、合并口径、补全币种或推导同比。
+- 收入、利润、ROE、毛利率等普通财务数值采用中性正文色，不因数值为正而显示为“利好”；只有解析器明确标记方向的增长类指标才可使用上涨/下跌语义色，并同时提供箭头和文字。
+- 现有 `SourceInfo` 只能作为回答级证据。首期可在答案旁展示来源文件、页码和“检索匹配度”，但不得声称某一 KPI 已有逐项来源映射；该能力需要后端返回可靠的指标—来源关联后另行设计。
 
 ## 4. 其他页面
 
@@ -139,8 +147,9 @@
 | 能力 | 首期状态 | 现有来源/限制 |
 |---|---|---|
 | 公司范围 | 可实施 | `getCompanies()` |
-| 问答、KPI、引用、页码 | 可实施 | `queryQuestion`、`streamAgentQuery`、消息 Store、`SourceInfo`；分数只能标为检索匹配度 |
-| 分析过程 | 可实施但需脱敏 | 仅 `action`、`action_input`、`observation`、状态 |
+| 问答、KPI、引用、页码 | 可实施 | `queryQuestion`、`streamAgentQuery`、消息 Store、`SourceInfo`；来源为回答级，分数只能标为检索匹配度 |
+| 财务 KPI 语义 | 可实施 | 保留解析出的原始 `value`/`unit`；仅增长类可使用方向语义，普通数值保持中性 |
+| 分析过程 | 可实施但需脱敏 | 仅允许展示脱敏后的 `action`、`action_input`、`observation` 摘要和状态 |
 | 图表和类型筛选 | 可实施 | `getCharts()` / `ChartData` |
 | 文档索引状态 | 可实施 | `getDocuments()` |
 | 文档公司/年度/章节 | 不纳入首期 | 当前 API 未提供可靠字段 |
@@ -148,4 +157,4 @@
 
 ## 8. 视觉验收方法
 
-每个工作包在 1440、1024、768、375 宽度进行截图对比。验收不是主观地追求“炫”，而是检查：研究上下文是否连续、结论是否优先、证据是否可见、状态是否清晰、长文是否易读。
+每个工作包在现有开发环境中以 1440、1024、768、375 宽度进行截图对比；首期不为此新增浏览器自动化框架或依赖。验收不是主观地追求“炫”，而是检查：研究上下文是否连续、结论是否优先、证据范围是否如实表达、状态是否清晰、长文是否易读。
