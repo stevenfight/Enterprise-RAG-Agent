@@ -16,9 +16,10 @@
 - [x] B3. 已实现 Python 3.11 后端编译与固定白名单测试任务。
 - [x] B4. 已实现 Node 20 前端安装、Vitest 与生产构建任务。
 - [x] B5. 本地等价命令与 YAML 解析已通过，工作包 B 已提交（`7a51458`）；远端 actionlint 与 GitHub Actions 回归验证仍待完成。
-- [ ] B5.1. 依据当前仓库事实更新根目录 `README.md`：项目状态、React/Ant Design 版本、历史/本轮测试口径与 OpenSpec 归档说明；不宣称未验收的远端成功。
-- [ ] B5.2. 将 Docker 工作流路径过滤补充 `requirements.lock` 与 `quality-gate.yml`，并验证仅修改任一文件时都会触发 Quality Gate 与镜像构建。
-- [ ] B5.3. 将 `CHANGELOG.md` 的 v5.16 条目移至最新条目位置，并按实际完成状态补充 README 同步与 C0 部署隔离，不提前记录远端或服务器成功。
+- [x] B5.1. 已依据当前仓库事实更新根目录 `README.md`：项目状态、React/Ant Design 版本、历史/本轮测试口径与 OpenSpec 归档说明；未宣称未验收的远端成功。
+- [x] B5.2. 已将 Docker 工作流路径过滤补充 `requirements.lock` 与 `quality-gate.yml`。
+- [ ] B5.2.1. 推送后验证仅修改 `requirements.lock` 或 `quality-gate.yml` 时，都会触发 Quality Gate 与镜像构建。
+- [x] B5.3. 已将 `CHANGELOG.md` 的 v5.16 条目移至最新条目位置，并按实际完成状态记录 README 同步与 C0 部署隔离，未提前记录远端或服务器成功。
 - [ ] B6. 推送后确认 GitHub Actions 的 actionlint、backend 与 frontend 任务均为通过状态。
 - [ ] B6.1. 从已完成的远端运行记录 workflow-lint、backend 与 frontend 的实际检查全名。
 - [ ] B7. 由仓库管理员仅使用 B6.1 已核实的检查全名，在 GitHub 为 main 启用 Quality Gate 必需检查；再验证失败质量任务不发布镜像。此项需要 GitHub 管理权限或已认证 CLI，不能由本地文件替代。
@@ -26,7 +27,7 @@
 
 ## 工作包 C：自动部署可验证性
 
-- [ ] C0. 作为所有当前未推送变更的硬前置条件，临时移除 `workflow_run` 触发，仅保留 `workflow_dispatch`，以隔离已失败的自动部署；记录恢复条件，不能永久关闭自动部署。完成 C0 前不得推送 README、Docker 路径过滤或其他会触发 Docker Build & Push 的变更。
+- [x] C0. 已在本地临时移除 `workflow_run` 触发，仅保留 `workflow_dispatch`，以隔离已失败的自动部署；恢复条件已记录，不能永久关闭自动部署。该变更尚未推送。
 - [ ] C1. 排查 Deploy to Server 的 SSH action 失败原因；当前公开记录仅能确认该步骤失败，无法读取受限日志。
 - [ ] C2. 在取得服务器访问与 GitHub Secrets 管理授权后，核验 `SSH_HOST`、`SSH_USER`、`SSH_KEY`、`/opt/enterprise-rag`，并配置或确认仅有 `read:packages` 权限的服务器 GHCR 拉取 Secret；全程不输出凭据。
 - [ ] C3. 为 `workflow_dispatch` 增加必填 `image_sha` 输入及格式校验；将首次受控部署流程改为以该 SHA 拉取后端、前端同一版本镜像，而不是仅依赖可变的 `latest` 标签。
@@ -45,3 +46,4 @@
 | v1.4 | 2026-08-25 | 二次复核：补充锁文件/质量门禁路径触发，以及手动和自动部署的镜像 SHA 来源与同版本校验。 |
 | v1.5 | 2026-08-25 | 三次复核：将部署隔离设为推送硬前置条件，补充远端检查名核验与自动部署仅限 main 的分支边界。 |
 | v1.6 | 2026-08-25 | 实施前复核：补充 CHANGELOG 最新条目顺序与本地/远端验证状态一致性要求。 |
+| v1.7 | 2026-08-25 | 完成 C0、README/CHANGELOG 事实同步与 Docker 路径过滤；远端触发验证保持 RED。 |

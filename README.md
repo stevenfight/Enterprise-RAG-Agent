@@ -1,7 +1,7 @@
 # 企业知识库智能问答系统 (RAG-Agent)
 
-> **当前状态**: RAG-Agent 智能体架构开发完成 + 现代化前端 (Phase 2 已完成) + Docker 容器化部署 + API 鉴权安全加固 (v5.1)。管道模式 (Streamlit + FastAPI) 和 Agent 模式 (ReAct + 工具调用 + 自我反思) 均可用。
-> 开发进度: 112/112 SDD 任务 (100%), 后端 179 + 前端 48 = 227 TDD GREEN。
+> **当前状态**: RAG-Agent 智能体架构、现代化前端、Docker 容器化和 API 鉴权已完成；v5.16 已在本地完成 OpenSpec 收口与 Quality Gate 配置。管道模式 (Streamlit + FastAPI) 和 Agent 模式 (ReAct + 工具调用 + 自我反思) 均可用。
+> **验证状态**: 历史 v5.1 基线为 112/112 SDD、后端 179 + 前端 48 = 227 TDD GREEN；本轮本地后端白名单 32 项、前端 Vitest 150 项及生产构建均通过。GitHub Actions 远端验收、main 分支保护和服务器部署仍待完成。
 
 > 基于 RAG 技术的企业年报智能 Agent 系统，从管道 RAG 进化而来，支持 ReAct 自主推理 + 工具调用。
 > 原始 RAG 项目：[enterprise-rag-financial-reports](https://github.com/stevenfight/enterprise-rag-financial-reports)
@@ -52,7 +52,7 @@
 - **并发安全**：8 场景验证，会话隔离架构保证线程安全
 - **空结果安全阀**：三层防护机制（空结果检测 + 计数器 + 强制降级），防止 LLM 在连续空检索时陷入无效循环
 - **双轨验证**：保留管道模式作为对照组，同批查询同时跑管道与 Agent 对比答案质量
-- **现代化前端界面**：React 18 + Ant Design 5 独立前端，支持对话首页、会话管理、主题切换
+- **现代化前端界面**：React 19 + Ant Design 6 独立前端，支持对话首页、会话管理、主题切换
 - **SSE 流式思维链**：Agent 推理过程实时流式传输，侧边抽屉时间线样式展示 Think → Act → Observe 循环
 - **交互式 ECharts 图表**：替换静态 PNG，支持柱状图/折线图/饼图、Tooltip、图例
 - **DAG 任务规划看板**：@antv/g6 v5 可视化 Planner 子任务依赖关系图，支持缩放/拖拽
@@ -74,7 +74,7 @@
 | 生成 | DashScope Qwen-Max |
 | 意图识别 | DashScope Qwen-Plus |
 | 后端 | FastAPI + Uvicorn |
-| 前端(主) | React 18 + Ant Design 5 + ECharts + @antv/g6 (Phase 2 已完成) |
+| 前端(主) | React 19 + Ant Design 6 + ECharts + @antv/g6 |
 | 前端(备) | Streamlit |
 
 ## 项目结构
@@ -156,12 +156,8 @@
 │   └── 系统设计决策记录.md          # 关键技术约束与架构决策
 ├── openspec/                 # SDD 规范驱动开发文档
 │   └── changes/
-│       ├── modern-ui/                       # 第六~七轮迭代：现代化前端界面（Phase 1 + Phase 2）
-│       ├── long-term-memory-persistence/    # 第五轮迭代：长期记忆 JSON 持久化
-│       ├── react-empty-result-safety/       # 第四轮迭代：空结果安全阀
-│       ├── rag-to-agent/                    # 第三轮迭代：Agent 智能体架构
-│       ├── quality-robustness-enhancement/  # 第二轮迭代：健壮性增强
-│       └── model-upgrade/                   # 第一轮迭代：模型升级
+│       ├── openspec-lifecycle-and-ci-quality-gate/ # 当前在研：收口与质量发布门禁
+│       └── archive/                         # 已完成变更归档，保留历史规范与验证记录
 ├── snippets/                 # 独立工具代码片段
 │   ├── small_to_big_chunker.py       # Small-to-Big 分块算法演示
 │   └── coverage_guarantee.py         # 覆盖率保障逻辑
@@ -340,7 +336,7 @@ curl -X POST http://localhost:8000/api/query \
 | 第九轮 | langsmith-openevals-integration | LangSmith 在线追踪（11 节点）+ OpenEvals 离线评测（10 条用例，通过率 80%）+ Prompt 规则迭代优化 |
 | 第十轮 | p0-critical-fixes | 5 个 P0 关键缺陷修复：empty_result_count 归零 Bug + run_stream 推理链 + memory 配置生效 + per-request Agent 并发安全 + API 鉴权中间件 (v5.1)|
 
-详见 openspec/changes/ 目录下的各轮迭代设计文档
+详见 `openspec/changes/archive/` 下的历史迭代设计文档，以及 `openspec/changes/openspec-lifecycle-and-ci-quality-gate/` 下的当前质量门禁计划。
 
 ## 文档
 

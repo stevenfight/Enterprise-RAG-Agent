@@ -4,6 +4,23 @@
 > 版本号按迭代轮次递增
 
 ---
+## [第二十五轮] — v5.16 OpenSpec 收口与质量发布门禁
+
+### 变更
+
+- 归档 `model-upgrade`、`quality-robustness-enhancement`、`prompt-injection-guard`、`sync-roadmap-status` 和 `workspace-hygiene-cleanup` 五个已完成 OpenSpec 变更。
+- 新增可复用 Quality Gate：工作流静态检查、Python 3.11 后端编译与无密钥测试白名单、Node 20 前端测试与生产构建；Docker Build & Push 在构建和推送镜像前调用该门禁。
+- Docker 构建路径过滤纳入 `requirements.lock` 与 `quality-gate.yml`，避免锁文件或门禁规则变更绕过构建。
+- 当前 Deploy to Server 暂时仅允许手动触发，等待 SSH 失败原因、GHCR 凭据和 SHA 镜像受控部署验证完成后再恢复自动触发。
+- 根目录 README 同步当前前端依赖、OpenSpec 归档结构与本地/远端验证边界。
+
+### 验证
+
+- 后端 `compileall` 和 pytest 白名单 32 项通过。
+- 前端 Vitest 150 项通过，生产构建通过。
+- GitHub Actions 远端运行、main 分支保护和服务器部署均未完成验收。
+
+---
 ## [第二十四轮] — v5.15 OpenSpec 变更归档与交接文档精简
 
 ### 变更
@@ -451,16 +468,3 @@
 
 - Embedding v3 (1024 维)、gte-rerank-v2 批量重排、qwen-max 生成
 - 检索权重自适应、指令细分化 Prompt (4 种类型)
-## [第二十五轮] — v5.16 OpenSpec 收口与质量发布门禁
-
-### 变更
-
-- 归档 model-upgrade、quality-robustness-enhancement、prompt-injection-guard、sync-roadmap-status 和 workspace-hygiene-cleanup 五个已完成 OpenSpec 变更。
-- 新增可复用 Quality Gate：工作流静态检查、Python 3.11 后端编译与无密钥测试白名单、Node 20 前端测试与生产构建。
-- Docker Build & Push 在构建和推送镜像前调用 Quality Gate；质量失败时不再进入镜像构建任务。
-
-### 验证
-
-- 后端 `compileall` 和 pytest 白名单 32 项通过。
-- 前端 Vitest 150 项通过，生产构建通过。
-- GitHub Actions 远端验证与 main 分支保护配置待后续完成。

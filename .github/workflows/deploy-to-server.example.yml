@@ -1,5 +1,5 @@
-# ===== 服务器自动部署（示例） =====
-# 当 Docker 镜像构建完成后，自动 SSH 登录服务器拉取最新镜像并重启
+# ===== 服务器受控部署 =====
+# 当前部署故障尚未完成排查，仅允许手动触发，避免后续推送自动重试失败脚本。
 #
 # 使用此工作流需要先在 GitHub Secrets 中配置：
 #   Settings → Secrets and variables → Actions → New repository secret
@@ -8,22 +8,18 @@
 #   - SSH_KEY:  服务器 SSH 私钥内容
 #
 # 触发条件:
-#   - docker-build.yml 工作流成功完成后自动触发
-#   - 或手动触发
+#   - 手动触发
+# 自动触发将在服务器、GHCR 凭据和 SHA 镜像部署完成受控验证后恢复。
 
 name: Deploy to Server
 
 on:
-  workflow_run:
-    workflows: ["Docker Build & Push"]
-    types:
-      - completed
   workflow_dispatch:  # 允许手动触发
 
 jobs:
   deploy:
-    # 仅当 docker-build 成功时运行（手动触发时也运行）
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # 当前仅允许手动受控部署。
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
 
     steps:

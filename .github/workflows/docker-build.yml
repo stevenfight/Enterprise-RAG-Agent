@@ -20,9 +20,11 @@ on:
       - 'Dockerfile.frontend'
       - 'frontend/**'
       - 'requirements.txt'
+      - 'requirements.lock'
       - 'src/**'
       - 'config/**'
       - '.github/workflows/docker-build.yml'
+      - '.github/workflows/quality-gate.yml'
   workflow_dispatch:  # 允许手动触发
 
 env:
