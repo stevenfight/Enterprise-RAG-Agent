@@ -4,6 +4,263 @@
 > 版本号按迭代轮次递增
 
 ---
+## [第二十四轮] — v5.15 OpenSpec 变更归档与交接文档精简
+
+### 变更
+
+- 归档 `openspec/changes/` 下已完成变更目录至 `openspec/changes/archive/`（v5.0~v5.13 共 30 个目录：frontend 视觉优化类、multi-agent-step01~15、p0-critical-fixes、modern-ui、backend-memory-config-dedup 等），根目录仅保留仍处规划中的 `model-upgrade`、`prompt-injection-guard`、`quality-robustness-enhancement`
+- 精简交接文档「三、已完成的任务」历史会话记录为压缩摘要（169KB/1580 行 → 111KB/954 行，约 -34% 体积），保留各轮核心成果、验证数据、TDD 数量与 OpenSpec 归档路径，关键信息无丢失
+
+### 验证
+
+- 归档目录移动全部成功（30 个目录，无缺失）
+- 交接文档章节结构完整（一~十二）、32 条踩坑记录保留、无中文乱码
+- v5.10~v5.14 详细小节与「四、当前卡在哪里」「五、下一步计划」保持不变
+
+---
+## [第二十三轮] — v5.14 运行环境修复与后端回归
+
+### 修复
+
+- 健康检查 `agent_loaded` 改为读取 Agent 共享组件初始化状态，修复 per-request 模式下误报 `agent_loaded=false`
+- 冒烟测试从 `config/agent_config.json` 读取 API Key 并携带 Bearer 鉴权头，请求字段对齐 `conversation_id`
+- 图表列表与 Agent 规划冒烟断言对齐当前响应契约（`{charts, total}` 与 `{nodes, edges, execution_order}`）
+
+### 验证
+
+- `/api/health`：`agent_loaded=true`，`rag_generator_loaded=true`
+- API 冒烟测试：4 PASS / 0 FAIL
+- 后端相关测试：13 passed（统一入口 3 项 + AgentMemory 相关 10 项）
+- Python 语法编译通过
+
+---
+## [第二十二轮] — v5.13 API 会话记忆配置一致性
+
+### 修复
+
+- 新增统一 API 会话记忆创建入口，集中传递工作记忆、情景记忆、长期记忆和 `session_id` 配置
+- 普通 Agent 查询、SSE、LangBot 兼容接口和 OpenAI 兼容接口统一复用会话记忆入口
+- 同一 `conversation_id` 复用记忆实例，不同会话使用独立的持久化会话标识
+
+### 验证
+
+- 会话记忆专项测试：3 项通过
+- `api_service.py` 与测试文件 Python 语法编译通过
+- 相关 API 冒烟测试受当前运行服务未初始化和鉴权状态影响，未将环境失败归因于本次改动
+
+---
+## [第二十一轮] — v5.12 前端审查问题收敛
+
+### 修复
+
+- 新增共享 `ChartData` 类型模块，解除图表服务层对组件层类型的反向依赖
+- 从 DAG 任务类型常量导出 `DagNodeType`，由服务层、页面、组件与测试夹具统一复用
+- 将 `ChartTable` 分页测试从 Ant Design 内部 `list` role 断言改为第二页可见页码断言
+
+### 验证
+
+- 专项 Vitest：4 个测试文件、41 项通过
+- 全量 Vitest：22 个测试文件、150 项通过
+- TypeScript 检查与 Vite 生产构建产物生成通过（保留既有 chunk 体积警告）
+
+---
+
+## [第二十轮] — v5.11 图表与 DAG 接口鉴权收紧
+
+### 修复
+
+- 从 `APIAuthMiddleware.SKIP_PATHS` 移除 `/api/charts/list` 与 `/api/agent/plan`，恢复这两个接口的 API Key 鉴权
+- 保留 `/api/agent/stream` 豁免（EventSource 无法携带自定义请求头）
+- 保留 `/api/charts/images/` 前缀豁免（静态图片标签无法携带鉴权头）
+
+### 变更背景
+
+第一阶段已将前端图表与 DAG 请求统一到 `apiClient`，请求拦截器自动附加 `Authorization` 头，因此这两个接口已具备恢复正常鉴权的前提。
+
+### 验证
+
+- 后端语法编译通过
+- 前端 Vitest：22 个测试文件、150 项通过（无回归）
+- 鉴权测试用例新增至 `tests/test_p0_fixes.py`（无 Key / 错误 Key / 正确 Key）
+
+---
+
+## [第十九轮] — v5.10 第一阶段重复逻辑收敛
+
+### 新增
+
+- 新增图表服务 `chartService.ts`，`ChartsPage` 图表列表请求迁移到统一 `apiClient`
+- 新增 DAG 服务 `dagService.ts`，`DagBoardPage` 任务规划请求迁移到统一 `apiClient`
+- 新增通用状态概览组件 `StatusOverview`，知识库概览与设置页系统状态概览统一复用
+- 新增通用图表表格组件 `ChartTable`，`ChartsPage` 表格视图与 `ChartContainer` 表格类型统一复用
+- `AppLayout` 健康检查复用 `chatService.checkHealth`，删除页面层原生 fetch
+- 概览网格、卡片、状态样式统一为 `status-overview-*`，保留四列/五列与紧凑两种视觉形态
+
+### 验证
+
+- 第一阶段专项测试 7 项通过（服务层、StatusOverview、ChartTable）
+- 前端 Vitest：22 个测试文件、150 项通过
+- TypeScript 检查通过
+- 生产构建通过
+
+---
+
+## [第十八轮] — v5.9 图表中心视觉增强
+
+### 新增
+
+- 图表模式改为桌面端两列、移动端单列的响应式网格
+- 图表和表格卡片增加横轴、纵轴、来源文件和生成时间元信息
+- 图表模式与表格模式分别使用网格和全宽列表，提升数据阅读空间
+- 优化无图表和筛选无结果时的空状态提示
+
+### 验证
+
+- ChartMeta 专项测试 2 项通过
+- 前端 Vitest：19 个测试文件、139 项通过
+- TypeScript 检查通过
+- 生产构建通过
+
+---
+
+## [第十七轮] — v5.8 DAG 看板视觉增强
+
+### 新增
+
+- DAG 页面新增任务摘要：任务类型、节点数、依赖连线数和执行批次数
+- 新增执行批次时间线，直观展示每批节点及执行阶段
+- DAG 节点边框根据等待、执行中、成功、失败和跳过状态显示不同颜色
+- 增加摘要和时间线的桌面端、中等屏幕和移动端响应式布局
+
+### 验证
+
+- DAG 视觉组件测试 3 项通过
+- 前端 Vitest：18 个测试文件、137 项通过
+- TypeScript 检查通过
+- 生产构建通过
+
+---
+
+## [第十六轮] — v5.7 知识库页面 KPI 概览
+
+### 新增
+
+- 知识库页面新增文档总数、已索引、待索引和索引完成率四项概览卡片
+- 统计数据直接基于现有文档列表计算，不新增接口和数据字段
+- 增加桌面端四列、中等屏幕两列、移动端单列的响应式布局
+- 保留上传、删除、刷新、表格筛选和索引状态展示
+
+### 验证
+
+- KnowledgeOverview 专项测试 2 项通过
+- 前端 Vitest：17 个测试文件、134 项通过
+- TypeScript 检查通过
+- 生产构建通过
+
+---
+
+## [第十五轮] — v5.6 修复前端生产构建
+
+### 修复
+
+- 修复 ThoughtChainDrawer 测试数据与 `ReasoningStep` 类型不一致问题
+- 修复 G6 DAG 节点点击事件类型和未使用 React 导入
+- 修复图表表格数据和 Ant Design Table 列类型问题
+- 修复知识库表格过滤器类型问题
+- 移除未使用的 HeaderBar 导入和 EventSource 辅助函数
+- 使用 `vitest/config` 提供 Vite 测试配置类型支持
+
+### 验证
+
+- TypeScript 检查通过
+- 前端 Vitest：16 个测试文件、132 项通过
+- `npm run build` 成功，产物生成于 `frontend/dist`
+- 构建仍提示大 chunk 警告，但不影响构建成功
+
+---
+
+## [第十四轮] — v5.5 设置页仪表盘改造
+
+### 新增
+
+- 设置页新增系统状态概览 KPI 卡片：Agent、向量数据库、长期记忆、LangSmith 追踪和工具注册
+- 根据现有系统状态自动显示成功、告警和异常状态，不新增接口
+- 增加桌面端 5 列、中等屏幕 3 列、移动端单列的响应式布局
+- 保留原有 Agent 配置、系统健康和已注册工具详情卡片
+
+### 测试
+
+- SettingsOverview 组件测试 2 项通过
+- TypeScript 检查命令受环境 npm 日志沙箱限制，需在允许 npm cache 日志目录后复核
+
+---
+## [第十三轮] — v5.4 页面容器与卡片规范统一
+
+### 新增
+
+- 新增 `PageShell` / `PageHeader` 公共组件，统一 DAG、图表、知识库和系统设置页面的内容宽度、标题结构和页面间距
+- 新增页面级卡片规范，统一圆角、边框、背景和阴影，并通过主题变量支持亮色/暗色模式
+- 新增移动端页面容器适配：页面水平内边距收敛为 16px
+
+### 测试
+
+- PageShell 组件测试 2 项通过
+- 前端 Vitest 130 项通过
+- TypeScript 检查通过
+- 生产构建仍存在项目既有类型错误，未在本轮扩大修复范围
+
+---
+
+## [第十二轮] — v5.3 前端观感优化（A/B/C/D）+ DAG 看板修复
+
+### 新增
+
+- **聊天 UI 全面升级 @ant-design/x**：手写聊天组件替换为 Sender / Bubble / Conversations / Welcome（后端 SSE 流式、多Agent状态、思维链逻辑不变）
+- **财务指标卡片化**（方向 A）：`frontend/src/utils/financialFormat.ts` 自动提取 KPI + `FinancialKPICards.tsx` AI 消息顶部渲染指标卡片；Markdown 表格美化（表头渐变、斑马纹、数字等宽右对齐、圆角阴影、行 hover）
+- **主题切换 + 消息微交互**（方向 B+C）：HeaderBar 太阳/月亮按钮（localStorage 持久化）；MessageBubble hover 显示复制/重新生成；气泡入场动画 `fade-in-up-smooth`
+- **欢迎页快捷指令 + 图表暗色适配**（方向 D）：ChatContainer `quickCommands` 胶囊；ChartContainer `dark` prop 亮/暗双配色；ChartsPage 跟随全局主题
+- **planner DAG 分解增强**：`CHART_KEYWORDS`、`CALC_KEYWORDS` 增加"涨幅/增长/同比"；`_build_multi_compare` 补齐 retrieve→compare→(calc)→(chart)→verify 子任务链；`COMPARE_KEYWORDS` 移除连接词防单公司误判，trend 分类放宽
+- **planner 三大运营商别名识别**：`COMPANY_ALIASES` + `_extract_companies`；`COMPANY_NAMES` set→list 修复顺序不稳定
+
+### 修复
+
+- **DAG 节点无文字**：G6 v5 `labelText` 空字符串/模板 `${data.label}` 不解析，改用函数形式 `(datum) => datum.data?.label ?? ''`
+- **DAG 节点详情**：点击节点弹出详情 Modal（任务 ID / 类型 / 描述 / 工具 / 状态 / 工具参数 JSON）
+- **后端检索缺失中国移动**：`_adjust_top_n_for_companies` 按公司数自动扩容 top_n
+- **单公司趋势误判对比**：连接词"及"不再触发 multi_compare，"中芯国际近几年主营业务及营收变化，图表展示"正确走 trend
+
+### 测试
+
+- 前端 Vitest 126 用例全绿（14 个测试文件）
+- planner TDD 11 用例全绿（AL-01~AL-11）
+- 后端既有测试无回归（18 passed + 342 passed）
+
+---
+
+## [第十一轮] — v5.2 Phase 3 前端现代化 UI（管理后台）
+
+### 新增
+
+- **知识库管理页面（KnowledgePage）**：文档列表 + 索引状态展示 + PDF 拖拽上传（50MB 限制）
+- **后端知识库服务 `knowledge_service.py`**：文档 CRUD + 路径遍历防护 + 索引状态查询
+- **系统设置监控页面（SettingsPage）**：只读监控面板（Agent / 向量数据库 / 长期记忆 / LangSmith 追踪 / 工具注册 五项 KPI），后端新增系统状态接口
+- **响应式适配**：`responsive.css` 移动端适配（侧边栏 fixed 布局）
+- **生产构建优化**：`App.tsx` 改用 `React.lazy` 四路由代码分割（分包构建），优化首屏加载
+- **前端服务层**：`knowledgeService.ts`、`systemService.ts` 封装知识库与系统状态 API；`types/chat.ts` 扩展知识库/系统状态类型
+- **OpenSpec 规范文档**：proposal.md、design.md、tasks.md、spec-frontend-ui.md、tdd-frontend-ui.md（`openspec/changes/archive/modern-ui/`）
+
+### 变更
+
+- 后端 `api_service.py`：新增 5 个模型 + 5 条路由（知识库文档列表/上传/删除、索引状态、系统状态）
+- 知识库关键路径日志补全（knowledge_service.py / api_service.py / KnowledgePage.tsx）
+
+### 验证
+
+- `python -m py_compile` / `npx tsc --noEmit` / `npx vite build` 全部通过（分包构建成功）
+- TC-FE-011 知识库管理 7/7 绿，TC-FE-012 系统设置 6/6 绿，TC-FE-013 生产就绪 5/7 绿
+- 2 项留待后续：移动端汉堡菜单 + Nginx 部署配置（对应 TC-FE-013 2 项红）
+
+---
 
 ## [第十轮] — v5.1 P0 关键缺陷修复
 

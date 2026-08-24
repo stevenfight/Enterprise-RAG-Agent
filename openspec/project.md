@@ -20,7 +20,7 @@
 | 意图识别 | DashScope Qwen-Plus |
 | Agent 框架 | 自研 ReAct (不引入 LangChain 等) |
 | 后端 | FastAPI + Uvicorn |
-| 前端(主) | React 19 + Ant Design 6 + TypeScript (Phase 2 已完成) |
+| 前端(主) | React 19 + Ant Design 6 + TypeScript (Phase 3 已完成) |
 | 前端(备) | Streamlit |
 
 ## 演进路线
@@ -31,11 +31,12 @@
 | v1.0 | model-upgrade | 模型升级 + 检索精准度 (8 项优化) | 已完成 |
 | v1.1 | quality-robustness-enhancement | 健壮性 + 功能完整性 (15 项优化) | 已完成 |
 | v2.0 | rag-to-agent | RAG 管道 → RAG-Agent 智能体 | 已完成 |
-| v3.0 | modern-ui | 现代化前端展示界面 (React + Ant Design, 3 阶段交付) | Phase 1 已完成<br>Phase 2 已完成<br>Phase 3 规划中 |
+| v3.0 | modern-ui | 现代化前端展示界面 (React + Ant Design, 3 阶段交付) | 已完成（Phase 1~3）|
 | v4.0 | docker-deployment | Docker 容器化部署 | 已完成 |
-| v5.0 | langsmith-openevals-integration | 接入 LangSmith + OpenEvals 能力评测监控 | 实施中（评测通过率 80%，待归档）|
+| v5.0 | langsmith-openevals-integration | 接入 LangSmith + OpenEvals 能力评测监控 | 已完成（评测通过率 80%，已归档）|
 | v5.1 | p0-critical-fixes | P0 关键缺陷修复（empty_result_count + run_stream推理链 + memory配置 + 并发安全 + API鉴权）| 已完成（TDD 20/20）|
-| v6.0 | multi-agent-step01 | 多 Agent 升级步骤 0.1：基础能力搭建（LLMProvider 抽象层 + StepCallback + WorkerToolFactory + AgentResult 扩展 + Prompt 外部化）| 实施中 |
+| v6.0 | multi-agent-step01~step15 | 多 Agent 升级主线（步骤 0.1~0.2 + 阶段一~十五：LLMProvider 抽象 / Worker / SharedMemory / DelegateTool / Orchestrator / 并行调度 / Reflector / API 端点统一 / 阶段五调优 / step09~15 验证与优化）| 已完成（阶段零~十五，342 passed + 5 skipped）|
+| v5.3 | 前端观感优化 A/B/C/D + DAG 看板修复 | @ant-design/x 聊天 UI + 马卡龙风格 + KPI 卡片/表格美化 + 主题切换/微交互 + 快捷指令/图表暗色 + planner 三大运营商别名/子任务链 + top_n 扩容 | 已完成（前端 Vitest 126 用例全绿 + planner TDD 11 用例全绿）|
 
 ## 项目结构
 
