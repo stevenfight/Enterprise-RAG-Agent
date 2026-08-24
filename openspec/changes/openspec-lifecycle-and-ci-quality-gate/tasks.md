@@ -20,8 +20,9 @@
 - [x] B5.2. 已将 Docker 工作流路径过滤补充 `requirements.lock` 与 `quality-gate.yml`。
 - [ ] B5.2.1. 推送后验证仅修改 `requirements.lock` 或 `quality-gate.yml` 时，都会触发 Quality Gate 与镜像构建。
 - [x] B5.3. 已将 `CHANGELOG.md` 的 v5.16 条目移至最新条目位置，并按实际完成状态记录 README 同步与 C0 部署隔离，未提前记录远端或服务器成功。
-- [ ] B6. 推送后确认 GitHub Actions 的 actionlint、backend 与 frontend 任务均为通过状态。
-- [ ] B6.1. 从已完成的远端运行记录 workflow-lint、backend 与 frontend 的实际检查全名。
+- [x] B6. 已确认 GitHub Actions 运行 `32759245372` 的 actionlint、backend 与 frontend 任务均通过。
+- [x] B6.1. 已记录远端实际检查全名：`Quality Gate / workflow-lint`、`Quality Gate / backend`、`Quality Gate / frontend`。
+- [x] B6.2. 已确认运行 `32759245372` 的 Docker Build & Push 成功，后端与前端镜像推送步骤均通过；本次未自动触发服务器部署。
 - [ ] B7. 由仓库管理员仅使用 B6.1 已核实的检查全名，在 GitHub 为 main 启用 Quality Gate 必需检查；再验证失败质量任务不发布镜像。此项需要 GitHub 管理权限或已认证 CLI，不能由本地文件替代。
 - [ ] B8. 所有适用验证通过后，将本 TDD 标记为 GREEN。
 
@@ -47,3 +48,5 @@
 | v1.5 | 2026-08-25 | 三次复核：将部署隔离设为推送硬前置条件，补充远端检查名核验与自动部署仅限 main 的分支边界。 |
 | v1.6 | 2026-08-25 | 实施前复核：补充 CHANGELOG 最新条目顺序与本地/远端验证状态一致性要求。 |
 | v1.7 | 2026-08-25 | 完成 C0、README/CHANGELOG 事实同步与 Docker 路径过滤；远端触发验证保持 RED。 |
+| v1.8 | 2026-08-25 | GitHub Quality Gate 三项作业通过，记录实际检查全名；镜像构建结果仍待完成。 |
+| v1.9 | 2026-08-25 | GitHub Quality Gate 与前后端镜像推送均通过，确认 C0 未触发新的服务器部署。 |

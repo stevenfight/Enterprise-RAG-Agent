@@ -10,14 +10,14 @@
 | LC-R04 | GREEN | 活动目录检查 | 不再显示五个已完成变更目录。 |
 | CI-R01 | GREEN | 后端本地等价命令 | `compileall` 与 32 项 pytest 白名单均通过。 |
 | CI-R02 | GREEN | 前端本地等价命令 | Vitest 150 项通过，生产构建通过。 |
-| CI-R03 | RED | 工作流静态检查 | 工作流只使用读取权限，不含部署、镜像推送或 Secrets。 |
-| CI-R04 | RED | GitHub Actions 验收 | main 或拉取请求上的 backend、frontend 两个任务均通过。 |
-| CI-R05 | RED | 工作流静态检查 | actionlint 不报告 YAML 或 GitHub Actions 语义错误。 |
+| CI-R03 | GREEN | 工作流静态检查 | 远端 `Quality Gate / workflow-lint` 通过；质量工作流只使用读取权限，不含部署、镜像推送或 Secrets。 |
+| CI-R04 | GREEN | GitHub Actions 验收 | 运行 `32759245372` 的 `Quality Gate / backend`、`Quality Gate / frontend` 均通过。 |
+| CI-R05 | GREEN | 工作流静态检查 | 运行 `32759245372` 的 actionlint 不报告 YAML 或 GitHub Actions 语义错误。 |
 | CI-R06 | RED | Docker 路径触发 | 修改 `requirements.lock` 或 `quality-gate.yml` 时，Docker Build & Push 都会被触发并调用 Quality Gate。 |
 | RG-R01 | RED | 发布门禁失败路径 | 若启用发布门禁，Quality Gate 失败不会触发镜像推送或服务器部署。 |
-| RG-R02 | RED | 发布门禁通过路径 | 若启用发布门禁，Docker 镜像使用通过质量验证的提交 SHA 构建并标记。 |
+| RG-R02 | GREEN | 发布门禁通过路径 | 运行 `32759245372` 在 Quality Gate 通过后成功构建并推送前后端镜像，镜像使用提交 `74df2b0` 的 SHA 标签。 |
 | RG-R03 | RED | 分支保护核查 | main 配置 backend、frontend 为必需状态检查，且禁止绕过合并规则。 |
-| RG-R04 | RED | 检查名核验 | 在 GitHub 已完成运行中记录实际显示的 workflow-lint、backend、frontend 检查名，分支保护只使用这些名称。 |
+| RG-R04 | GREEN | 检查名核验 | 已记录 GitHub 实际检查名：`Quality Gate / workflow-lint`、`Quality Gate / backend`、`Quality Gate / frontend`；分支保护只使用这些名称。 |
 | DP-R01 | RED | 部署失败状态核查 | 部署工作流失败时，发布记录明确服务器未更新或状态未确认。 |
 | DP-R02 | RED | SHA 镜像部署验证 | 受控部署只拉取通过 Quality Gate 的提交 SHA 镜像，并在健康检查通过后标记成功。 |
 | DOC-R01 | GREEN | README 事实同步 | README 的 v5.16 状态、React 19 / Ant Design 6、历史/本轮验证口径及 OpenSpec 归档说明均与仓库事实一致，且不宣称远端或服务器已成功。 |

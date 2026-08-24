@@ -1,7 +1,7 @@
 # 企业知识库智能问答系统 (RAG-Agent)
 
 > **当前状态**: RAG-Agent 智能体架构、现代化前端、Docker 容器化和 API 鉴权已完成；v5.16 已在本地完成 OpenSpec 收口与 Quality Gate 配置。管道模式 (Streamlit + FastAPI) 和 Agent 模式 (ReAct + 工具调用 + 自我反思) 均可用。
-> **验证状态**: 历史 v5.1 基线为 112/112 SDD、后端 179 + 前端 48 = 227 TDD GREEN；本轮本地后端白名单 32 项、前端 Vitest 150 项及生产构建均通过。GitHub Actions 远端验收、main 分支保护和服务器部署仍待完成。
+> **验证状态**: 历史 v5.1 基线为 112/112 SDD、后端 179 + 前端 48 = 227 TDD GREEN；本轮本地后端白名单 32 项、前端 Vitest 150 项及生产构建均通过。GitHub Actions Quality Gate 与镜像构建已通过；main 分支保护和服务器受控部署仍待完成。
 
 > 基于 RAG 技术的企业年报智能 Agent 系统，从管道 RAG 进化而来，支持 ReAct 自主推理 + 工具调用。
 > 原始 RAG 项目：[enterprise-rag-financial-reports](https://github.com/stevenfight/enterprise-rag-financial-reports)

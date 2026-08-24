@@ -18,7 +18,7 @@
 
 - 后端 `compileall` 和 pytest 白名单 32 项通过。
 - 前端 Vitest 150 项通过，生产构建通过。
-- GitHub Actions 远端运行、main 分支保护和服务器部署均未完成验收。
+- GitHub Actions 运行 `32759245372` 的 Quality Gate 与前后端镜像构建/推送均成功；main 分支保护和服务器受控部署仍待完成。
 
 ---
 ## [第二十四轮] — v5.15 OpenSpec 变更归档与交接文档精简
