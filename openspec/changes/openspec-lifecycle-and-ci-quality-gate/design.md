@@ -47,7 +47,7 @@ README 不得宣称 GitHub Actions、分支保护或服务器已成功；这些�
 1. **C0：临时隔离。** 在推送质量门禁变更前，将部署工作流触发条件收敛为 `workflow_dispatch`；保留工作流文件和手动部署能力，不删除现有配置。此状态仅用于故障排查，不是永久关闭自动部署。
 2. **C1/C2：凭据与目标核验。** 在用户提供服务器访问授权及仓库 Secrets 管理权限后，核验 `SSH_HOST`、`SSH_USER`、`SSH_KEY`、`/opt/enterprise-rag` 与 GHCR 包访问权限。服务器拉取私有 GHCR 镜像必须使用最小范围、具备 `read:packages` 权限的专用凭据（例如受限的 `GHCR_PULL_TOKEN`）；凭据只能从 GitHub Secret 注入，不能输出到日志或写入仓库。`GITHUB_TOKEN` 可在满足包访问关系的 Actions 作业中使用，但它是作业级短期令牌，不应作为服务器长期拉取凭据。
 3. **C3：镜像版本。** 首次受控部署至少拉取已通过 Quality Gate 的提交 SHA 标签，而非 `latest`。手动触发必须提供并校验一个非空、格式正确的 `image_sha` 输入；自动触发恢复后必须使用 `workflow_run.head_sha`。后端和前端镜像必须使用同一个 SHA，且该 SHA 必须能在 GHCR 拉取。不得把默认分支当前 SHA、手动触发工作流的 SHA 与待部署镜像 SHA 混用。在服务器路径、凭据和部署成功得到验证后，再评估将部署目标提升为镜像 digest，以获得更强的不可变性。
-4. **C4/C5：受控恢复。** 手动部署须确认镜像拉取、`docker compose` 启动和健康检查均成功；仅在用户确认该次验证通过后，恢复 `workflow_run` 自动触发。现有 `docker compose down` 会导致完整短暂停机，是否改为 `docker compose pull && docker compose up -d --remove-orphans` 必须先核实服务器 compose 配置，作为后续最小化停机优化，不在本次故障隔离中直接改写。
+4. **C4/C5：受控恢复。** 手动部署须确认镜像拉取、`docker compose` 启动和健康检查均成功；仅在用户确认该次验证通过后，恢复 `workflow_run` 自动触发。恢复时必须将 `workflow_run` 限定为 main 分支上的 Docker Build & Push 成功事件，并在任务条件中复核目标分支，不能让其他分支的手动 Docker 构建触发生产部署。现有 `docker compose down` 会导致完整短暂停机，是否改为 `docker compose pull && docker compose up -d --remove-orphans` 必须先核实服务器 compose 配置，作为后续最小化停机优化，不在本次故障隔离中直接改写。
 
 GitHub main 分支保护同样需要仓库管理员通过 GitHub 设置或已认证的 CLI 操作配置，不能凭本地仓库状态宣称已经启用。
 
@@ -58,3 +58,5 @@ GitHub main 分支保护同样需要仓库管理员通过 GitHub 设置或已认
 ## 提交与验证顺序
 
 先完成收口提交并在本地复查目录状态；再新增 CI，先在本地执行与 CI 等价的后端、前端命令，通过后提交。远端 Actions 运行结果通过后才将质量门禁视为完成。
+
+当前未推送变更的执行顺序必须以部署隔离为先：先完成 C0，再完成 README 同步与 Docker 路径过滤，最后才允许推送。远端运行完成后，先记录实际显示的必需检查名称，再由仓库管理员配置分支保护；不能在未观察到 GitHub 检查名时猜测 `backend`、`frontend` 的名称。

@@ -114,3 +114,19 @@ GitHub Actions 必须在不使用真实服务密钥的条件下验证后端和�
 
 - **当** 恢复 `workflow_run` 自动触发
 - **则** 工作流必须使用触发 Docker Build & Push 的 `workflow_run.head_sha` 作为两个镜像的标签
+
+### 场景：恢复后的自动部署分支边界
+
+- **当** 恢复 `workflow_run` 自动触发
+- **则** 仅 main 分支上成功的 Docker Build & Push 可以触发部署
+- **且** 其他分支的手动或自动 Docker 构建不得触发生产服务器部署
+
+## 要求：分支保护检查名可验证
+
+main 分支保护配置必须使用 GitHub 实际展示的检查名，不能根据本地任务键名猜测。
+
+### 场景：配置质量门禁必需检查
+
+- **当** 远端 Quality Gate 至少完成一次可观察运行
+- **则** 记录 GitHub 展示的 workflow-lint、backend 与 frontend 检查全名
+- **且** 仓库管理员仅以这些已验证名称配置 main 必需检查

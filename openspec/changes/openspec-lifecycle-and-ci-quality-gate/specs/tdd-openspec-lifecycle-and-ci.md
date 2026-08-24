@@ -17,6 +17,7 @@
 | RG-R01 | RED | 发布门禁失败路径 | 若启用发布门禁，Quality Gate 失败不会触发镜像推送或服务器部署。 |
 | RG-R02 | RED | 发布门禁通过路径 | 若启用发布门禁，Docker 镜像使用通过质量验证的提交 SHA 构建并标记。 |
 | RG-R03 | RED | 分支保护核查 | main 配置 backend、frontend 为必需状态检查，且禁止绕过合并规则。 |
+| RG-R04 | RED | 检查名核验 | 在 GitHub 已完成运行中记录实际显示的 workflow-lint、backend、frontend 检查名，分支保护只使用这些名称。 |
 | DP-R01 | RED | 部署失败状态核查 | 部署工作流失败时，发布记录明确服务器未更新或状态未确认。 |
 | DP-R02 | RED | SHA 镜像部署验证 | 受控部署只拉取通过 Quality Gate 的提交 SHA 镜像，并在健康检查通过后标记成功。 |
 | DOC-R01 | RED | README 事实同步 | README 的 v5.16 状态、React 19 / Ant Design 6、历史/本轮验证口径及 OpenSpec 归档说明均与仓库事实一致，且不宣称远端或服务器已成功。 |
@@ -26,3 +27,4 @@
 | DP-R06 | RED | 自动触发恢复 | 仅在受控部署成功并获用户确认后恢复 `workflow_run`，随后验证自动部署成功。 |
 | DP-R07 | RED | 手动镜像 SHA 输入 | 手动部署缺少、格式错误或无法拉取的 `image_sha` 时失败；合法 SHA 使前后端拉取同一标签。 |
 | DP-R08 | RED | 自动镜像 SHA 来源 | 自动部署恢复后以 `workflow_run.head_sha` 作为前后端共同镜像标签。 |
+| DP-R09 | RED | 自动部署分支边界 | 自动部署仅响应 main 成功构建；非 main 分支的 Docker Build & Push 不触发服务器部署。 |
