@@ -16,7 +16,10 @@ import logging
 import sys
 import threading
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from agent_core import AgentResult  # 避免循环导入，仅用于类型检查
 
 logger = logging.getLogger("shared_memory")
 logger.setLevel(logging.INFO)
@@ -40,13 +43,13 @@ class SharedMemory:
         sm.set_task_context("query", "三大运营商2024营收对比")
         sm.set_task_context("companies", ["中国移动", "中国联通", "中国电信"])
         sm.add_agent_result("DataAgent(中芯)", result)
-        ctx = sm.get_context_for("CalcAgent", {"company_name": "中芯国际"})
+        ctx = sm.get_context_for("CalcAgent")
     """
 
     def __init__(self):
-        self._lock = threading.Lock()
+        self._lock: threading.Lock = threading.Lock()
         self.task_context: Dict[str, Any] = {}
-        self.agent_outputs: Dict[str, Any] = {}  # { "DataAgent(中芯)": AgentResult, ... }
+        self.agent_outputs: Dict[str, "AgentResult"] = {}  # { "DataAgent(中芯)": AgentResult, ... }
         self.execution_log: List[Dict[str, Any]] = []
 
     # ---- 任务上下文 ----
@@ -62,7 +65,7 @@ class SharedMemory:
 
     # ---- Agent 结果写入 ----
 
-    def add_agent_result(self, agent_name: str, result) -> None:
+    def add_agent_result(self, agent_name: str, result: "AgentResult") -> None:
         """写入 Worker Agent 的执行结果（并发安全）
 
         Args:
@@ -82,12 +85,12 @@ class SharedMemory:
 
     # ---- Agent 结果读取 ----
 
-    def get_agent_result(self, agent_name: str) -> Optional[Any]:
+    def get_agent_result(self, agent_name: str) -> Optional["AgentResult"]:
         """获取指定 Worker 的执行结果"""
         with self._lock:
             return self.agent_outputs.get(agent_name)
 
-    def get_all_agent_results(self) -> Dict[str, Any]:
+    def get_all_agent_results(self) -> Dict[str, "AgentResult"]:
         """获取所有 Worker 的执行结果"""
         with self._lock:
             return dict(self.agent_outputs)
@@ -95,16 +98,14 @@ class SharedMemory:
     def get_context_for(self, agent_name: str) -> str:
         """为下游 Agent 构建上下文文本
 
-        不同 Worker 角色返回不同格式：
-        - ChartAgent: 返回结构化数值（方便构造 data 参数）
-        - VerifyAgent: 返回陈述文本 + 来源文本
-        - 其他: 返回纯文本摘要
+        将所有上游 Agent 的结果拼接为统一格式的文本块。
+        agent_name 参数预留，用于未来按角色区分输出格式。
 
         Args:
-            agent_name: 下游 Agent 名称（如 "ChartAgent"）
+            agent_name: 下游 Agent 名称（如 "ChartAgent"），当前版本仅用于语义标识
 
         Returns:
-            上下文文本
+            上下文文本，格式为 "[AgentName 结果]\\nanswer" 的拼接
         """
         with self._lock:
             lines = []

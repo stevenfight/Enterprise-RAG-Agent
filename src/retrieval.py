@@ -77,6 +77,21 @@ COMPANY_ABBREV_MAP = {
 }
 
 
+def _adjust_top_n_for_companies(top_n, companies):
+    """多公司检索时，确保 top_n 至少覆盖每家公司 1 条，避免保底逻辑互相顶替。
+
+    参数:
+        top_n: 当前返回条数上限
+        companies: 待检索公司名列表
+
+    返回:
+        调整后的 top_n（多公司且 top_n 小于公司数时，扩容到公司数）
+    """
+    if len(companies) > 1 and top_n < len(companies):
+        return len(companies)
+    return top_n
+
+
 def truncate_text_to_tokens(text, max_tokens=MAX_INPUT_TOKENS):
     tokens = ENCODING.encode(text)
     if len(tokens) <= max_tokens:
@@ -1252,6 +1267,15 @@ class HybridRetriever:
             companies = list(self._company_registry.get("companies", {}).keys())
 
         logger.info("[HybridRetriever] 待检索公司: %s", ", ".join(companies))
+
+        # 多公司检索时，确保 top_n 至少覆盖每家公司 1 条，避免保底逻辑互相顶替
+        adjusted_top_n = _adjust_top_n_for_companies(top_n, companies)
+        if adjusted_top_n != top_n:
+            logger.info(
+                "[HybridRetriever] 多公司检索调整 top_n: %d -> %d (公司数=%d)",
+                top_n, adjusted_top_n, len(companies),
+            )
+            top_n = adjusted_top_n
 
         all_merged = []
 

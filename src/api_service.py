@@ -579,6 +579,22 @@ def _ensure_conversation(conversation_id: str) -> ConversationManager:
     return conversation_store.get_or_create(conversation_id)
 
 
+def _get_or_create_conversation_memory(
+    conversation_id: str,
+) -> tuple[ConversationManager, AgentMemory]:
+    """获取会话并按统一配置创建或复用 AgentMemory。"""
+    cm = _ensure_conversation(conversation_id)
+    if cm.agent_memory is None:
+        agent_cfg = _shared_state.get("ag_cfg", {})
+        cm.link_memory(AgentMemory(
+            working_memory_limit=agent_cfg.get("memory_working_memory_limit", 10),
+            episodic_memory_turns=agent_cfg.get("memory_episodic_memory_turns", 5),
+            enable_long_term=agent_cfg.get("memory_enable_long_term", False),
+            session_id=conversation_id,
+        ))
+    return cm, cm.agent_memory
+
+
 # ==================== FastAPI 应用 ====================
 
 app = FastAPI(
@@ -611,10 +627,8 @@ class APIAuthMiddleware(BaseHTTPMiddleware):
         "/docs",
         "/openapi.json",
         "/redoc",
-        # 前端页面内部接口：EventSource / 原生 fetch 无法携带鉴权头
+        # 前端页面内部接口：EventSource 无法携带自定义请求头
         "/api/agent/stream",
-        "/api/agent/plan",
-        "/api/charts/list",
     }
 
     # 无需鉴权的路径前缀（动态资源，如前端展示的图表图片）
@@ -1225,10 +1239,7 @@ async def api_agent_query(request: AgentQueryRequest):
 
     # ---- 会话隔离: 每个 conversation_id 持有独立的 AgentMemory ----
     conversation_id = request.conversation_id or str(uuid.uuid4())
-    cm = _ensure_conversation(conversation_id)
-    if cm.agent_memory is None:
-        cm.link_memory(AgentMemory())
-    per_request_memory = cm.agent_memory  # 会话独立的 memory
+    cm, per_request_memory = _get_or_create_conversation_memory(conversation_id)
 
     # ---- mode 路由（阶段四新增）----
     effective_mode = request.mode  # auto / single / multi
@@ -1411,10 +1422,7 @@ async def api_agent_stream(
 
     # 会话隔离
     conv_id = conversation_id or str(uuid.uuid4())
-    cm = _ensure_conversation(conv_id)
-    if cm.agent_memory is None:
-        cm.link_memory(AgentMemory())
-    per_request_memory = cm.agent_memory
+    cm, per_request_memory = _get_or_create_conversation_memory(conv_id)
 
     # ---- 预创建 Agent 实例（仅在非 multi 模式下使用）----
     single_agent = _create_per_request_agent(
@@ -1561,14 +1569,14 @@ async def api_health():
     logger.info("[api_service] 收到 /api/health 请求")
 
     status = "ok" if rag_generator is not None else "not_ready"
-    logger.info("[api_service] /api/health 返回状态: %s, RAGGenerator 已加载: %s, Agent 已加载: %s",
-                 status, rag_generator is not None, agent is not None)
+    logger.info("[api_service] /api/health 返回状态: %s, RAGGenerator 已加载: %s, Agent 共享组件已加载: %s",
+                 status, rag_generator is not None, bool(_shared_state.get("agent_initialized")))
 
     return {
         "status": status,
         "vector_db_dir": str(vector_db_dir),
         "rag_generator_loaded": rag_generator is not None,
-        "agent_loaded": agent is not None,
+        "agent_loaded": bool(_shared_state.get("agent_initialized")),
         "filter_enabled": (
             _shared_state["query_processor"] is not None
             and _shared_state["query_processor"]._filter_config is not None
@@ -1753,10 +1761,7 @@ async def api_langbot_chat(request: LangBotRequest):
     try:
         # 会话隔离
         conversation_id = request.conversation_id or str(uuid.uuid4())
-        cm = _ensure_conversation(conversation_id)
-        if cm.agent_memory is None:
-            cm.link_memory(AgentMemory())
-        per_request_memory = cm.agent_memory
+        cm, per_request_memory = _get_or_create_conversation_memory(conversation_id)
 
         # 每请求创建独立 Agent 实例（并发安全，与 /api/agent/query 一致）
         per_request_agent = _create_per_request_agent(
@@ -1890,10 +1895,7 @@ async def api_openai_chat_completions(request: OpenAIChatRequest):
     try:
         # 会话隔离
         conversation_id = request.conversation_id or str(uuid.uuid4())
-        cm = _ensure_conversation(conversation_id)
-        if cm.agent_memory is None:
-            cm.link_memory(AgentMemory())
-        per_request_memory = cm.agent_memory
+        cm, per_request_memory = _get_or_create_conversation_memory(conversation_id)
 
         # 每请求创建独立 Agent 实例（并发安全，与 /api/agent/query 一致）
         per_request_agent = _create_per_request_agent(

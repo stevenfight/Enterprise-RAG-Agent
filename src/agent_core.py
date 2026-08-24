@@ -216,6 +216,112 @@ class ReActAgent:
     # 核心 run 方法
     # ============================================================
 
+    def _execute_single_step(self, messages, step, tools_called, empty_result_count):
+        """执行单步 ReAct 推理（run 和 run_stream 共享核心逻辑）
+
+        Args:
+            messages: 当前消息列表
+            step: 当前步骤号（0-based）
+            tools_called: 已调用工具集合
+            empty_result_count: 空结果累计次数
+
+        Returns:
+            dict: 步骤结果，type 字段区分类型：
+                - "ok": thought/action/action_input/observation/step_elapsed_ms/reasoning_step
+                - "final_answer": answer
+                - "llm_failure": error_msg/is_token_limit
+                - "parse_failure": (无额外字段)
+        """
+        step_num = step + 1
+        step_start = time.time()
+        logger.info("[ReActAgent] --- 步骤 %d/%d 开始 ---", step_num, self.max_steps)
+
+        # 步骤摘要
+        steps_done = step  # 当前步骤之前已完成步数
+        if steps_done > 0:
+            logger.info("[ReActAgent] 步骤摘要: 已完成%d步, 已调用工具=%s, 空结果次数=%d",
+                       steps_done, sorted(tools_called), empty_result_count)
+        if empty_result_count >= 2:
+            logger.warning("[ReActAgent] 连续%d次空结果, 可能导致无效循环", empty_result_count)
+
+        # 调用 LLM
+        llm_response = self._call_llm(messages)
+        if llm_response is None:
+            logger.error("[ReActAgent] LLM 调用失败，终止推理")
+            return {
+                "type": "llm_failure",
+                "error_msg": "Token 超限" if self._token_limit_reached else "LLM 调用失败",
+                "is_token_limit": self._token_limit_reached,
+            }
+
+        logger.info("[ReActAgent] LLM 响应长度: %d 字符", len(llm_response))
+        messages.append({"role": "assistant", "content": llm_response})
+
+        # 解析 LLM 响应
+        thought, action, action_input = self._parse_response(llm_response)
+        logger.info("[ReActAgent] 解析结果: thought=%.60s..., action=%s", thought, action)
+
+        # 检测空解析（格式错误）
+        if not action:
+            logger.warning("[ReActAgent] 解析失败: 未提取到有效 Action, 可能 LLM 格式异常")
+            messages.append({
+                "role": "user",
+                "content": "你的回复格式不正确。请严格使用 Thought/Action/Action Input 格式。"
+            })
+            return {"type": "parse_failure"}
+
+        # 检查是否为 Final Answer
+        if action == "Final Answer":
+            return {"type": "final_answer", "answer": action_input}
+
+        # 执行工具
+        logger.info("[ReActAgent] 执行行动: action=%s", action)
+        observation = self._execute_action(action, action_input)
+
+        # 记录工具调用类型，检测空结果
+        tools_called.add(action)
+        is_empty = self._is_empty_result(observation)
+        if is_empty:
+            empty_result_count += 1
+            logger.warning("[ReActAgent] 工具 '%s' 返回空结果 (累计%d次)", action, empty_result_count)
+        else:
+            empty_result_count = 0
+            logger.info("[ReActAgent] 空结果计数器: 发现有效结果, 计数器已重置为0")
+
+        step_elapsed = (time.time() - step_start) * 1000
+        self.memory.add(
+            thought=thought,
+            action=action,
+            action_input=action_input,
+            observation=observation,
+            elapsed_ms=step_elapsed,
+        )
+
+        reasoning_step = {
+            "step": step_num,
+            "thought": thought,
+            "action": action,
+            "action_input": action_input,
+            "observation": observation,
+            "elapsed_ms": step_elapsed,
+        }
+
+        logger.info("[ReActAgent] 步骤 %d 耗时: %.0fms", step_num, step_elapsed)
+
+        # 将观察结果反馈给 LLM
+        messages.append({"role": "user", "content": f"Observation: {observation}"})
+
+        return {
+            "type": "ok",
+            "thought": thought,
+            "action": action,
+            "action_input": action_input,
+            "observation": observation,
+            "step_elapsed_ms": step_elapsed,
+            "reasoning_step": reasoning_step,
+            "empty_result_count": empty_result_count,
+        }
+
     @traceable(name="react-loop")
     def run(
         self,
@@ -271,76 +377,36 @@ class ReActAgent:
         logger.info("[ReActAgent] 初始消息构建完成, 共 %d 条", len(messages))
 
         # ReAct 主循环
-        tools_called = set()  # 记录已调用的工具类型，检测重复调用
-        empty_result_count = 0  # 空结果次数，检测搜索枯竭
+        tools_called = set()
+        empty_result_count = 0
 
         for step in range(self.max_steps):
-            step_start = time.time()
-            logger.info("[ReActAgent] --- 步骤 %d/%d 开始 ---", step + 1, self.max_steps)
+            result = self._execute_single_step(messages, step, tools_called, empty_result_count)
 
-            # 步骤摘要: 当前已收集信息概览
-            steps_done = len(reasoning_chain)
-            if steps_done > 0:
-                logger.info("[ReActAgent] 步骤摘要: 已完成%d步, 已调用工具=%s, 空结果次数=%d",
-                           steps_done, sorted(tools_called), empty_result_count)
-            if empty_result_count >= 2:
-                logger.warning("[ReActAgent] 连续%d次空结果, 可能导致无效循环", empty_result_count)
-
-            # 调用 LLM
-            llm_response = self._call_llm(messages)
-            if llm_response is None:
-                if self._token_limit_reached:
-                    logger.warning("[ReActAgent] Token 超限，终止推理 (已%d步, %d条消息)",
-                                   step + 1, len(messages))
-                else:
-                    logger.error("[ReActAgent] LLM 调用失败，终止推理")
+            if result["type"] == "llm_failure":
                 elapsed = (time.time() - start_time) * 1000
                 if self._step_callback:
                     self._step_callback.on_done(AgentResult(
-                        answer="",
-                        success=False,
-                        total_steps=step + 1,
-                        total_elapsed_ms=elapsed,
-                        error="Token 超限" if self._token_limit_reached else "LLM 调用失败",
-                        sources=self._sources,
-                        total_tokens=self._total_tokens,
+                        answer="", success=False, total_steps=step + 1,
+                        total_elapsed_ms=elapsed, error=result["error_msg"],
+                        sources=self._sources, total_tokens=self._total_tokens,
                     ))
                 return AgentResult(
-                    answer="",
-                    success=False,
-                    reasoning_chain=reasoning_chain,
-                    total_steps=step + 1,
-                    total_elapsed_ms=elapsed,
-                    error="Token 超限" if self._token_limit_reached else "LLM 调用失败",
-                    sources=self._sources,
-                    total_tokens=self._total_tokens,
+                    answer="", success=False, reasoning_chain=reasoning_chain,
+                    total_steps=step + 1, total_elapsed_ms=elapsed,
+                    error=result["error_msg"],
+                    sources=self._sources, total_tokens=self._total_tokens,
                 )
 
-            logger.info("[ReActAgent] LLM 响应长度: %d 字符", len(llm_response))
-            messages.append({"role": "assistant", "content": llm_response})
-
-            # 解析 LLM 响应
-            thought, action, action_input = self._parse_response(llm_response)
-            logger.info("[ReActAgent] 解析结果: thought=%.60s..., action=%s",
-                       thought, action)
-
-            # 推送 Thought 步骤事件（多 Agent SSE）
+            # 推送 Thought 步骤事件
             if self._step_callback:
-                self._step_callback.on_step("thought", step + 1, thought)
+                self._step_callback.on_step("thought", step + 1, result.get("thought", ""))
 
-            # 检测空解析 (格式错误)
-            if not action:
-                logger.warning("[ReActAgent] 解析失败: 未提取到有效 Action, 可能 LLM 格式异常")
-                # 提示 LLM 修正格式
-                messages.append({
-                    "role": "user",
-                    "content": "你的回复格式不正确。请严格使用 Thought/Action/Action Input 格式。"
-                })
+            if result["type"] == "parse_failure":
                 continue
 
-            # 检查是否为 Final Answer
-            if action == "Final Answer":
-                final_answer = action_input
+            if result["type"] == "final_answer":
+                final_answer = result["answer"]
                 elapsed_ms = (time.time() - start_time) * 1000
                 self.memory.summarize_to_episodic(query, final_answer)
                 logger.info("[ReActAgent] ===== 推理完成 (Final Answer) =====")
@@ -348,66 +414,25 @@ class ReActAgent:
                 if self._step_callback:
                     self._step_callback.on_step("answer", step + 1, final_answer[:500])
                     self._step_callback.on_done(AgentResult(
-                        answer=final_answer,
-                        success=True,
-                        total_steps=step + 1,
-                        total_elapsed_ms=elapsed_ms,
-                        sources=self._sources,
+                        answer=final_answer, success=True, total_steps=step + 1,
+                        total_elapsed_ms=elapsed_ms, sources=self._sources,
                         total_tokens=self._total_tokens,
                     ))
                 return AgentResult(
-                    answer=final_answer,
-                    success=True,
-                    reasoning_chain=reasoning_chain,
-                    total_steps=step + 1,
-                    total_elapsed_ms=elapsed_ms,
-                    sources=self._sources,
-                    total_tokens=self._total_tokens,
+                    answer=final_answer, success=True, reasoning_chain=reasoning_chain,
+                    total_steps=step + 1, total_elapsed_ms=elapsed_ms,
+                    sources=self._sources, total_tokens=self._total_tokens,
                 )
 
-            # 执行工具
-            logger.info("[ReActAgent] 执行行动: action=%s", action)
-            # 推送 Action 步骤事件（多 Agent SSE）
+            # result["type"] == "ok" — 正常工具执行
+            # 推送 Action/Observation 步骤事件
             if self._step_callback:
-                self._step_callback.on_step("action", step + 1, action)
-            observation = self._execute_action(action, action_input)
+                self._step_callback.on_step("action", step + 1, result["action"])
+                self._step_callback.on_step("observation", step + 1,
+                    result["observation"][:500] if result["observation"] else result["observation"])
 
-            # 推送 Observation 步骤事件（多 Agent SSE）
-            if self._step_callback:
-                self._step_callback.on_step("observation", step + 1, observation[:500] if observation else observation)
-
-            # 记录工具调用类型，检测空结果
-            tools_called.add(action)
-            is_empty = self._is_empty_result(observation)
-            if is_empty:
-                empty_result_count += 1
-                logger.warning("[ReActAgent] 工具 '%s' 返回空结果 (累计%d次)", action, empty_result_count)
-            else:
-                empty_result_count = 0  # 有结果则直接归零（连续空结果次数）
-                logger.info("[ReActAgent] 空结果计数器: 发现有效结果, 计数器已重置为0")
-
-            step_elapsed = (time.time() - step_start) * 1000
-            self.memory.add(
-                thought=thought,
-                action=action,
-                action_input=action_input,
-                observation=observation,
-                elapsed_ms=step_elapsed,
-            )
-
-            reasoning_chain.append({
-                "step": step + 1,           # M11: 统一为 step (原为 step_number)
-                "thought": thought,
-                "action": action,
-                "action_input": action_input,
-                "observation": observation,
-                "elapsed_ms": step_elapsed,
-            })
-
-            logger.info("[ReActAgent] 步骤 %d 耗时: %.0fms", step + 1, step_elapsed)
-
-            # 将观察结果反馈给 LLM
-            messages.append({"role": "user", "content": f"Observation: {observation}"})
+            empty_result_count = result["empty_result_count"]
+            reasoning_chain.append(result["reasoning_step"])
 
         # 达到 max_steps，强制生成答案
         elapsed_ms = (time.time() - start_time) * 1000
@@ -417,24 +442,15 @@ class ReActAgent:
         if self._step_callback:
             self._step_callback.on_step("answer", self.max_steps, forced_answer[:500])
             self._step_callback.on_done(AgentResult(
-                answer=forced_answer,
-                success=True,
-                total_steps=self.max_steps,
-                total_elapsed_ms=elapsed_ms,
-                forced_stop=True,
-                sources=self._sources,
-                total_tokens=self._total_tokens,
+                answer=forced_answer, success=True, total_steps=self.max_steps,
+                total_elapsed_ms=elapsed_ms, forced_stop=True,
+                sources=self._sources, total_tokens=self._total_tokens,
             ))
 
         return AgentResult(
-            answer=forced_answer,
-            success=True,
-            reasoning_chain=reasoning_chain,
-            total_steps=self.max_steps,
-            total_elapsed_ms=elapsed_ms,
-            forced_stop=True,
-            sources=self._sources,
-            total_tokens=self._total_tokens,
+            answer=forced_answer, success=True, reasoning_chain=reasoning_chain,
+            total_steps=self.max_steps, total_elapsed_ms=elapsed_ms,
+            forced_stop=True, sources=self._sources, total_tokens=self._total_tokens,
         )
 
     # ============================================================
@@ -481,7 +497,7 @@ class ReActAgent:
         self._sources = []
         self._total_tokens = 0
 
-        # 构建 System Prompt (复用现有逻辑)
+        # 构建 System Prompt
         tool_descriptions = self.tool_registry.get_tool_descriptions()
         context = self.memory.get_full_context(conversation_history)
         system_prompt = self._build_system_prompt(
@@ -504,31 +520,20 @@ class ReActAgent:
 
         now_ms = lambda: int(time.time() * 1000)
 
-        reasoning_chain: list = []  # 流式模式累积推理链，用于强制答案生成
+        reasoning_chain: list = []
 
-        # M12: 空结果检查和工具重复调用检测
         tools_called = set()
         empty_result_count = 0
 
         try:
             for step in range(self.max_steps):
-                step_start = time.time()
-                logger.info("[ReActAgent][stream] --- 步骤 %d/%d 开始 ---", step + 1, self.max_steps)
+                result = self._execute_single_step(messages, step, tools_called, empty_result_count)
 
-                # M12: 空结果检查和工具重复调用检测
-                steps_done = len(reasoning_chain)
-                if steps_done > 0:
-                    logger.info("[ReActAgent][stream] 步骤摘要: 已完成%d步", steps_done)
-                if empty_result_count >= 2:
-                    logger.warning("[ReActAgent][stream] 连续%d次空结果, 可能导致无效循环", empty_result_count)
-
-                # 调用 LLM
-                llm_response = self._call_llm(messages)
-                if llm_response is None:
+                if result["type"] == "llm_failure":
                     logger.error("[ReActAgent][stream] LLM 调用失败，终止推理")
                     yield {
                         "type": "error",
-                        "content": "LLM 调用失败",
+                        "content": result["error_msg"],
                         "timestamp": now_ms(),
                     }
                     yield {
@@ -539,35 +544,21 @@ class ReActAgent:
                     }
                     return
 
-                logger.info("[ReActAgent][stream] LLM 响应长度: %d 字符", len(llm_response))
-                messages.append({"role": "assistant", "content": llm_response})
-
-                # 解析 LLM 响应
-                thought, action, action_input = self._parse_response(llm_response)
-                logger.info("[ReActAgent][stream] 解析: thought=%.60s..., action=%s", thought, action)
-
                 # 发送 Thought 事件
                 yield {
                     "type": "thought",
                     "step": step + 1,
-                    "content": thought,
+                    "content": result.get("thought", ""),
                     "timestamp": now_ms(),
                 }
                 if self._step_callback:
-                    self._step_callback.on_step("thought", step + 1, thought)
+                    self._step_callback.on_step("thought", step + 1, result.get("thought", ""))
 
-                # 检测空解析
-                if not action:
-                    logger.warning("[ReActAgent][stream] 解析失败: 未提取到有效 Action")
-                    messages.append({
-                        "role": "user",
-                        "content": "你的回复格式不正确。请严格使用 Thought/Action/Action Input 格式。"
-                    })
+                if result["type"] == "parse_failure":
                     continue
 
-                # 检查是否为 Final Answer
-                if action == "Final Answer":
-                    final_answer = action_input
+                if result["type"] == "final_answer":
+                    final_answer = result["answer"]
                     elapsed_ms = (time.time() - start_time) * 1000
                     self.memory.summarize_to_episodic(query, final_answer)
                     logger.info("[ReActAgent][stream] ===== 推理完成 =====")
@@ -580,11 +571,8 @@ class ReActAgent:
                     if self._step_callback:
                         self._step_callback.on_step("answer", step + 1, final_answer[:500])
                         self._step_callback.on_done(AgentResult(
-                            answer=final_answer,
-                            success=True,
-                            total_steps=step + 1,
-                            total_elapsed_ms=elapsed_ms,
-                            sources=self._sources,
+                            answer=final_answer, success=True, total_steps=step + 1,
+                            total_elapsed_ms=elapsed_ms, sources=self._sources,
                             total_tokens=self._total_tokens,
                         ))
                     yield {
@@ -595,63 +583,32 @@ class ReActAgent:
                     }
                     return
 
+                # result["type"] == "ok" — 正常工具执行
                 # 发送 Action 事件
                 yield {
                     "type": "action",
                     "step": step + 1,
-                    "content": action,
-                    "action_input": action_input,
+                    "content": result["action"],
+                    "action_input": result["action_input"],
                     "timestamp": now_ms(),
                 }
                 if self._step_callback:
-                    self._step_callback.on_step("action", step + 1, action)
-
-                # 执行工具
-                logger.info("[ReActAgent][stream] 执行行动: action=%s", action)
-                observation = self._execute_action(action, action_input)
-
-                # M12: 记录工具调用类型，检测空结果
-                tools_called.add(action)
-                is_empty = self._is_empty_result(observation)
-                if is_empty:
-                    empty_result_count += 1
-                    logger.warning("[ReActAgent][stream] 工具 '%s' 返回空结果 (累计%d次)", action, empty_result_count)
-                else:
-                    empty_result_count = 0
-
-                step_elapsed = (time.time() - step_start) * 1000
-                self.memory.add(
-                    thought=thought,
-                    action=action,
-                    action_input=action_input,
-                    observation=observation,
-                    elapsed_ms=step_elapsed,
-                )
+                    self._step_callback.on_step("action", step + 1, result["action"])
 
                 # 发送 Observation 事件
                 yield {
                     "type": "observation",
                     "step": step + 1,
-                    "content": observation[:500] if observation else observation,
+                    "content": result["observation"][:500] if result["observation"] else result["observation"],
                     "timestamp": now_ms(),
                 }
                 if self._step_callback:
-                    self._step_callback.on_step("observation", step + 1, observation[:500])
+                    self._step_callback.on_step("observation", step + 1,
+                        result["observation"][:500] if result["observation"] else result["observation"])
 
-                logger.info("[ReActAgent][stream] 步骤 %d 耗时: %.0fms", step + 1, step_elapsed)
+                empty_result_count = result["empty_result_count"]
+                reasoning_chain.append(result["reasoning_step"])
 
-                # 将观察结果反馈给 LLM
-                messages.append({"role": "user", "content": f"Observation: {observation}"})
-
-                # 累积推理链（用于强制答案生成时传入正确的推理历史）
-                reasoning_chain.append({
-                    "step": step + 1,
-                    "thought": thought,
-                    "action": action,
-                    "action_input": action_input,
-                    "observation": observation,
-                    "elapsed_ms": step_elapsed,
-                })
             elapsed_ms = (time.time() - start_time) * 1000
             logger.warning("[ReActAgent][stream] ===== 达到最大步数，强制生成答案 =====")
             forced_answer = self._generate_forced_answer(messages, reasoning_chain)
@@ -664,13 +621,9 @@ class ReActAgent:
             if self._step_callback:
                 self._step_callback.on_step("answer", self.max_steps, forced_answer[:500])
                 self._step_callback.on_done(AgentResult(
-                    answer=forced_answer,
-                    success=True,
-                    total_steps=self.max_steps,
-                    total_elapsed_ms=elapsed_ms,
-                    forced_stop=True,
-                    sources=self._sources,
-                    total_tokens=self._total_tokens,
+                    answer=forced_answer, success=True, total_steps=self.max_steps,
+                    total_elapsed_ms=elapsed_ms, forced_stop=True,
+                    sources=self._sources, total_tokens=self._total_tokens,
                 ))
             yield {
                 "type": "done",
@@ -683,13 +636,9 @@ class ReActAgent:
             logger.error("[ReActAgent][stream] 流式推理异常: %s", str(e))
             if self._step_callback:
                 self._step_callback.on_done(AgentResult(
-                    answer="",
-                    success=False,
-                    total_steps=0,
+                    answer="", success=False, total_steps=0,
                     total_elapsed_ms=(time.time() - start_time) * 1000,
-                    error=str(e),
-                    sources=self._sources,
-                    total_tokens=self._total_tokens,
+                    error=str(e), sources=self._sources, total_tokens=self._total_tokens,
                 ))
             yield {
                 "type": "error",

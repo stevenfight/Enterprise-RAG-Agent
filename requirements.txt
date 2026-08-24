@@ -1,40 +1,53 @@
 # 企业级财务年报分析智能 RAG-Agent 依赖清单
 # Python >= 3.11
+# 使用 ~= 兼容版本约束，允许同大版本内的补丁更新
+# 生产部署请使用 requirements.lock 精确版本
+# 安装命令: pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # Web 框架
-fastapi
-uvicorn[standard]
+fastapi~=0.115.14
+uvicorn[standard]~=0.34.3
 
 # 前端界面
-streamlit
+streamlit~=1.57.0
 
 # LLM 与 Embedding
-DashScope
+dashscope~=1.22.2
 
 # 向量检索
-faiss-cpu
+faiss-cpu~=1.13.2
 
 # 关键词检索
-rank-bm25
-jieba
+rank-bm25~=0.2.2
+jieba~=0.42.1
 
 # 文本分块与 Token 计算
-tiktoken
+tiktoken~=0.9.0
 
 # 数据科学
-numpy
-matplotlib
+numpy~=2.4.4
+matplotlib~=3.10.9
 
 # PDF 解析
-PyMuPDF
-mineru
+PyMuPDF~=1.27.2
 
 # 配置与环境变量
-python-dotenv
+python-dotenv~=1.2.2
+PyYAML~=6.0.3
 
 # 数据校验（FastAPI 已依赖，显式声明确保版本）
-pydantic
+pydantic~=2.13.4
+
+# ASGI 框架（FastAPI 已依赖，显式声明因为 src/ 直接 import）
+starlette~=0.46.2
 
 # 在线追踪与评测（可选）
-langsmith
-openevals
+langsmith~=0.10.12
+
+# 测试框架（开发依赖）
+pytest~=8.3.5
+requests~=2.34.2
+
+# 以下为可选依赖，未在本地安装，如需启用请取消注释：
+# mineru       - PDF 解析增强（安装命令: pip install mineru）
+# openevals    - 离线评测框架（安装命令: pip install openevals）

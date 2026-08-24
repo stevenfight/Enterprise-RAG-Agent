@@ -120,7 +120,13 @@ class TaskPlan:
 # ============================================================
 
 # 已知公司名 (用于检测用户提到了哪些公司)
-COMPANY_NAMES = {"中芯国际", "中国移动", "中国联通", "中国电信"}
+# 注意: 使用 list 保持定义顺序，保证提取结果稳定
+COMPANY_NAMES = ["中芯国际", "中国移动", "中国联通", "中国电信"]
+
+# 行业/别名 → 公司列表 (用户常用称谓，需展开为具体公司)
+COMPANY_ALIASES = {
+    "三大运营商": ["中国移动", "中国联通", "中国电信"],
+}
 
 # 财务指标关键词
 METRIC_KEYWORDS = {
@@ -137,12 +143,15 @@ METRIC_KEYWORDS = {
 TREND_KEYWORDS = {"趋势", "变化", "走势", "历年", "近几年", "增长趋势",
                   "历史", "逐年", "几年", "走势图"}
 
-# 对比关键词
-COMPARE_KEYWORDS = {"对比", "比较", "哪个", "差距", "vs", "VS",
-                    "和", "与", "及", "以及"}
+# 图表/可视化关键词
+CHART_KEYWORDS = {"图表", "柱状图", "折线图", "饼图", "可视化", "画图", "图形"}
+
+# 对比关键词 (仅含明确的对比意图词, "和/与/及"等连接词不判定为对比, 防止单公司误判)
+COMPARE_KEYWORDS = {"对比", "比较", "哪个", "差距", "vs", "VS"}
 
 # 计算关键词
-CALC_KEYWORDS = {"同比增长", "增速", "CAGR", "复合增长率", "利润率"}
+CALC_KEYWORDS = {"同比增长", "增速", "CAGR", "复合增长率", "利润率",
+                 "涨幅", "增长", "同比"}
 
 
 # ============================================================
@@ -276,8 +285,8 @@ class TaskPlanner:
         Returns:
             QueryCategory
         """
-        # 提取公司名
-        companies = [c for c in COMPANY_NAMES if c in query]
+        # 提取公司名 (含行业别名展开)
+        companies = self._extract_companies(query)
         logger.debug("[Planner] 检测到公司: %s", companies if companies else "(无)")
 
         # 提取指标
@@ -294,20 +303,20 @@ class TaskPlanner:
         years = self._extract_years(query)
         logger.debug("[Planner] 检测到年份: %s", years if years[0] else "(无)")
 
-        # 检测趋势
-        need_chart = any(kw in query for kw in TREND_KEYWORDS)
+        # 检测趋势/图表
+        need_chart = any(kw in query for kw in TREND_KEYWORDS) or any(kw in query for kw in CHART_KEYWORDS)
         # 检测计算需求
         need_calculate = any(kw in query for kw in CALC_KEYWORDS)
         # 检测对比需求
         need_compare = len(companies) >= 2 or any(kw in query for kw in COMPARE_KEYWORDS)
 
-        # 分类判定
-        if need_chart and need_calculate:
+        # 分类判定 (多公司优先: 即使含图表/计算需求也走 multi_compare, 由子任务承载)
+        if need_compare and len(companies) >= 2:
+            category = "multi_compare"  # 多公司对比 → 直接用 compare 工具
+        elif need_chart and (need_calculate or companies):
             category = "trend"          # 趋势分析 → 检索+计算+图表
         elif need_calculate and companies:
             category = "compound"       # 复合计算 → 检索+计算
-        elif need_compare and len(companies) >= 2:
-            category = "multi_compare"  # 多公司对比 → 直接用 compare 工具
         elif need_compare:
             category = "multi_compare"  # 含对比关键词但未明确公司 → 仍按对比处理
         else:
@@ -322,6 +331,27 @@ class TaskPlanner:
             need_calculate=need_calculate,
             need_compare=need_compare,
         )
+
+    def _extract_companies(self, query: str) -> List[str]:
+        """提取查询中的公司名，支持行业别名展开
+
+        策略:
+          1. 先精确匹配已知公司名（按 COMPANY_NAMES 定义顺序）
+          2. 再按 COMPANY_ALIASES 别名映射补充公司（去重，追加在后）
+
+        Args:
+            query: 用户原始查询
+
+        Returns:
+            公司名列表（保持定义顺序）
+        """
+        companies = [c for c in COMPANY_NAMES if c in query]
+        for alias, mapped in COMPANY_ALIASES.items():
+            if alias in query:
+                for name in mapped:
+                    if name not in companies:
+                        companies.append(name)
+        return companies
 
     def _extract_years(self, text: str) -> Tuple[Optional[int], Optional[int]]:
         """提取查询中的年份范围"""
@@ -396,31 +426,89 @@ class TaskPlanner:
         return [retrieve, verify]
 
     def _build_multi_compare(self, cat: QueryCategory, query: str) -> List[SubTask]:
-        """多公司对比: 直接用 compare_tool (内部会自行检索)
+        """多公司对比: 检索 → 对比 → (计算) → (图表) → 验证
 
-        依赖策略:
-          - 不预先检索，compare_tool 的三层保底机制已自行处理
-          - 对比结果出来后做一次验证
+        依赖链: retrieve → compare → (calc) → (chart) → verify
+          - calc:  查询含涨幅/增长等计算需求时追加
+          - chart: 查询含图表/可视化需求时追加
         """
-        tid1 = self._next_id()
         metric = cat.metric_names[0] if cat.metric_names else "营收"
         year = cat.year_range[0] if cat.year_range[0] else 2024
+        companies_text = "、".join(cat.company_names) if cat.company_names else "各公司"
 
+        # 1. 检索任务: 拉取各家目标年份指标数据
+        tid_retrieve = self._next_id()
+        retrieve = SubTask(
+            task_id=tid_retrieve,
+            task_type=SubTaskType.RETRIEVE,
+            description="检索 %s %s年%s 数据" % (companies_text, year, metric),
+            tool_name="retrieve",
+            tool_params={
+                "query": "%s %s年%s" % (companies_text, year, metric),
+                "company_name": cat.company_names[0] if cat.company_names else None,
+            },
+            priority=0,
+        )
+
+        # 2. 对比任务: 依赖检索结果
+        tid_compare = self._next_id()
         compare = SubTask(
-            task_id=tid1,
+            task_id=tid_compare,
             task_type=SubTaskType.COMPARE,
-            description="对比 %s: %s年%s" % (
-                "、".join(cat.company_names) if cat.company_names else "各公司",
-                year, metric
-            ),
+            description="对比 %s: %s年%s" % (companies_text, year, metric),
             tool_name="compare",
             tool_params={
                 "companies": cat.company_names,
                 "metric": metric,
                 "year": year,
             },
-            priority=0,
+            depends_on=[tid_retrieve],
+            priority=1,
         )
+
+        tasks: List[SubTask] = [retrieve, compare]
+        last_id = tid_compare
+        priority = 2
+
+        # 涨幅/增长计算任务 (依赖对比结果)
+        if cat.need_calculate:
+            tid_calc = self._next_id()
+            calc = SubTask(
+                task_id=tid_calc,
+                task_type=SubTaskType.CALCULATE,
+                description="计算 %s %s年%s涨幅" % (companies_text, year, metric),
+                tool_name="calculator",
+                tool_params={
+                    "operation": "yoy_growth",
+                    "current": 0,      # 由 Agent 填充实际值
+                    "previous": 0,
+                },
+                depends_on=[last_id],
+                priority=priority,
+            )
+            tasks.append(calc)
+            last_id = tid_calc
+            priority += 1
+
+        # 图表展示任务 (依赖最终数据)
+        if cat.need_chart:
+            tid_chart = self._next_id()
+            chart = SubTask(
+                task_id=tid_chart,
+                task_type=SubTaskType.CHART,
+                description="生成 %s %s年%s 对比图表" % (companies_text, year, metric),
+                tool_name="chart",
+                tool_params={
+                    "chart_type": "bar",
+                    "title": "%s %s年%s对比" % (companies_text, year, metric),
+                    "data": {},        # 由 Agent 填充
+                },
+                depends_on=[last_id],
+                priority=priority,
+            )
+            tasks.append(chart)
+            last_id = tid_chart
+            priority += 1
 
         verify = SubTask(
             task_id=self._next_id(),
@@ -428,11 +516,12 @@ class TaskPlanner:
             description="验证对比结果的数值准确性",
             tool_name="verify",
             tool_params={"query": query},
-            depends_on=[tid1],
-            priority=1,
+            depends_on=[last_id],
+            priority=priority,
         )
 
-        return [compare, verify]
+        tasks.append(verify)
+        return tasks
 
     def _build_trend(self, cat: QueryCategory, query: str) -> List[SubTask]:
         """趋势分析: 检索历史数据 → 计算 → 图表

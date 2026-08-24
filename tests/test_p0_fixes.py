@@ -141,6 +141,44 @@ def test_auth_v1_chat_no_key():
             f"status={status}, body={json.dumps(body, ensure_ascii=False)[:200]}")
 
 
+def test_auth_charts_list():
+    """补充: /api/charts/list 无 Key 返回 401，正确 Key 放行"""
+    print("\n[补充] /api/charts/list 鉴权")
+
+    status, body = _request("GET", "/api/charts/list")
+    _assert("/api/charts/list 无 Key 返回 401", status == 401,
+            f"status={status}, body={json.dumps(body, ensure_ascii=False)[:200]}")
+
+    status, body = _request("GET", "/api/charts/list",
+                            headers={"Authorization": "Bearer wrong-key-12345"})
+    _assert("/api/charts/list 错误 Key 返回 401", status == 401,
+            f"status={status}, body={json.dumps(body, ensure_ascii=False)[:200]}")
+
+    status, body = _request("GET", "/api/charts/list",
+                            headers={"Authorization": f"Bearer {VALID_API_KEY}"})
+    _assert("/api/charts/list 正确 Key 非 401", status != 401,
+            f"status={status}")
+
+
+def test_auth_agent_plan():
+    """补充: /api/agent/plan 无 Key 返回 401，正确 Key 放行"""
+    print("\n[补充] /api/agent/plan 鉴权")
+
+    status, body = _request("GET", "/api/agent/plan?query=%E8%90%A5%E6%94%B6")
+    _assert("/api/agent/plan 无 Key 返回 401", status == 401,
+            f"status={status}, body={json.dumps(body, ensure_ascii=False)[:200]}")
+
+    status, body = _request("GET", "/api/agent/plan?query=%E8%90%A5%E6%94%B6",
+                            headers={"Authorization": "Bearer wrong-key-12345"})
+    _assert("/api/agent/plan 错误 Key 返回 401", status == 401,
+            f"status={status}, body={json.dumps(body, ensure_ascii=False)[:200]}")
+
+    status, body = _request("GET", "/api/agent/plan?query=%E8%90%A5%E6%94%B6",
+                            headers={"Authorization": f"Bearer {VALID_API_KEY}"})
+    _assert("/api/agent/plan 正确 Key 非 401", status != 401,
+            f"status={status}")
+
+
 # ============================================================
 # SP0-05b: max_steps 硬上限
 # ============================================================
@@ -236,6 +274,8 @@ def main():
     test_auth_health_skip()
     test_auth_query_no_key()
     test_auth_v1_chat_no_key()
+    test_auth_charts_list()
+    test_auth_agent_plan()
 
     # ---- SP0-05b: max_steps 硬上限 ----
     print("\n" + "=" * 40)

@@ -203,7 +203,7 @@ class TestSharedMemory(unittest.TestCase):
         sm = SharedMemory()
         sm.add_agent_result("DataAgent(中芯)", self._make_result(answer="中芯营收 495 亿"))
         sm.add_agent_result("DataAgent(华虹)", self._make_result(answer="华虹营收 100 亿"))
-        ctx = sm.get_context_for("CompareAgent", {})
+        ctx = sm.get_context_for("CompareAgent")
         self.assertIn("DataAgent(中芯)", ctx)
         self.assertIn("中芯营收 495 亿", ctx)
         self.assertIn("DataAgent(华虹)", ctx)
