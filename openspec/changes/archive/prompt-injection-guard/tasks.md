@@ -70,7 +70,7 @@
 
 ## 阶段 5: 清理
 
-- [ ] 5.1 用户确认后删除 `.bak` 备份文件
+- [x] 5.1 核实 `.py.bak` 备份文件无需删除：`src/query_processor.py.bak`、`src/agent_core.py.bak`、`src/retrieval.py.bak` 均不存在，且 `*.py.bak` 已被忽略
 - [x] 5.2 更新版本记录
 
 ---
