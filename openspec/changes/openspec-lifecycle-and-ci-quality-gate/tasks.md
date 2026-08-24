@@ -18,6 +18,7 @@
 - [x] B5. 本地等价命令与 YAML 解析已通过，工作包 B 已提交（`7a51458`）；远端 actionlint 与 GitHub Actions 回归验证仍待完成。
 - [ ] B5.1. 依据当前仓库事实更新根目录 `README.md`：项目状态、React/Ant Design 版本、历史/本轮测试口径与 OpenSpec 归档说明；不宣称未验收的远端成功。
 - [ ] B5.2. 将 Docker 工作流路径过滤补充 `requirements.lock` 与 `quality-gate.yml`，并验证仅修改任一文件时都会触发 Quality Gate 与镜像构建。
+- [ ] B5.3. 将 `CHANGELOG.md` 的 v5.16 条目移至最新条目位置，并按实际完成状态补充 README 同步与 C0 部署隔离，不提前记录远端或服务器成功。
 - [ ] B6. 推送后确认 GitHub Actions 的 actionlint、backend 与 frontend 任务均为通过状态。
 - [ ] B6.1. 从已完成的远端运行记录 workflow-lint、backend 与 frontend 的实际检查全名。
 - [ ] B7. 由仓库管理员仅使用 B6.1 已核实的检查全名，在 GitHub 为 main 启用 Quality Gate 必需检查；再验证失败质量任务不发布镜像。此项需要 GitHub 管理权限或已认证 CLI，不能由本地文件替代。
@@ -43,3 +44,4 @@
 | v1.3 | 2026-08-25 | 计划复核：补充 README 事实同步、失败部署临时隔离、最小 GHCR 拉取权限、自动恢复条件与停机风险。 |
 | v1.4 | 2026-08-25 | 二次复核：补充锁文件/质量门禁路径触发，以及手动和自动部署的镜像 SHA 来源与同版本校验。 |
 | v1.5 | 2026-08-25 | 三次复核：将部署隔离设为推送硬前置条件，补充远端检查名核验与自动部署仅限 main 的分支边界。 |
+| v1.6 | 2026-08-25 | 实施前复核：补充 CHANGELOG 最新条目顺序与本地/远端验证状态一致性要求。 |

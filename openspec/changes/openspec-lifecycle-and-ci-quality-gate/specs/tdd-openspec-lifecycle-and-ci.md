@@ -21,6 +21,7 @@
 | DP-R01 | RED | 部署失败状态核查 | 部署工作流失败时，发布记录明确服务器未更新或状态未确认。 |
 | DP-R02 | RED | SHA 镜像部署验证 | 受控部署只拉取通过 Quality Gate 的提交 SHA 镜像，并在健康检查通过后标记成功。 |
 | DOC-R01 | RED | README 事实同步 | README 的 v5.16 状态、React 19 / Ant Design 6、历史/本轮验证口径及 OpenSpec 归档说明均与仓库事实一致，且不宣称远端或服务器已成功。 |
+| DOC-R02 | RED | CHANGELOG 当前版本记录 | v5.16 位于 CHANGELOG 最新条目位置，记录实际完成的 README/C0 变更，不把远端或服务器验收写为通过。 |
 | DP-R03 | RED | 失败部署隔离 | 当前部署根因未确认时，工作流只允许手动触发，不再因本次推送自动重试。 |
 | DP-R04 | RED | GHCR 拉取凭据 | 服务器部署使用最小范围 `read:packages` Secret，凭据不进入仓库或日志。 |
 | DP-R05 | RED | 受控 SHA 部署 | 手动部署拉取已通过质量门禁的提交 SHA 镜像，服务启动与健康检查均通过。 |
