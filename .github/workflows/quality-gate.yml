@@ -1,0 +1,71 @@
+name: Quality Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workflow-lint:
+    name: workflow-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      - name: 检查 GitHub Actions 工作流
+        run: docker run --rm -v "${{ github.workspace }}:/repo" --workdir /repo rhysd/actionlint:1.7.12 -color
+
+  backend:
+    name: backend
+    needs: workflow-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      - name: 配置 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - name: 安装已固定直接依赖
+        run: python -m pip install -r requirements.lock
+      - name: 编译后端源码
+        run: python -m compileall -q src
+      - name: 运行无密钥后端测试
+        run: python -m pytest -q tests/test_api_memory_factory.py tests/test_prompt_injection_guard.py tests/tdd_planner_alias.py tests/tdd_retrieval_topn_fix.py
+
+  frontend:
+    name: frontend
+    needs: workflow-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      - name: 配置 Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: 安装前端依赖
+        run: npm ci
+      - name: 运行前端测试
+        run: npm test
+      - name: 构建前端生产产物
+        run: npm run build

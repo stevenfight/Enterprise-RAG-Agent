@@ -1,5 +1,5 @@
 # ===== Docker 镜像自动构建与推送 =====
-# 当 main 分支有推送时，自动构建后端和前端镜像并推送到 GitHub Container Registry
+# 当 main 分支有推送时，先执行质量门禁；全部通过后再构建后端和前端镜像并推送到 GitHub Container Registry
 #
 # 触发条件:
 #   - push 到 main 分支
@@ -32,7 +32,12 @@ env:
   IMAGE_NAME_FRONTEND: ${{ github.repository_owner }}/enterprise-rag-agent/frontend
 
 jobs:
+  quality:
+    name: Quality Gate
+    uses: ./.github/workflows/quality-gate.yml
+
   build-and-push:
+    needs: quality
     runs-on: ubuntu-latest
     permissions:
       contents: read
