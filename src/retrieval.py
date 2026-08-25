@@ -14,6 +14,7 @@
 
 import json
 import logging
+import re
 import os
 import pickle
 import sys
@@ -1457,6 +1458,8 @@ class RAGGenerator:
         # 第二轮：按优先级构建上下文（先保证每家公司至少1条，再填充剩余）
         context_parts = []
         used_count = 0
+        used_result_indices = set()
+        used_result_texts = {}
         all_entries = priority_parts + remaining_parts
 
         for entry in all_entries:
@@ -1468,6 +1471,8 @@ class RAGGenerator:
                     context_parts.append(entry["header"] + truncated)
                     total_tokens = self.MAX_CONTEXT_TOKENS
                     used_count += 1
+                    used_result_indices.add(entry["index"] - 1)
+                    used_result_texts[entry["index"] - 1] = truncated
                     logger.info("[RAGGenerator]   片段 #%d 截断至 %d tokens（已达上限）", entry["index"], remaining)
                 else:
                     logger.info("[RAGGenerator]   片段 #%d 跳过（剩余空间不足: %d tokens）", entry["index"], remaining)
@@ -1476,11 +1481,13 @@ class RAGGenerator:
                 context_parts.append(entry["header"] + entry["text"])
                 total_tokens += chunk_tokens
                 used_count += 1
+                used_result_indices.add(entry["index"] - 1)
+                used_result_texts[entry["index"] - 1] = entry["text"]
 
         context = "\n---\n".join(context_parts)
         logger.info("[RAGGenerator] 上下文构建完成: 使用 %d/%d 个片段，总 tokens=%d，覆盖公司: %s",
                      used_count, len(retrieved_results), total_tokens, ", ".join(company_added))
-        return context, used_count
+        return context, used_count, used_result_indices, used_result_texts
 
     def _build_prompt(self, query, context, conversation_context=""):
         prompt = (
@@ -1492,7 +1499,9 @@ class RAGGenerator:
             "3. 如果文档中没有足够信息回答问题，请明确说明\n"
             "4. 回答要准确、完整、有条理\n"
             "5. 如果用户问题省略了主语或上下文，请参考对话历史理解\n"
-            "6. 涉及财务金额时注意单位换算：文档原始数据单位为「千元」，千元 ÷ 100,000 = 亿元，千元 ÷ 10 = 万元\n\n"
+            "6. 涉及财务金额时，必须先读取每条来源文本标注的原始单位，再换算；不同年报不得一律按千元处理。\n"
+            "   - 千元 → 亿元：数值 ÷ 100,000；百万元 → 亿元：数值 ÷ 100；万元 → 亿元：数值 ÷ 10,000。\n"
+            "   - 示例：1,040,759百万元 = 10,407.59亿元，不能误写为1,040.76亿元。\n\n"
             f"{conversation_context}"
             f"<用户问题>\n{query}\n</用户问题>\n\n"
             f"检索到的文档内容：\n{context}\n\n"
@@ -1511,7 +1520,9 @@ class RAGGenerator:
             "5. 如果某家公司的数据在文档中缺失，请明确说明「该公司的数据未在检索结果中找到」\n"
             "6. 回答要准确、完整、有条理\n"
             "7. 如果用户问题省略了主语或上下文，请参考对话历史理解\n"
-            "8. 涉及财务金额时注意单位换算：文档原始数据单位为「千元」，千元 ÷ 100,000 = 亿元，千元 ÷ 10 = 万元\n\n"
+            "8. 对比前必须先读取每家公司来源文本标注的原始单位，再统一换算；不同年报不得一律按千元处理。\n"
+            "   - 千元 → 亿元：数值 ÷ 100,000；百万元 → 亿元：数值 ÷ 100；万元 → 亿元：数值 ÷ 10,000。\n"
+            "   - 示例：1,040,759百万元 = 10,407.59亿元，不能误写为1,040.76亿元。\n\n"
             f"{conversation_context}"
             f"<用户问题>\n{query}\n</用户问题>\n\n"
             f"检索到的文档内容：\n{context}\n\n"
@@ -1531,11 +1542,14 @@ class RAGGenerator:
             "6. 如有同比/环比数据，请一并给出变化幅度\n"
             "7. 如果用户问题省略了主语或上下文，请参考对话历史理解\n\n"
             "【重要 - 单位换算规则】\n"
-            "检索文档中的财务数据原始单位为「千元」，用户通常以「亿元」或「万元」提问。你必须先读取文档中标示的原始单位，再按以下公式精确换算：\n"
+            "用户通常以「亿元」或「万元」提问。你必须先读取每条文档中标示的原始单位，再按以下公式精确换算；不同来源不得一律按千元处理：\n"
             "  - 千元 → 亿元：数值 ÷ 100,000（即 数值 × 1000 ÷ 100,000,000）\n"
+            "  - 百万元 → 亿元：数值 ÷ 100\n"
+            "  - 万元 → 亿元：数值 ÷ 10,000\n"
             "  - 千元 → 万元：数值 ÷ 10（即 数值 × 1000 ÷ 10,000）\n"
             "  示例：文档中写「营业收入 57,795,570」，单位是千元，则 57,795,570 ÷ 100,000 = 577.96 亿元，或 57,795,570 ÷ 10 = 5,779,557 万元。\n"
-            "  严禁省略千位直接除以亿，严禁将千元数值当作元来换算。\n\n"
+            "  示例：1,040,759百万元 = 10,407.59亿元，不能误写为1,040.76亿元。\n"
+            "  严禁忽略单位标注，严禁将百万元按千元或将千元数值当作元来换算。\n\n"
             f"{conversation_context}"
             f"<用户问题>\n{query}\n</用户问题>\n\n"
             f"检索到的文档内容：\n{context}\n\n"
@@ -1618,7 +1632,7 @@ class RAGGenerator:
         sources = []
         for i, r in enumerate(retrieved_results):
             source_info = {
-                "index": i + 1,
+                "index": r.get("_source_index", i + 1),
                 "source_file": r.get("source_file", "未知来源"),
                 "pages": r.get("pages", []),
                 "company_name": r.get("company_name", "未知公司"),
@@ -1627,6 +1641,7 @@ class RAGGenerator:
                     "rerank": r.get("scores", {}).get("rerank", 0.0),
                     "confidence": r.get("scores", {}).get("confidence", "unknown"),
                 },
+                "excerpt": self._build_source_excerpt(r.get("parent_text", "")),
             }
             if "vector" in r.get("scores", {}):
                 source_info["scores"]["vector"] = r["scores"]["vector"]
@@ -1641,6 +1656,17 @@ class RAGGenerator:
                          s["scores"]["rerank"], s["scores"]["confidence"])
 
         return sources
+
+    @staticmethod
+    def _build_source_excerpt(text, limit=240):
+        """生成仅用于证据定位的受限片段摘要。"""
+        normalized = re.sub(r"\s+", " ", str(text)).strip()
+        normalized = re.sub(
+            r"(?i)((?:api[_-]?key|token|authorization|password|secret)\s*[=:]\s*)\S+",
+            r"\1[已隐藏]",
+            normalized,
+        )
+        return normalized[:limit]
 
     @traceable(name="rag-query")
     def query(self, query, company_name=None, top_n=RERANK_TOP_N, mentioned_companies=None, intent=None, extracted_years=None):
@@ -1671,7 +1697,7 @@ class RAGGenerator:
             }
 
         logger.info("[RAGGenerator] 阶段2: 构建 LLM 上下文")
-        context, used_count = self._build_context(retrieved_results)
+        context, used_count, used_result_indices, used_result_texts = self._build_context(retrieved_results)
 
         logger.info("[RAGGenerator] 阶段3: 构建 Prompt")
         conversation_context = ""
@@ -1699,7 +1725,16 @@ class RAGGenerator:
         answer = self._generate_answer(prompt)
 
         logger.info("[RAGGenerator] 阶段5: 构建来源摘要")
-        sources = self._build_sources_summary(retrieved_results)
+        used_results = [
+            {
+                **result,
+                "parent_text": used_result_texts[index],
+                "_source_index": index + 1,
+            }
+            for index, result in enumerate(retrieved_results)
+            if index in used_result_indices
+        ]
+        sources = self._build_sources_summary(used_results)
 
         result = {
             "answer": answer,
@@ -1709,6 +1744,10 @@ class RAGGenerator:
             "retrieved_count": len(retrieved_results),
             "context_used_count": used_count,
         }
+        from src.verified_financial_facts import VerifiedFinancialFactRegistry
+        comparison = VerifiedFinancialFactRegistry().get_comparison_for_query(query)
+        if comparison["available"]:
+            result["comparison"] = comparison
 
         logger.info("=" * 60)
         logger.info("[RAGGenerator] RAG 问答流程完成")

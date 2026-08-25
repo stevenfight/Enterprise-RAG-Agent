@@ -276,6 +276,7 @@ class SourceInfo(BaseModel):
     pages: List[int]
     company_name: str
     scores: dict
+    excerpt: str = ""
 
 
 class QueryResponse(BaseModel):
@@ -288,6 +289,7 @@ class QueryResponse(BaseModel):
     context_used_count: Optional[int] = None
     processing_time: float = 0.0
     conversation_id: Optional[str] = None
+    comparison: Optional[dict] = None
 
 
 class RetrieveResultItem(BaseModel):
@@ -1647,6 +1649,19 @@ async def api_filter_reload():
         }
 
 # ==================== Phase 2 新增接口 ====================
+
+@app.get("/api/comparisons/verified", summary="获取已核验的财务比较事实")
+async def api_verified_comparison(metric_key: str, fiscal_year: int, companies: str):
+    """只返回具备逐项官方年报来源的受限比较事实。"""
+    from src.verified_financial_facts import VerifiedFinancialFactRegistry
+
+    company_list = [company.strip() for company in companies.split(",") if company.strip()]
+    return VerifiedFinancialFactRegistry().get_comparison(
+        metric_key=metric_key,
+        fiscal_year=fiscal_year,
+        companies=company_list,
+    )
+
 
 @app.get("/api/charts/list", summary="获取所有图表列表（含结构化数据供 ECharts 渲染）")
 async def api_charts_list():
