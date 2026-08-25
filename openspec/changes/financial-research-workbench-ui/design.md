@@ -70,7 +70,9 @@
 
 `action_input` 和 `observation` 也不能原样透传到界面。实现时应按工具类型采用允许展示字段清单、长度上限和敏感键名脱敏；密钥、令牌、授权信息、请求头、运行配置、文件绝对路径、堆栈及无法归类的原始输入均不得展示。没有可安全展示的内容时，只显示工具名称、步骤状态和“未提供可展示摘要”。
 
-安全投影必须发生在 SSE 事件写入消息 Store 之前，而非仅在组件渲染时隐藏。`chatStore` 持久化前只保存安全的过程视图模型：单 Agent 丢弃 `thought`，多 Agent 丢弃 `step_type = thought` 的内容，仅保留 Worker 名称、状态、已完成步骤数和耗时。加载旧 `chat-sessions` 时需清理遗留的内部思维、原始输入和原始观测字段；用户消息与最终回答不受影响。
+安全投影必须发生在 SSE 事件写入消息 Store 之前，而非仅在组件渲染时隐藏。新增前端 `AnalysisTraceStep` 安全过程视图模型，并让 `agentEvent` 以该模型累积过程数据；`Message.reasoningChain` 与 `ThoughtChainDrawer` 不再以包含 `thought` 的后端 `AgentStepInfo` 作为显示/持久化类型。`chatStore` 持久化前只保存安全模型：单 Agent 不含 `thought`，多 Agent 丢弃 `step_type = thought` 的内容，仅保留 Worker 名称、状态、已完成步骤数和耗时。加载旧 `chat-sessions` 时需清理遗留的内部思维、原始输入和原始观测字段，并立即回写已清理的会话；用户消息与最终回答不受影响。
+
+已有 `agentEvent`、`MessageBubble`、`ThoughtChainDrawer` 与 `HeaderBar` 测试中对原始过程内容或布尔健康状态的断言必须改为安全模型与三态状态断言；不得通过删除既有测试来规避回归。
 
 ### 3.3 财务数字与证据语义
 
