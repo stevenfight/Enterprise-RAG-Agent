@@ -57,6 +57,7 @@
 | CP-R21 | GREEN | 截断来源与评分契约 | 上下文截断时摘要不得包含未进入模型的尾部文本；前端评分类型可表示后端 `confidence` 状态，但仅数值 `hybrid` 可显示为匹配度。 |
 | CP-R22 | GREEN | 来源编号稳定性 | 检索优先级改变且部分来源未进入上下文时，返回来源的 `index` 必须保留原始上下文编号，和回答中的 `[来源N]` 一致。 |
 | CP-R23 | GREEN | 已核验比较卡片 | 回答携带完整受限比较事实时，展示公司、格式化数值、统一单位与逐项文件页码；回答未携带比较事实时不渲染卡片。 |
+| CP-R24 | GREEN | Drawer API 兼容性 | 研究配置与会话抽屉不得使用 Ant Design 已弃用的 `width` 属性，避免运行时弃用警告；保持原有像素宽度。 |
 
 ## 执行记录
 
@@ -71,6 +72,7 @@
 | 2026-08-25 | CP-R23 | RED | 新增 `VerifiedComparisonCard` 组件测试，先确认模块不存在；要求仅以回答随附的结构化比较事实渲染，不能通过回答 Markdown 或历史图表补造数据。 |
 | 2026-08-25 | CP-R23、C7.3.2 | RED → GREEN | 首先验证卡片模块缺失而失败，再实现回答关联、会话持久化和比较卡片；后端回答路径、前端卡片与完整前端回归通过。 |
 | 2026-08-25 | C6.4 / D3 | BLOCKED（环境） | 第四次 Edge 无头截图使用软件渲染参数仍触发 `GPU process isn't usable`，未生成截图；不据此推断界面通过或失败。 |
+| 2026-08-25 | CP-R24 | RED → GREEN | 浏览器控制台截图确认 Ant Design `Drawer width` 弃用警告；先增加渲染期警告断言，再将研究配置和会话抽屉迁移为同等像素值的 `size`，相关测试、lint 与生产构建通过。 |
 | 2026-08-25 | CP-R19 | RED → GREEN | 先增加 `tests/test_source_excerpt.py` 与 `SourceCard.test.tsx`，后实现受限摘要、脱敏、仅保留进入上下文的来源；执行 `python -m unittest tests.test_source_excerpt -v`、`npm test -- --run src/components/chat/__tests__/SourceCard.test.tsx`，均通过。 |
 | 2026-08-25 | DS-R05-01、DS-R05-02、DS-R07-01 | GREEN | `npm test -- --run src/styles/__tests__/theme.test.ts`，7 项通过。 |
 | 2026-08-25 | DS-R06-01、DS-R06-02、DS-R06-03 | RED → GREEN | 先确认缺少 `appearancePreference` 模块而失败；实现后执行 `npm test -- --run src/utils/__tests__/appearancePreference.test.ts src/styles/__tests__/theme.test.ts`，10 项通过。 |

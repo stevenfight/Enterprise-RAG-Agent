@@ -185,7 +185,7 @@ export default function ChatContainer({ onSend, isLoading = false, isAgentMode =
       <Drawer
         title="会话列表"
         placement="left"
-        width={300}
+        size={300}
         open={isMobileSessionsOpen}
         onClose={() => setMobileSessionsOpen(false)}
       >

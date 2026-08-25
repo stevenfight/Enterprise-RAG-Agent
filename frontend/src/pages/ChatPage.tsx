@@ -383,7 +383,7 @@ export default function ChatPage() {
       <Drawer
         title="研究配置"
         placement="left"
-        width={320}
+        size={320}
         open={activeDrawer === 'config'}
         onClose={() => setActiveDrawer(null)}
         styles={{ body: { background: isDark ? colors.bgDarkCard : colors.bgCard } }}

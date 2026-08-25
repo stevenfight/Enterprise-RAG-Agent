@@ -130,4 +130,15 @@ describe('ChatPage Agent SSE', () => {
     expect(screen.getByRole('tab', { name: '证据' })).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByText('资料检索')).toBeInTheDocument();
   });
+
+  it('CP-R24-01: 研究配置抽屉不使用已弃用的 width 属性', () => {
+    const warningSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    render(<ChatPage />);
+
+    expect(warningSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('[antd: Drawer] `width` is deprecated'),
+    );
+    warningSpy.mockRestore();
+  });
 });
