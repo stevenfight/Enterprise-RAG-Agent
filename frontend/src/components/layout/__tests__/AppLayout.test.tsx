@@ -14,7 +14,11 @@ vi.mock('react-router-dom', () => ({
 }));
 
 vi.mock('@/hooks/useTheme', () => ({
-  useTheme: () => ({ isDark: false, themeMode: 'light' }),
+  useTheme: () => ({
+    isDark: false,
+    themeMode: 'light',
+    accentTheme: 'deepBlue',
+  }),
 }));
 
 vi.mock('@/components/layout/Sidebar', () => ({
@@ -49,5 +53,13 @@ describe('AppLayout 聊天区铺满', () => {
     const { container } = render(<AppLayout />);
     const content = container.querySelector('.ant-layout-content');
     expect(content?.getAttribute('style')).toContain('overflow: auto');
+  });
+
+  it('DS-R05-05 将当前主体色写入页面 CSS 变量', () => {
+    mockPathname.value = '/';
+    const { container } = render(<AppLayout />);
+    const rootLayout = container.querySelector('.ant-layout');
+
+    expect(rootLayout?.getAttribute('style')).toContain('--page-primary: #1D4ED8');
   });
 });

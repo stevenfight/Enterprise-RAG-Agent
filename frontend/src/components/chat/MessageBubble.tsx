@@ -12,19 +12,17 @@ import {
   RobotOutlined,
   WarningOutlined,
   BulbOutlined,
-  ToolOutlined,
-  EyeOutlined,
   CaretDownOutlined,
   CopyOutlined,
   RedoOutlined,
   CheckOutlined,
 } from '@ant-design/icons';
-import type { Message, ReasoningStep } from '@/types/chat';
-import SourceCard from './SourceCard';
+import type { Message, AnalysisTraceStep } from '@/types/chat';
 import { useTheme } from '@/hooks/useTheme';
 import { colors, gradients } from '@/styles/theme';
 import { formatMarkdown, extractFinancialKPIs } from '@/utils/financialFormat';
 import FinancialKPICards from './FinancialKPICards';
+import VerifiedComparisonCard from './VerifiedComparisonCard';
 import { createLogger } from '@/utils/logger';
 
 const logger = createLogger('MessageBubble');
@@ -32,14 +30,16 @@ const { Text } = Typography;
 
 interface MessageBubbleProps {
   message: Message;
-  onViewReasoning?: (steps: ReasoningStep[]) => void;
+  onViewReasoning?: (steps: AnalysisTraceStep[]) => void;
   /** 是否处于流式输出状态（AI 消息正在接收 SSE 数据时显示打字机光标） */
   isStreaming?: boolean;
   /** 重新生成回调 */
   onRegenerate?: (messageId: string) => void;
+  /** 打开该回答的完整证据面板 */
+  onViewEvidence?: (messageId: string) => void;
 }
 
-export default function MessageBubble({ message, onViewReasoning, isStreaming = false, onRegenerate }: MessageBubbleProps) {
+export default function MessageBubble({ message, onViewReasoning, isStreaming = false, onRegenerate, onViewEvidence }: MessageBubbleProps) {
   logger.renderStart({ role: message.role, id: message.id, contentLen: message.content.length, sourcesCount: message.sources?.length });
   const { isDark } = useTheme();
   const [showReasoning, setShowReasoning] = useState(false); // Agent 推理链路展开/收起
@@ -75,6 +75,7 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
       {!isUser && kpis.length > 0 && (
         <FinancialKPICards kpis={kpis} isDark={isDark} />
       )}
+      {!isUser && <VerifiedComparisonCard comparison={message.comparison} />}
       <div
         className="markdown-body"
         dangerouslySetInnerHTML={{
@@ -140,8 +141,8 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
         </div>
       )}
 
-      {/* Agent 推理链路 (Phase 2 SSE) */}
-      {!isUser && message.reasoningChain && message.reasoningChain.length > 0 && (
+      {/* 安全分析过程摘要 */}
+      {!isUser && message.analysisTrace && message.analysisTrace.length > 0 && (
         <div style={{
           marginTop: 10,
           paddingTop: 8,
@@ -162,7 +163,7 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
               <Space size={6}>
                 <BulbOutlined style={{ fontSize: 13, color: '#B8A9C9' }} />
                 <Text style={{ fontSize: 12, color: '#B8A9C9' }}>
-                  推理过程 ({message.reasoningChain.length} 步)
+                  分析过程 ({message.analysisTrace.length} 步)
                 </Text>
               </Space>
               <CaretDownOutlined
@@ -178,22 +179,18 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
             {/* Phase 2: 侧边抽屉入口 */}
             <Text
               style={{ fontSize: 11, color: '#B8A9C9', cursor: 'pointer', textDecoration: 'underline' }}
-              onClick={() => {
-                if (message.reasoningChain) {
-                  onViewReasoning?.(message.reasoningChain);
-                }
-              }}
+              onClick={() => onViewReasoning?.(message.analysisTrace ?? [])}
             >
               展开详情
             </Text>
           </div>
           {showReasoning && (
             <div style={{ marginTop: 8 }}>
-              {message.reasoningChain.map((step, idx) => (
+              {message.analysisTrace.map((step, idx) => (
                 <div
                   key={idx}
                   style={{
-                    marginBottom: idx < message.reasoningChain!.length - 1 ? 8 : 0,
+                    marginBottom: idx < message.analysisTrace!.length - 1 ? 8 : 0,
                     padding: '8px 10px',
                     borderRadius: 8,
                     background: isDark
@@ -207,49 +204,19 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
                     color="purple"
                     style={{ fontSize: 10, margin: '0 0 4px 0', lineHeight: '16px', borderRadius: 4 }}
                   >
-                    步骤 {step.step_number}
+                    步骤 {step.stepNumber} · {step.status === 'completed' ? '已完成' : step.status === 'failed' ? '未完成' : '进行中'}
                   </Tag>
 
-                  {/* Thought */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 2 }}>
-                    <BulbOutlined style={{
-                      fontSize: 11,
-                      color: '#B8A9C9',
-                      marginTop: 2,
-                      marginRight: 6,
-                      flexShrink: 0,
-                    }} />
-                    <Text style={{ fontSize: 12, color: isDark ? '#bbb' : '#555', lineHeight: 1.6 }}>
-                      {step.thought}
-                    </Text>
-                  </div>
-
-                  {/* Action */}
-                  {step.action && (
+                  {step.inputSummary && (
                     <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 2 }}>
-                      <ToolOutlined style={{
-                        fontSize: 11,
-                        color: '#52c41a',
-                        marginTop: 2,
-                        marginRight: 6,
-                        flexShrink: 0,
-                      }} />
                       <Text style={{ fontSize: 12, color: isDark ? '#98D8C8' : '#389e0d', lineHeight: 1.6 }}>
-                        调用工具: {step.action}
+                        {step.toolLabel}：{step.inputSummary}
                       </Text>
                     </div>
                   )}
 
-                  {/* Observation */}
-                  {step.observation && (
+                  {step.observationSummary && (
                     <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                      <EyeOutlined style={{
-                        fontSize: 11,
-                        color: '#1890ff',
-                        marginTop: 2,
-                        marginRight: 6,
-                        flexShrink: 0,
-                      }} />
                       <Text style={{
                         fontSize: 11,
                         color: isDark ? '#a0a0a0' : '#888',
@@ -257,9 +224,7 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
                         maxHeight: 60,
                         overflow: 'hidden',
                       }}>
-                        {step.observation.length > 200
-                          ? step.observation.slice(0, 200) + '...'
-                          : step.observation}
+                        {step.observationSummary}
                       </Text>
                     </div>
                   )}
@@ -270,73 +235,21 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
         </div>
       )}
 
-      {/* 多 Agent 运行状态 (Phase 10) */}
-      {!isUser && message.agentRun?.isMultiAgent && (
-        <div style={{
-          marginTop: 10,
-          paddingTop: 8,
-          borderTop: `1px solid ${isDark ? colors.borderDark : colors.border}`,
-        }}>
-          <Space size={6} style={{ marginBottom: 8 }}>
-            <RobotOutlined style={{ fontSize: 13, color: '#B8A9C9' }} />
-            <Tag color="geekblue" style={{ fontSize: 11, margin: 0, lineHeight: '16px', borderRadius: 4 }}>
-              多 Agent
-            </Tag>
-            <Text style={{ fontSize: 12, color: '#B8A9C9' }}>
-              已注册 {message.agentRun.registeredAgents.length} 个 Worker
-            </Text>
-          </Space>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {message.agentRun.workers.map((worker, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '6px 10px',
-                  borderRadius: 8,
-                  background: isDark
-                    ? 'rgba(184, 169, 201, 0.08)'
-                    : 'rgba(184, 169, 201, 0.06)',
-                }}
-              >
-                <Space size={6}>
-                  <Text style={{ fontSize: 12, color: isDark ? '#ddd' : '#444' }}>{worker.agent}</Text>
-                  <Tag
-                    color={worker.done ? (worker.success === false ? 'red' : 'green') : 'processing'}
-                    style={{ fontSize: 10, margin: 0, lineHeight: '14px', borderRadius: 4 }}
-                  >
-                    {worker.done ? (worker.success === false ? '失败' : '完成') : '运行中'}
-                  </Tag>
-                </Space>
-                <Text style={{ fontSize: 11, color: '#B8A9C9' }}>
-                  {worker.steps.length} 步{worker.elapsed_ms != null ? ` · ${(worker.elapsed_ms / 1000).toFixed(1)}s` : ''}
-                </Text>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 引用来源 */}
+      {/* 引用来源仅保留入口，完整卡片统一在证据面板展示。 */}
       {!isUser && message.sources && message.sources.length > 0 && (
         <div style={{
           marginTop: 12,
           paddingTop: 8,
           borderTop: `1px solid ${isDark ? colors.borderDark : colors.border}`,
         }}>
-          <Text style={{
-            fontSize: 12,
-            color: isDark ? colors.textSecondaryDark : colors.textSecondary,
-            marginBottom: 4,
-            display: 'block',
-          }}>
-            引用来源
-          </Text>
-          {message.sources.map((source) => (
-            <SourceCard key={source.index} source={source} />
-          ))}
+          <Button
+            type="link"
+            size="small"
+            style={{ padding: 0 }}
+            onClick={() => onViewEvidence?.(message.id)}
+          >
+            查看 {message.sources.length} 条证据
+          </Button>
         </div>
       )}
 

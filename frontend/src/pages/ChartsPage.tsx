@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Card, Radio, Empty, Spin, message, Segmented } from 'antd';
+import { Card, Radio, Empty, Spin, message, Segmented, Statistic } from 'antd';
 import { BarChartOutlined, LineChartOutlined, PieChartOutlined, AlignLeftOutlined, TableOutlined } from '@ant-design/icons';
 import ChartContainer from '@/components/charts/ChartContainer';
 import type { ChartData } from '../types/chart';
@@ -16,6 +16,14 @@ import { getCharts } from '@/services/chartService';
 import ChartTable from '@/components/charts/ChartTable';
 
 type ViewMode = 'chart' | 'table';
+
+const CHART_TYPE_LABELS: Record<string, string> = {
+  bar: '柱状图',
+  hbar: '横向柱状图',
+  line: '折线图',
+  pie: '饼图',
+  table: '表格',
+};
 
 export default function ChartsPage() {
   const { isDark } = useTheme();
@@ -40,17 +48,35 @@ export default function ChartsPage() {
   const filtered = activeType === 'all'
     ? charts
     : charts.filter(c => c.chart_type === activeType);
+  const chartTypeCounts = charts.reduce<Record<string, number>>((counts, chart) => {
+    counts[chart.chart_type] = (counts[chart.chart_type] ?? 0) + 1;
+    return counts;
+  }, {});
 
   return (
     <PageShell>
       <PageHeader
-        title="数据图表中心"
+        eyebrow="研究成果"
+        title="分析成果"
         icon={<BarChartOutlined />}
-        description="浏览由财务分析生成的交互式图表与数据表格"
+        description="浏览由财务分析生成的图表与数据表格；仅展示当前可用成果"
       />
 
+      {!loading && (
+        <section className="status-overview-grid status-overview-grid--cols-5" aria-label="成果摘要">
+          <Card className="status-overview-card status-overview-card--compact">
+            <Statistic title="成果总数" value={charts.length} />
+          </Card>
+          {Object.entries(chartTypeCounts).map(([type, count]) => (
+            <Card key={type} className="status-overview-card status-overview-card--compact">
+              <Statistic title={CHART_TYPE_LABELS[type] ?? '其他类型'} value={count} suffix="项" />
+            </Card>
+          ))}
+        </section>
+      )}
+
       {/* 图表类型筛选 + 视图切换 */}
-      <Card size="small" className="page-card" style={{ marginBottom: 24 }}>
+      <Card size="small" className="page-card page-toolbar" style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <Radio.Group
             value={activeType}
@@ -77,20 +103,21 @@ export default function ChartsPage() {
 
       {/* 图表/表格列表 */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 80 }}>
+        <div className="page-state" style={{ textAlign: 'center', padding: 80 }}>
           <Spin size="large" />
-          <div style={{ marginTop: 16, color: isDark ? '#6b6b6b' : '#bbb' }}>加载图表数据...</div>
+          <div style={{ marginTop: 16, color: 'var(--page-text-secondary)' }}>加载图表数据...</div>
         </div>
       ) : filtered.length === 0 ? (
-        <Empty
-          description="暂无图表数据"
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          style={{ marginTop: 60 }}
-        >
-          <div className="charts-empty-hint">
-            {charts.length === 0 ? '发送图表相关查询后，生成的图表将在此展示' : '可以切换图表类型筛选，或选择图表 / 表格视图'}
-          </div>
-        </Empty>
+        <div className="page-state">
+          <Empty
+            description="暂无图表数据"
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          >
+            <div className="charts-empty-hint">
+              {charts.length === 0 ? '发送图表相关查询后，生成的图表将在此展示' : '可以切换图表类型筛选，或选择图表 / 表格视图'}
+            </div>
+          </Empty>
+        </div>
       ) : viewMode === 'table' ? (
         <div className="charts-table-list">
         {filtered.map((chart, idx) => (
@@ -101,11 +128,8 @@ export default function ChartsPage() {
             className="page-card"
             style={{ marginBottom: 16 }}
             extra={
-              <span style={{ fontSize: 12, color: '#B8A9C9' }}>
-                {chart.chart_type === 'bar' ? '柱状图' :
-                 chart.chart_type === 'hbar' ? '横向柱状图' :
-                 chart.chart_type === 'line' ? '折线图' :
-                 chart.chart_type === 'table' ? '表格' : '饼图'}
+              <span style={{ fontSize: 12, color: 'var(--page-text-secondary)' }}>
+                {CHART_TYPE_LABELS[chart.chart_type] ?? '其他类型'}
               </span>
             }
           >

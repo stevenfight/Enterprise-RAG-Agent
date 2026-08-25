@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import {
   Alert,
   Button,
+  Card,
   Empty,
   Modal,
   Progress,
@@ -140,14 +141,20 @@ export default function KnowledgePage() {
   return (
     <PageShell>
       <PageHeader
-        title="知识库管理"
+        eyebrow="研究资料"
+        title="资料库"
         icon={<DatabaseOutlined />}
-        description="上传、管理和查看财务年报知识库索引状态"
+        description="上传财务年报，并查看当前资料的索引可用状态"
       />
 
       <KnowledgeOverview documents={documents} />
 
-      <div className="page-card" style={{ marginBottom: 24, padding: 20 }}>
+      <Card
+        className="page-card page-toolbar"
+        title="上传资料"
+        extra="仅支持 PDF，最大 50MB"
+        style={{ marginBottom: 24 }}
+      >
         <Dragger
           accept=".pdf"
           maxCount={1}
@@ -174,7 +181,7 @@ export default function KnowledgePage() {
             style={{ marginTop: 12 }}
           />
         )}
-      </div>
+      </Card>
 
       {error ? (
         <Alert
@@ -184,19 +191,21 @@ export default function KnowledgePage() {
           showIcon
         />
       ) : (
-        <Table
-          columns={columns}
-          dataSource={documents}
-          rowKey="filename"
-          loading={loading}
-          pagination={{
-            pageSize: 10,
-            showTotal: (t) => `共 ${t} 篇`,
-          }}
-          locale={{
-            emptyText: <Empty description="暂无文档" />,
-          }}
-        />
+        <Card className="page-card" title={`资料清单（${documents.length}）`}>
+          <Table
+            columns={columns}
+            dataSource={documents}
+            rowKey="filename"
+            loading={loading}
+            pagination={{
+              pageSize: 10,
+              showTotal: (t) => `共 ${t} 篇`,
+            }}
+            locale={{
+              emptyText: <Empty description="暂无文档" />,
+            }}
+          />
+        </Card>
       )}
     </PageShell>
   );

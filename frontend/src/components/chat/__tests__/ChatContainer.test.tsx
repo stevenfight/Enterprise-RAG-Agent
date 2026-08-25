@@ -3,7 +3,7 @@
  * ChatContainer 组件单元测试
  * 覆盖: Conversations 会话列表 / 新建对话 / 切换会话 / Welcome 欢迎页
  */
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ChatContainer from '@/components/chat/ChatContainer';
 
@@ -80,7 +80,7 @@ describe('ChatContainer', () => {
 
   it('TC-AX-004-04 空消息态渲染 Welcome 欢迎组件', () => {
     render(<ChatContainer {...defaultProps} />);
-    expect(screen.getByText('您好，我是企业财务年报分析助手')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '研究启动页' })).toBeInTheDocument();
   });
 
   it('TC-AX-004-05 有消息时隐藏 Welcome，展示消息气泡', () => {
@@ -88,5 +88,39 @@ describe('ChatContainer', () => {
     render(<ChatContainer {...defaultProps} />);
     expect(screen.queryByText('您好，我是企业财务年报分析助手')).toBeNull();
     expect(screen.getByText('这是回答内容')).toBeInTheDocument();
+  });
+
+  it('RW-R10-03: 提供可访问的移动端会话入口', () => {
+    render(<ChatContainer {...defaultProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '打开会话列表' }));
+
+    expect(within(screen.getByRole('dialog')).getByText('会话列表')).toBeInTheDocument();
+  });
+
+  it('CP-R04-01: 页面可受控关闭移动会话抽屉', () => {
+    const onMobileSessionsOpenChange = vi.fn();
+    render(
+      <ChatContainer
+        {...defaultProps}
+        mobileSessionsOpen
+        onMobileSessionsOpenChange={onMobileSessionsOpenChange}
+      />,
+    );
+
+    fireEvent.click(document.querySelector('.ant-drawer-close')!);
+
+    expect(onMobileSessionsOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('CP-R09-01: 请求进行中禁用新建、切换和移动会话入口', () => {
+    render(<ChatContainer {...defaultProps} isLoading />);
+
+    fireEvent.click(screen.getByText('新建对话'));
+    fireEvent.click(screen.getByText('会话二'));
+
+    expect(state.createNewSession).not.toHaveBeenCalled();
+    expect(state.switchSession).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '打开会话列表' })).toBeDisabled();
   });
 });

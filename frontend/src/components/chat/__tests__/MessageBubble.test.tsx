@@ -3,7 +3,7 @@
  * MessageBubble 组件单元测试
  * 覆盖: 用户/AI/系统消息渲染、Markdown 表格、来源卡片、推理链折叠区
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import MessageBubble from '@/components/chat/MessageBubble';
 import type { Message } from '@/types/chat';
@@ -55,9 +55,11 @@ describe('MessageBubble', () => {
     expect(container.querySelector('td')?.textContent).toContain('中芯国际');
   });
 
-  it('TC-AX-003-05 含来源的消息渲染来源卡片', () => {
+  it('CP-R10-01: 主回答区仅展示紧凑证据入口', () => {
+    const onViewEvidence = vi.fn();
     render(
       <MessageBubble
+        onViewEvidence={onViewEvidence}
         message={{
           ...baseMessage,
           sources: [
@@ -72,53 +74,44 @@ describe('MessageBubble', () => {
         }}
       />,
     );
-    expect(screen.getByText('引用来源')).toBeInTheDocument();
-    expect(screen.getByText('中芯国际2024年报.pdf')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查看 1 条证据' })).toBeInTheDocument();
+    expect(screen.queryByText('中芯国际2024年报.pdf')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '查看 1 条证据' }));
+    expect(onViewEvidence).toHaveBeenCalledWith('m1');
   });
 
-  it('TC-AX-003-06 含推理链的消息渲染"推理过程"折叠区', () => {
+  it('TC-AX-003-06 含安全分析过程的消息渲染摘要折叠区', () => {
     render(
       <MessageBubble
         message={{
           ...baseMessage,
-          reasoningChain: [
+          analysisTrace: [
             {
-              step_number: 1,
-              thought: '检索财务数据',
-              action: 'search',
-              observation: '命中 3 条结果',
-              elapsed_ms: 120,
+              stepNumber: 1,
+              toolLabel: '资料检索',
+              status: 'completed',
+              inputSummary: '已提供检索条件',
+              observationSummary: '已获取检索结果',
             },
           ],
         }}
       />,
     );
-    expect(screen.getByText(/推理过程.*1 步/)).toBeInTheDocument();
+    expect(screen.getByText(/分析过程.*1 步/)).toBeInTheDocument();
   });
 
-  it('AI 消息含多 Agent 状态时渲染 Worker 运行状态', () => {
+  it('AI 消息不渲染遗留的原始过程字段', () => {
     render(
       <MessageBubble
         message={{
           ...baseMessage,
-          agentRun: {
-            isMultiAgent: true,
-            registeredAgents: ['search', 'compare'],
-            workers: [
-              {
-                agent: 'search',
-                steps: [],
-                done: true,
-                success: true,
-                elapsed_ms: 500,
-              },
-            ],
-          },
-        }}
+          reasoningChain: [{ thought: '内部推理' }],
+          agentRun: { workers: [{ agent: 'InternalAgent', steps: [{ content: '原始步骤' }] }] },
+        } as Message}
       />,
     );
-    expect(screen.getByText('多 Agent')).toBeInTheDocument();
-    expect(screen.getByText(/已注册 2 个 Worker/)).toBeInTheDocument();
+    expect(screen.queryByText('内部推理')).toBeNull();
+    expect(screen.queryByText('原始步骤')).toBeNull();
   });
 
   it('TC-UI-003-01 AI 消息流式输出时渲染打字机光标', () => {

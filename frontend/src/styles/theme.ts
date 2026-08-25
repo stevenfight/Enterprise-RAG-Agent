@@ -6,6 +6,23 @@
 
 import type { ThemeConfig } from 'antd';
 
+/** 可选主体色标识 */
+export type AccentTheme = 'financialTeal' | 'deepBlue';
+
+/** 受控主体色色板 */
+export const accentThemes: Record<AccentTheme, { light: string; dark: string; label: string }> = {
+  financialTeal: {
+    light: '#0F766E',
+    dark: '#2DD4BF',
+    label: '金融青绿',
+  },
+  deepBlue: {
+    light: '#1D4ED8',
+    dark: '#60A5FA',
+    label: '深蓝',
+  },
+};
+
 // ============================================================
 // 马卡龙色板 - 低饱和度高明度粉彩色系
 // ============================================================
@@ -250,6 +267,47 @@ export const darkTheme: ThemeConfig = {
     },
   },
 };
+
+/**
+ * 按深浅模式和主体色生成 Ant Design 配置。
+ * 语义色保持独立，避免将主体色误用为成功、警告或错误状态。
+ */
+export function createThemeConfig(
+  mode: 'light' | 'dark',
+  accentTheme: AccentTheme,
+): ThemeConfig {
+  const baseTheme = mode === 'dark' ? darkTheme : lightTheme;
+  const primary = accentThemes[accentTheme][mode];
+
+  return {
+    ...baseTheme,
+    token: {
+      ...baseTheme.token,
+      colorPrimary: primary,
+      colorLink: primary,
+    },
+    components: {
+      ...baseTheme.components,
+      Menu: {
+        ...baseTheme.components?.Menu,
+        itemSelectedBg: `${primary}18`,
+        itemSelectedColor: primary,
+        itemHoverBg: `${primary}0A`,
+      },
+      Button: {
+        ...baseTheme.components?.Button,
+        primaryShadow: `0 2px 8px ${primary}59`,
+      },
+      Slider: {
+        ...baseTheme.components?.Slider,
+        trackBg: primary,
+        trackHoverBg: primary,
+        handleColor: primary,
+        handleActiveColor: primary,
+      },
+    },
+  };
+}
 
 // 等宽字体 (用于财务数字展示)
 export const monoFont = `'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace`;

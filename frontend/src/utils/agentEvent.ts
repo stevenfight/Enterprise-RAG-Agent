@@ -1,21 +1,49 @@
 // -*- coding: utf-8 -*-
 /**
- * Agent SSE 事件处理纯函数模块
+ * Agent SSE 事件处理纯函数模块。
  *
- * 将 SSE 事件流转换为可测试的不可变累积状态 (AgentEventAccumulator)。
- * 单 Agent 与多 Agent 事件均可由 applyAgentEvent 处理，组件层只负责把
- * 返回的新状态同步到 Zustand store，便于 Vitest 单元测试。
+ * 原始推理、工具输入、观测内容和 Worker 标识只在 SSE 回调中短暂存在，
+ * 此模块仅输出可展示、可持久化的安全分析摘要。
  */
 
-import type {
-  SSEEvent,
-  AgentStepInfo,
-  MultiAgentRunState,
-  MultiAgentWorkerStatus,
-  MultiAgentWorkerStep,
-} from '@/types/chat';
+import type { SSEEvent, AnalysisTraceStep } from '@/types/chat';
 
-/** 多 Agent 事件类型集合 */
+export type { AnalysisTraceStep } from '@/types/chat';
+
+const TOOL_LABELS: Record<string, string> = {
+  retrieve: '资料检索',
+  search: '资料检索',
+  compare: '指标对比',
+  calculate: '财务计算',
+  chart: '图表分析',
+};
+
+const WORKER_LABELS: Record<string, string> = {
+  DataAgent: '资料检索',
+  CalcAgent: '财务计算',
+  ChartAgent: '图表分析',
+};
+
+/** 将原始工具过程投影为安全摘要。 */
+export function projectAnalysisTrace(input: {
+  stepNumber: number;
+  action?: string | null;
+  actionInput?: Record<string, unknown> | null;
+  observation?: string | null;
+  status: AnalysisTraceStep['status'];
+}): AnalysisTraceStep {
+  const hasInput = Boolean(input.actionInput && Object.keys(input.actionInput).length > 0);
+  const isRetrieval = input.action === 'retrieve' || input.action === 'search';
+  return {
+    stepNumber: input.stepNumber,
+    toolLabel: input.action ? (TOOL_LABELS[input.action] ?? '分析工具') : '分析工具',
+    status: input.status,
+    ...(hasInput ? { inputSummary: isRetrieval ? '已提供检索条件' : '已提供分析条件' } : {}),
+    ...(input.observation ? { observationSummary: '已获取检索结果' } : {}),
+  };
+}
+
+/** 多 Agent 事件类型集合。 */
 const MULTI_AGENT_EVENT_TYPES = new Set<string>([
   'orchestrator_start',
   'delegating',
@@ -25,139 +53,101 @@ const MULTI_AGENT_EVENT_TYPES = new Set<string>([
   'reflection',
 ]);
 
-/** 判断是否为多 Agent 事件类型 */
+/** 判断是否为多 Agent 事件类型。 */
 export function isMultiAgentEventType(type: string): boolean {
   return MULTI_AGENT_EVENT_TYPES.has(type);
 }
 
-/** SSE 事件累积状态 (不可变) */
+/** SSE 事件累积状态。只包含安全过程摘要与最终回答。 */
 export interface AgentEventAccumulator {
-  /** 单 Agent 推理链（回归保留） */
-  reasoningChain: AgentStepInfo[];
-  /** 多 Agent 运行状态 */
-  agentRun: MultiAgentRunState | null;
-  /** 当前答案（answer_chunk 累积，answer 覆盖） */
+  analysisTrace: AnalysisTraceStep[];
   answer: string;
-  /** 是否完成 */
   done: boolean;
 }
 
-/** 创建空累积状态 */
+/** 创建空累积状态。 */
 export function createEmptyAccumulator(): AgentEventAccumulator {
-  return {
-    reasoningChain: [],
-    agentRun: null,
-    answer: '',
-    done: false,
-  };
+  return { analysisTrace: [], answer: '', done: false };
 }
 
-/** 返回一个空的 Worker 状态（未完成） */
-function createWorker(agent: string): MultiAgentWorkerStatus {
-  return {
-    agent,
-    steps: [],
-    done: false,
-  };
+function nextStepNumber(acc: AgentEventAccumulator, event: SSEEvent): number {
+  return event.step ?? acc.analysisTrace.length + 1;
 }
 
-/** 从累积状态中取得多 Agent 运行状态；若尚未初始化则返回空运行状态 */
-function ensureRun(acc: AgentEventAccumulator): MultiAgentRunState {
-  return acc.agentRun ?? { isMultiAgent: true, registeredAgents: [], workers: [] };
+function workerLabel(agent?: string): string {
+  return agent ? (WORKER_LABELS[agent] ?? '协同分析') : '协同分析';
 }
 
-/** 应用单个 SSE 事件，返回新的累积状态 */
+function appendTrace(acc: AgentEventAccumulator, trace: AnalysisTraceStep): AgentEventAccumulator {
+  return { ...acc, analysisTrace: [...acc.analysisTrace, trace] };
+}
+
+/** 应用单个 SSE 事件，返回新的安全累积状态。 */
 export function applyAgentEvent(acc: AgentEventAccumulator, event: SSEEvent): AgentEventAccumulator {
   switch (event.type) {
-    // ===== 多 Agent 事件 =====
     case 'orchestrator_start':
-      return {
-        ...acc,
-        agentRun: {
-          isMultiAgent: true,
-          registeredAgents: event.registered_agents ?? [],
-          workers: [],
-        },
-      };
+      return appendTrace(acc, {
+        stepNumber: nextStepNumber(acc, event),
+        toolLabel: '协同分析',
+        status: 'running',
+      });
 
-    case 'delegating': {
-      const run = ensureRun(acc);
-      const agents = event.agents ?? [];
-      const workers = [...run.workers];
-      for (const agent of agents) {
-        if (!workers.some((w) => w.agent === agent)) {
-          workers.push(createWorker(agent));
-        }
-      }
-      return { ...acc, agentRun: { ...run, workers } };
-    }
+    case 'delegating':
+      return appendTrace(acc, {
+        stepNumber: nextStepNumber(acc, event),
+        toolLabel: '协同分析',
+        status: 'running',
+        inputSummary: '已分配分析任务',
+      });
 
-    case 'worker_step': {
-      const agent = event.agent ?? '未知 Worker';
-      const step: MultiAgentWorkerStep = {
-        agent,
-        step_type: event.step_type ?? 'thought',
-        step: event.step ?? 0,
-        content: event.content ?? '',
-      };
-      const run = ensureRun(acc);
-      const existing = run.workers.find((w) => w.agent === agent);
-      const workers = existing
-        ? run.workers.map((w) =>
-            w.agent === agent ? { ...w, steps: [...w.steps, step] } : w,
-          )
-        : [...run.workers, { ...createWorker(agent), steps: [step] }];
-      return { ...acc, agentRun: { ...run, workers } };
-    }
+    case 'worker_step':
+      return appendTrace(acc, {
+        stepNumber: nextStepNumber(acc, event),
+        toolLabel: workerLabel(event.agent),
+        status: 'running',
+        inputSummary: '正在执行分析步骤',
+      });
 
-    case 'worker_done': {
-      const agent = event.agent ?? '未知 Worker';
-      const run = ensureRun(acc);
-      const existing = run.workers.find((w) => w.agent === agent);
-      const finished: MultiAgentWorkerStatus = {
-        agent,
-        steps: existing?.steps ?? [],
-        done: true,
-        success: event.success,
-        elapsed_ms: event.total_elapsed_ms,
-      };
-      const workers = existing
-        ? run.workers.map((w) => (w.agent === agent ? finished : w))
-        : [...run.workers, finished];
-      return { ...acc, agentRun: { ...run, workers } };
-    }
+    case 'worker_done':
+      return appendTrace(acc, {
+        stepNumber: nextStepNumber(acc, event),
+        toolLabel: workerLabel(event.agent),
+        status: event.success === false ? 'failed' : 'completed',
+        observationSummary: event.success === false ? '分析步骤未完成' : '已完成分析步骤',
+      });
 
     case 'answer_chunk':
       return { ...acc, answer: acc.answer + (event.content ?? '') };
 
-    // ===== 单 Agent 事件 =====
-    case 'thought': {
-      const step: AgentStepInfo = {
-        step_number: event.step ?? 0,
-        thought: event.content ?? '',
-        elapsed_ms: 0,
-      };
-      return { ...acc, reasoningChain: [...acc.reasoningChain, step] };
-    }
+    case 'thought':
+      return appendTrace(acc, projectAnalysisTrace({
+        stepNumber: nextStepNumber(acc, event),
+        status: 'running',
+      }));
 
     case 'action': {
-      if (acc.reasoningChain.length === 0) return acc;
-      const chain = acc.reasoningChain.map((s, i) =>
-        i === acc.reasoningChain.length - 1
-          ? { ...s, action: event.content ?? '', action_input: event.action_input ?? null }
-          : s,
+      if (acc.analysisTrace.length === 0) return acc;
+      const analysisTrace = acc.analysisTrace.map((step, index) =>
+        index === acc.analysisTrace.length - 1
+          ? projectAnalysisTrace({
+              stepNumber: step.stepNumber,
+              action: event.content,
+              actionInput: event.action_input,
+              status: 'running',
+            })
+          : step,
       );
-      return { ...acc, reasoningChain: chain };
+      return { ...acc, analysisTrace };
     }
 
     case 'observation': {
-      if (acc.reasoningChain.length === 0) return acc;
-      const chain = acc.reasoningChain.map((s, i) =>
-        i === acc.reasoningChain.length - 1
-          ? { ...s, observation: event.content ?? null }
-          : s,
+      if (acc.analysisTrace.length === 0) return acc;
+      const analysisTrace = acc.analysisTrace.map((step, index) =>
+        index === acc.analysisTrace.length - 1
+          ? { ...step, status: 'completed' as const, ...(event.content ? { observationSummary: '已获取检索结果' } : {}) }
+          : step,
       );
-      return { ...acc, reasoningChain: chain };
+      return { ...acc, analysisTrace };
     }
 
     case 'answer':
@@ -166,7 +156,6 @@ export function applyAgentEvent(acc: AgentEventAccumulator, event: SSEEvent): Ag
     case 'done':
       return { ...acc, done: true };
 
-    // connected / error / reflection 等无状态变更事件
     default:
       return acc;
   }

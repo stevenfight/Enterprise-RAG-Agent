@@ -261,7 +261,7 @@ export default function ChartContainer({ data, height = 360, dark = false }: Cha
         label: { show: true, position: 'top', fontSize: 11, color: palette.textColor, formatter: '{c}' },
       }],
     };
-  }, [data, dark]);
+  }, [data, palette.placeholderColor, palette.textColor, palette.titleColor]);
 
   // ---- 渲染 ----
 

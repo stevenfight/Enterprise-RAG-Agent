@@ -17,8 +17,6 @@ import type { SystemStatusData } from '@/types/chat';
 import { PageHeader, PageShell } from '@/components/common/PageShell';
 import SettingsOverview from '@/components/settings/SettingsOverview';
 
-const { Text } = Typography;
-
 const TOOL_LABELS: Record<string, string> = {
   retrieve: '检索',
   calculator: '计算',
@@ -48,12 +46,17 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div style={{
-        display: 'flex', justifyContent: 'center',
-        alignItems: 'center', minHeight: 300,
-      }}>
-        <Spin size="large" />
-      </div>
+      <PageShell>
+        <PageHeader
+          eyebrow="运行监控"
+          title="系统状态"
+          icon={<SettingOutlined />}
+          description="查看研究服务、模型、检索与运行配置的当前状态"
+        />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+          <Spin size="large" />
+        </div>
+      </PageShell>
     );
   }
 
@@ -61,7 +64,8 @@ export default function SettingsPage() {
     return (
       <PageShell>
         <PageHeader
-          title="系统设置"
+          eyebrow="运行监控"
+          title="系统状态"
           icon={<SettingOutlined />}
           description="查看当前 Agent、知识库和工具运行状态"
         />
@@ -80,7 +84,8 @@ export default function SettingsPage() {
   return (
     <PageShell>
       <PageHeader
-        title="系统设置"
+        eyebrow="运行监控"
+        title="系统状态"
         icon={<SettingOutlined />}
         description="当前运行状态（只读监控，修改配置请编辑 config/agent_config.json）"
       />
@@ -89,8 +94,41 @@ export default function SettingsPage() {
              style={{ width: '100%' }}>
         <SettingsOverview status={status} />
 
-        {/* ===== Agent 当前配置 ===== */}
-        <Card title="Agent 当前配置" className="page-card">
+        {/* ===== 研究可用性 ===== */}
+        <Card title="研究可用性" className="page-card">
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label="模型状态">
+              <Tag color={status.model.status === 'loaded' ? 'green' : 'red'}>
+                {status.model.status === 'loaded' ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+                {' '}{status.model.status === 'loaded' ? '已加载' : '未加载'}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="向量数据库">
+              <Tag color={status.vector_db.status === 'available' ? 'green' : 'red'}>
+                {status.vector_db.status === 'available' ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+                {' '}{status.vector_db.status === 'available' ? `可用 (${status.vector_db.company_count} 家公司)` : '不可用'}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="长期记忆">
+              <Tag color={status.memory.long_term_enabled ? 'green' : 'default'}>{status.memory.long_term_enabled ? '已启用' : '未启用'}</Tag>
+            </Descriptions.Item>
+          </Descriptions>
+        </Card>
+
+        {/* ===== 模型与检索工具 ===== */}
+        <Card title="模型与检索工具" className="page-card">
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label="模型"><Tag color="blue">{status.model.name}</Tag></Descriptions.Item>
+            {Object.entries(TOOL_LABELS).map(([key, label]) => (
+              <Descriptions.Item key={key} label={label}>
+                <Tag color={status.tools[key] ? 'green' : 'red'}>{status.tools[key] ? '已启用' : '已禁用'}</Tag>
+              </Descriptions.Item>
+            ))}
+          </Descriptions>
+        </Card>
+
+        {/* ===== 运行配置 ===== */}
+        <Card title="运行配置" className="page-card">
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="模型">
               <Tag color="blue">{status.model.name}</Tag>
@@ -110,74 +148,6 @@ export default function SettingsPage() {
           </Descriptions>
         </Card>
 
-        {/* ===== 系统健康 ===== */}
-        <Card title="系统健康" className="page-card">
-          <Descriptions column={1} bordered size="small">
-            <Descriptions.Item label="模型状态">
-              <Tag color={
-                  status.model.status === 'loaded' ? 'green' : 'red'}>
-                {status.model.status === 'loaded'
-                    ? <CheckCircleOutlined />
-                    : <CloseCircleOutlined />}
-                {' '}{status.model.status === 'loaded'
-                    ? '已加载' : '未加载'}
-              </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="向量数据库">
-              <Tag color={
-                  status.vector_db.status === 'available'
-                      ? 'green' : 'red'}>
-                {status.vector_db.status === 'available'
-                    ? <CheckCircleOutlined />
-                    : <CloseCircleOutlined />}
-                {' '}{status.vector_db.status === 'available'
-                    ? `可用 (${status.vector_db.company_count} 家公司)`
-                    : '不可用'}
-              </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="长期记忆">
-              <Tag color={
-                  status.memory.long_term_enabled ? 'green' : 'default'}>
-                {status.memory.long_term_enabled
-                    ? '已启用' : '未启用'}
-              </Tag>
-              {status.memory.long_term_enabled && (
-                <Text type="secondary" style={{ marginLeft: 8 }}>
-                  容量: {status.memory.working_memory_limit} 条
-                </Text>
-              )}
-            </Descriptions.Item>
-            <Descriptions.Item label="LangSmith">
-              <Tag color={
-                  status.monitoring.langsmith_available
-                      ? 'green' : 'default'}>
-                {status.monitoring.langsmith_available
-                    ? '已启用' : '未启用'}
-              </Tag>
-              {status.monitoring.langsmith_available && (
-                <Text type="secondary" style={{ marginLeft: 8 }}>
-                  {status.monitoring.langsmith_project}
-                </Text>
-              )}
-            </Descriptions.Item>
-          </Descriptions>
-        </Card>
-
-        {/* ===== 已注册工具 ===== */}
-        <Card title="已注册工具" className="page-card">
-          <Descriptions column={1} bordered size="small">
-            {Object.entries(TOOL_LABELS).map(([key, label]) => (
-              <Descriptions.Item key={key} label={label}>
-                <Tag color={status.tools[key] ? 'green' : 'red'}>
-                  {status.tools[key] ? '已启用' : '已禁用'}
-                </Tag>
-                <Text type="secondary" style={{ marginLeft: 8 }}>
-                  ({key})
-                </Text>
-              </Descriptions.Item>
-            ))}
-          </Descriptions>
-        </Card>
       </Space>
     </PageShell>
   );

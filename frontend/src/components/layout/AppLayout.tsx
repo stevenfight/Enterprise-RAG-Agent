@@ -10,7 +10,8 @@ import { Layout, ConfigProvider, theme as antdTheme, App as AntApp } from 'antd'
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import HeaderBar from './HeaderBar';
-import { colors, lightTheme, darkTheme } from '@/styles/theme';
+import type { SystemStatus } from './HeaderBar';
+import { accentThemes, colors, createThemeConfig } from '@/styles/theme';
 import { useTheme } from '@/hooks/useTheme';
 import '@/styles/global.css';
 import { createLogger } from '@/utils/logger';
@@ -20,13 +21,13 @@ const logger = createLogger('AppLayout');
 const { Content } = Layout;
 
 export default function AppLayout() {
-  const { themeMode, isDark } = useTheme();
-  const [systemOnline, setSystemOnline] = useState(false);
+  const { themeMode, isDark, accentTheme } = useTheme();
+  const [systemStatus, setSystemStatus] = useState<SystemStatus>('checking');
   const location = useLocation();
   // 聊天首页铺满内容区，其余页面保留标准内边距
   const isChatRoute = location.pathname === '/';
 
-  logger.renderStart({ themeMode, systemOnline, path: location.pathname });
+  logger.renderStart({ themeMode, systemStatus, path: location.pathname });
 
   // 定期检查系统健康状态
   useEffect(() => {
@@ -34,11 +35,11 @@ export default function AppLayout() {
       try {
         logger.debug('健康检查请求: GET /api/health');
         const data = await checkHealth();
-        const online = data.status === 'ok';
-        setSystemOnline(online);
-        logger.info('健康检查结果:', { status: data.status, online });
+        const nextStatus: SystemStatus = data.status === 'ok' ? 'ready' : 'unavailable';
+        setSystemStatus(nextStatus);
+        logger.info('健康检查结果:', { status: data.status, systemStatus: nextStatus });
       } catch (err) {
-        setSystemOnline(false);
+        setSystemStatus('unavailable');
         logger.warn('健康检查失败:', err);
       }
     };
@@ -48,49 +49,50 @@ export default function AppLayout() {
     return () => clearInterval(timer);
   }, []);
 
-  const currentTheme = isDark ? darkTheme : lightTheme;
+  const currentTheme = {
+    ...createThemeConfig(themeMode, accentTheme),
+    algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+  };
+  const pagePrimary = accentThemes[accentTheme][themeMode];
   const pageThemeStyle = {
-    '--page-primary': colors.primary,
+    '--page-primary': pagePrimary,
     '--page-text-primary': isDark ? colors.textPrimaryDark : colors.textPrimary,
     '--page-text-secondary': isDark ? colors.textSecondaryDark : colors.textSecondary,
     '--page-border': isDark ? colors.borderDark : colors.border,
     '--page-card-bg': isDark ? colors.bgDarkCard : colors.bgCard,
   } as CSSProperties;
-  logger.renderEnd(`主题=${themeMode}, 在线=${systemOnline}`);
+  logger.renderEnd(`主题=${themeMode}, 健康状态=${systemStatus}`);
 
   return (
     <ConfigProvider theme={currentTheme}>
       <AntApp>
-        <ConfigProvider
-          theme={{
-            algorithm: isDark
-              ? antdTheme.darkAlgorithm
-              : antdTheme.defaultAlgorithm,
+        <Layout
+          style={{
+            ...pageThemeStyle,
+            height: '100vh',
+            overflow: 'hidden',
           }}
         >
-          <Layout style={{ height: '100vh', overflow: 'hidden' }}>
-            {/* 左侧导航 */}
-            <Sidebar />
+          {/* 左侧导航 */}
+          <Sidebar />
 
-            {/* 右侧主区域 */}
-            <Layout>
-              {/* 顶部栏 */}
-              <HeaderBar systemOnline={systemOnline} />
+          {/* 右侧主区域 */}
+          <Layout>
+            {/* 顶部栏 */}
+            <HeaderBar systemStatus={systemStatus} />
 
-              {/* 内容区域 */}
-              <Content
-                style={{
-                  ...pageThemeStyle,
-                  overflow: isChatRoute ? 'hidden' : 'auto',
-                  padding: isChatRoute ? 0 : 24,
-                  background: isDark ? '#141414' : colors.bgLight,
-                }}
-              >
-                <Outlet />
-              </Content>
-            </Layout>
+            {/* 内容区域 */}
+            <Content
+              style={{
+                overflow: isChatRoute ? 'hidden' : 'auto',
+                padding: isChatRoute ? 0 : 24,
+                background: isDark ? '#141414' : colors.bgLight,
+              }}
+            >
+              <Outlet />
+            </Content>
           </Layout>
-        </ConfigProvider>
+        </Layout>
       </AntApp>
     </ConfigProvider>
   );

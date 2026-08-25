@@ -51,13 +51,14 @@ export default function DagBoardPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Agent 任务规划看板"
+        eyebrow="任务规划"
+        title="高级分析流程"
         icon={<NodeIndexOutlined />}
-        description="输入查询语句，查看 Agent 的任务拆解与执行依赖"
+        description="查看 Agent 如何组织任务、依赖关系与执行批次；不替代最终研究结论"
       />
 
       {/* 查询输入 */}
-      <Card size="small" className="page-card" style={{ marginBottom: 24 }}>
+      <Card size="small" className="page-card page-toolbar" style={{ marginBottom: 24 }}>
         <Space.Compact style={{ width: '100%' }}>
           <Input
             value={query}
@@ -72,7 +73,7 @@ export default function DagBoardPage() {
             icon={<SearchOutlined />}
             onClick={fetchPlan}
             loading={loading}
-            style={{ borderRadius: '0 8px 8px 0', background: '#B8A9C9', borderColor: '#B8A9C9' }}
+            style={{ borderRadius: '0 8px 8px 0' }}
           >
             分析
           </Button>
@@ -82,9 +83,9 @@ export default function DagBoardPage() {
 
       {/* 加载状态 */}
       {loading && (
-        <div style={{ textAlign: 'center', padding: 60 }}>
+        <div className="page-state" style={{ textAlign: 'center', padding: 60 }}>
           <Spin size="large" />
-          <div style={{ marginTop: 12, color: '#bbb' }}>Agent 正在规划任务...</div>
+          <div style={{ marginTop: 12, color: 'var(--page-text-secondary)' }}>Agent 正在规划任务...</div>
         </div>
       )}
 
@@ -99,11 +100,13 @@ export default function DagBoardPage() {
             status={planData.message}
           />
 
-          <DagFlow
-            nodes={planData.nodes}
-            edges={planData.edges}
-            height={420}
-          />
+          <div className="dag-flow-panel">
+            <DagFlow
+              nodes={planData.nodes}
+              edges={planData.edges}
+              height={420}
+            />
+          </div>
 
           <DagExecutionTimeline
             batches={planData.execution_order}
@@ -111,7 +114,7 @@ export default function DagBoardPage() {
           />
 
           {/* 图例 */}
-          <Card size="small" style={{ marginTop: 16, borderRadius: 10 }}>
+          <Card size="small" className="page-card" style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
               <Text style={{ fontSize: 12, color: '#888', fontWeight: 600 }}>图例:</Text>
               {Object.entries(TYPE_COLORS).map(([type, color]) => (
@@ -141,10 +144,10 @@ export default function DagBoardPage() {
 
       {/* 空状态 */}
       {!loading && !planData && !error && (
-        <div style={{
+        <div className="page-state" style={{
           textAlign: 'center',
           padding: 80,
-          color: '#bbb',
+          color: 'var(--page-text-secondary)',
         }}>
           <NodeIndexOutlined style={{ fontSize: 48, opacity: 0.3, marginBottom: 16 }} />
           <div style={{ fontSize: 14 }}>输入查询语句，查看 Agent 如何拆解任务</div>

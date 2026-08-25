@@ -11,7 +11,7 @@ import {
   BookOutlined,
   CaretDownOutlined,
 } from '@ant-design/icons';
-import type { SourceInfo } from '@/types/chat';
+import type { SourceInfo, SourceScoreValue } from '@/types/chat';
 import { useTheme } from '@/hooks/useTheme';
 import { colors } from '@/styles/theme';
 import { createLogger } from '@/utils/logger';
@@ -23,27 +23,20 @@ interface SourceCardProps {
   source: SourceInfo;
 }
 
-/** 计算置信度百分比
+/** 计算检索匹配度百分比
  * scores 包含多个不同量纲的字段:
  *   hybrid:  0.0~1.0  (加权融合分, 始终存在)  → 作为置信度主指标
  *   rerank:  0.0~10.0 (重排序分)
  *   vector:  ~0.0~1.0 (向量相似度)
  *   bm25:    >0 无上界 (BM25 分)
- * 统一使用 hybrid 分数作为置信度百分比
+ * 仅使用 hybrid 分数作为可比较的检索匹配度百分比。
  */
-function calcScorePercent(scores: Record<string, number>): number {
-  // 优先使用 hybrid 融合分（所有结果都有此字段）
+function calcScorePercent(scores: Record<string, SourceScoreValue>): number | null {
+  // hybrid 为 0~1 的融合分，可安全转换为百分比。
   if (typeof scores.hybrid === 'number') {
     return Math.round(Math.min(100, Math.max(0, scores.hybrid * 100)));
   }
-  // 降级: 取所有数值中的最大值，统一处理
-  const numericValues = Object.values(scores || {}).filter((v) => typeof v === 'number');
-  if (numericValues.length === 0) return 0;
-  const maxScore = Math.max(...numericValues);
-  const percent = maxScore > 1
-    ? Math.min(100, Math.max(0, maxScore))
-    : Math.round(Math.min(100, Math.max(0, maxScore * 100)));
-  return percent;
+  return null;
 }
 
 export default function SourceCard({ source }: SourceCardProps) {
@@ -96,12 +89,18 @@ export default function SourceCard({ source }: SourceCardProps) {
         >
           {source.source_file}
         </Text>
-        <Tag
-          color={scorePercent >= 80 ? 'success' : scorePercent >= 50 ? 'processing' : 'default'}
-          style={{ fontSize: 12, margin: 0, borderRadius: 6 }}
-        >
-          {scorePercent}%
-        </Tag>
+        {scorePercent !== null ? (
+          <Tag
+            color={scorePercent >= 80 ? 'success' : scorePercent >= 50 ? 'processing' : 'default'}
+            style={{ fontSize: 12, margin: 0, borderRadius: 6 }}
+          >
+            {scorePercent}%
+          </Tag>
+        ) : (
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            匹配度未提供
+          </Text>
+        )}
       </Space>
 
       <div style={{ marginTop: 6, marginLeft: 34 }}>
@@ -119,6 +118,12 @@ export default function SourceCard({ source }: SourceCardProps) {
 
       {expanded && (
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${borderColor}` }}>
+          {source.excerpt && (
+            <div style={{ marginBottom: 8 }}>
+              <Text strong style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>命中文本摘要</Text>
+              <Text type="secondary" style={{ fontSize: 12, lineHeight: 1.6 }}>{source.excerpt}</Text>
+            </div>
+          )}
           {/* 评分详情 - 独立的可点击标题，不再使用 Collapse 避免事件冲突 */}
           <div
             onClick={(e) => {

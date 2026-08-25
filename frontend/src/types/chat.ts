@@ -4,13 +4,17 @@
  * 与后端 FastAPI Pydantic 模型一一对应
  */
 
+/** 后端评分数值或状态字段。 */
+export type SourceScoreValue = number | string;
+
 /** 来源信息 (对应后端 SourceInfo) */
 export interface SourceInfo {
   index: number;
   source_file: string;
   pages: number[];
   company_name: string;
-  scores: Record<string, number>;
+  scores: Record<string, SourceScoreValue>;
+  excerpt?: string;
 }
 
 /** RAG 问答请求 (对应后端 QueryRequest) */
@@ -32,6 +36,16 @@ export interface QueryResponse {
   context_used_count?: number | null;
   processing_time: number;
   conversation_id?: string | null;
+  comparison?: VerifiedComparison | null;
+}
+
+export interface VerifiedComparison {
+  available: boolean;
+  metric_key: string;
+  fiscal_year: number;
+  unit: string;
+  fact_ids: string[];
+  items: Array<{ company_name: string; value: number; source_file: string; pages: number[]; excerpt: string }>;
 }
 
 /** 仅检索请求 (对应后端 RetrieveRequest) */
@@ -49,7 +63,7 @@ export interface RetrieveResultItem {
   company_name: string;
   child_id?: string | null;
   parent_key?: string | null;
-  scores: Record<string, number>;
+  scores: Record<string, SourceScoreValue>;
 }
 
 /** 仅检索响应 (对应后端 RetrieveResponse) */
@@ -90,6 +104,15 @@ export interface AgentStepInfo {
   elapsed_ms: number;
 }
 
+/** 可展示、可持久化的安全分析过程步骤。 */
+export interface AnalysisTraceStep {
+  stepNumber: number;
+  toolLabel: string;
+  status: 'completed' | 'running' | 'failed';
+  inputSummary?: string;
+  observationSummary?: string;
+}
+
 /** Agent 查询请求 (对应后端 AgentQueryRequest) */
 export interface AgentQueryRequest {
   query: string;
@@ -117,8 +140,10 @@ export interface Message {
   content: string;
   timestamp: number;
   sources?: SourceInfo[];
-  reasoningChain?: AgentStepInfo[];
-  agentRun?: MultiAgentRunState;
+  /** 安全分析过程摘要，不包含原始推理或工具数据。 */
+  analysisTrace?: AnalysisTraceStep[];
+  /** 回答随附的受限已核验比较事实。 */
+  comparison?: VerifiedComparison;
   error?: string;
 }
 
@@ -158,7 +183,7 @@ export interface MultiAgentWorkerStatus {
   elapsed_ms?: number;
 }
 
-/** 多 Agent 运行状态（挂到 Message.agentRun） */
+/** 多 Agent 原始运行状态（仅用于 SSE 协议类型，不得写入 Message）。 */
 export interface MultiAgentRunState {
   isMultiAgent: boolean;
   registeredAgents: string[];

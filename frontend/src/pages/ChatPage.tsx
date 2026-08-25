@@ -5,21 +5,25 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Typography, Select, Slider, Switch, Space, Card, Divider, Radio } from 'antd';
+import { Typography, Select, Slider, Switch, Space, Card, Divider, Drawer, Radio, Tabs } from 'antd';
 import {
-  SearchOutlined,
   BulbOutlined,
   RobotOutlined,
   SettingOutlined,
   DownOutlined,
 } from '@ant-design/icons';
 import { chatStore, selectCurrentMessages } from '@/stores/chatStore';
+import { appStore } from '@/stores/appStore';
 import { useTheme } from '@/hooks/useTheme';
 import { colors } from '@/styles/theme';
 import { queryQuestion, getCompanies, streamAgentQuery } from '@/services/chatService';
 import ChatContainer from '@/components/chat/ChatContainer';
 import ThoughtChainDrawer from '@/components/chat/ThoughtChainDrawer';
-import type { CompanyInfo, SSEEvent, AgentStepInfo, ReasoningStep, MultiAgentRunState } from '@/types/chat';
+import ResearchContextBar from '@/components/chat/ResearchContextBar';
+import EvidencePanel from '@/components/chat/EvidencePanel';
+import EvidenceContent from '@/components/chat/EvidenceContent';
+import AnalysisTraceContent from '@/components/chat/AnalysisTraceContent';
+import type { CompanyInfo, SSEEvent, AnalysisTraceStep } from '@/types/chat';
 import { createLogger } from '@/utils/logger';
 import { createEmptyAccumulator, applyAgentEvent } from '@/utils/agentEvent';
 
@@ -39,16 +43,7 @@ export default function ChatPage() {
 
   // 侧边栏配置状态
   const [companies, setCompanies] = useState<CompanyInfo[]>([]);
-  const [selectedCompany, setSelectedCompany] = useState<string | undefined>(undefined);
   const [topN, setTopN] = useState(5);
-  const [agentMode, setAgentMode] = useState<boolean>(() => {
-    // Phase 2: 从 localStorage 恢复 Agent 开关状态
-    try {
-      return localStorage.getItem('agent-mode') === 'true';
-    } catch {
-      return false;
-    }
-  });
   const [agentMaxSteps, setAgentMaxSteps] = useState<number>(() => {
     // Phase 2: 从 localStorage 恢复 Agent 推理步数
     try {
@@ -68,12 +63,13 @@ export default function ChatPage() {
   const [fillInputText, setFillInputText] = useState<string | undefined>(undefined);
 
   // Phase 2: 思维链侧边抽屉
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerSteps, setDrawerSteps] = useState<ReasoningStep[]>([]);
+  const [drawerSteps, setDrawerSteps] = useState<AnalysisTraceStep[]>([]);
+  const [activeDrawer, setActiveDrawer] = useState<'config' | 'sessions' | 'evidence' | 'reasoning' | null>(null);
+  const [selectedEvidenceMessageId, setSelectedEvidenceMessageId] = useState<string | undefined>(undefined);
 
-  const handleViewReasoning = useCallback((steps: ReasoningStep[]) => {
+  const handleViewReasoning = useCallback((steps: AnalysisTraceStep[]) => {
     setDrawerSteps(steps);
-    setDrawerOpen(true);
+    setActiveDrawer('reasoning');
   }, []);
 
   // chatStore
@@ -85,6 +81,26 @@ export default function ChatPage() {
   const updateLastAssistantMessage = chatStore((s) => s.updateLastAssistantMessage);
   const currentSessionId = chatStore((s) => s.currentSessionId);
   const currentMessages = chatStore(selectCurrentMessages);
+  const setResearchContext = appStore((s) => s.setResearchContext);
+  const selectedCompany = appStore((s) => s.researchContext?.companyName);
+  const agentMode = appStore((s) => s.researchContext?.mode === 'agent');
+  const setAgentMode = (enabled: boolean) => {
+    setResearchContext({ mode: enabled ? 'agent' : 'rag' });
+  };
+  const requestIdRef = useRef(0);
+  const ragAbortRef = useRef<AbortController | null>(null);
+  const requestCleanupRef = useRef<(() => void) | null>(null);
+  const latestAssistantMessage = [...currentMessages].reverse().find(
+    (message) => message.role === 'assistant',
+  );
+  const selectedEvidenceMessage = currentMessages.find(
+    (message) => message.id === selectedEvidenceMessageId && message.role === 'assistant',
+  ) ?? latestAssistantMessage;
+  const latestSources = selectedEvidenceMessage?.sources ?? [];
+
+  useEffect(() => {
+    setSelectedEvidenceMessageId(undefined);
+  }, [currentSessionId]);
 
   logger.renderStart({
     isLoading,
@@ -116,11 +132,12 @@ export default function ChatPage() {
   // 清理 SSE 连接 (Phase 2)
   useEffect(() => {
     return () => {
-      if (sseRef.current) {
-        sseRef.current.close();
-      }
+      requestIdRef.current += 1;
+      requestCleanupRef.current?.();
+      requestCleanupRef.current = null;
+      setLoading(false);
     };
-  }, []);
+  }, [setLoading]);
 
   // 持久化 Agent 开关状态 (Phase 2)
   useEffect(() => {
@@ -143,6 +160,10 @@ export default function ChatPage() {
   // 发送消息 (Phase 2: 支持 Agent SSE 流式模式)
   const handleSend = useCallback(
     async (content: string) => {
+      const requestSessionId = currentSessionId;
+      const requestId = ++requestIdRef.current;
+      const isRequestActive = () => requestId === requestIdRef.current;
+      requestCleanupRef.current?.();
       logger.info('发送消息:', {
         content: content.slice(0, 50),
         company: selectedCompany,
@@ -151,7 +172,7 @@ export default function ChatPage() {
         sessionId: currentSessionId,
       });
 
-      addUserMessage(content);
+      addUserMessage(content, requestSessionId);
       setLoading(true);
 
       if (agentMode) {
@@ -161,8 +182,19 @@ export default function ChatPage() {
 
         let acc = createEmptyAccumulator();
         let fullAnswer = '';
+        let answerReceived = false;
         let wasForcedStop = false; // 是否因步数上限强制终止
         let assistantMessageCreated = false; // 是否已创建 assistant 占位消息
+        let checkDone: ReturnType<typeof setInterval> | undefined;
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        let es: ReturnType<typeof streamAgentQuery> | null = null;
+        const cleanupStream = () => {
+          if (checkDone) clearInterval(checkDone);
+          if (timeoutId) clearTimeout(timeoutId);
+          if (sseRef.current === es) sseRef.current = null;
+          es?.close();
+        };
+        requestCleanupRef.current = cleanupStream;
 
         // 先关闭之前的 SSE 连接
         if (sseRef.current) {
@@ -170,7 +202,7 @@ export default function ChatPage() {
           sseRef.current.close();
         }
 
-        const es = streamAgentQuery(
+        es = streamAgentQuery(
           content,
           {
             company_name: selectedCompany || undefined,
@@ -178,34 +210,42 @@ export default function ChatPage() {
             conversation_id: currentSessionId,
           },
           (event: SSEEvent) => {
+            if (!isRequestActive()) return;
             acc = applyAgentEvent(acc, event);
 
-            // 首次出现推理步或多 Agent 状态时创建 assistant 占位消息
-            if (!assistantMessageCreated && (acc.reasoningChain.length > 0 || acc.agentRun !== null)) {
-              if (acc.agentRun) {
-                addAssistantMessage('正在编排多 Agent 任务...', [], undefined, acc.agentRun);
-              } else {
-                addAssistantMessage('推理中...', [], [...acc.reasoningChain]);
-              }
+            // 首次出现安全分析步骤时创建 assistant 占位消息。
+            if (!assistantMessageCreated && acc.analysisTrace.length > 0) {
+              if (!isRequestActive()) return;
+              addAssistantMessage('分析中...', [], [...acc.analysisTrace], requestSessionId);
               assistantMessageCreated = true;
               return;
             }
 
             // 同步事件到 store
-            const partial: { content?: string; reasoningChain?: AgentStepInfo[]; agentRun?: MultiAgentRunState } = {};
-            if (acc.agentRun) partial.agentRun = acc.agentRun;
-            if (acc.reasoningChain.length > 0) partial.reasoningChain = acc.reasoningChain;
+            const partial: { content?: string; analysisTrace?: AnalysisTraceStep[] } = {};
+            if (acc.analysisTrace.length > 0) partial.analysisTrace = acc.analysisTrace;
 
             if (event.type === 'answer_chunk') {
               partial.content = acc.answer;
             } else if (event.type === 'answer') {
               partial.content = acc.answer;
               fullAnswer = acc.answer;
+              answerReceived = true;
               logger.info('ON ANSWER 最终答案到达', { contentLen: acc.answer.length, elapsedMs: Date.now() - agentStartTime });
             }
 
-            if (Object.keys(partial).length > 0) {
-              updateLastAssistantMessage(partial);
+            if (!assistantMessageCreated && partial.content !== undefined) {
+              if (!isRequestActive()) return;
+              addAssistantMessage(
+                partial.content,
+                [],
+                partial.analysisTrace ? [...partial.analysisTrace] : undefined,
+                requestSessionId,
+              );
+              assistantMessageCreated = true;
+            } else if (Object.keys(partial).length > 0) {
+              if (!isRequestActive()) return;
+              updateLastAssistantMessage(partial, requestSessionId);
             }
 
             if (event.type === 'error') {
@@ -215,12 +255,23 @@ export default function ChatPage() {
               logger.info('SSE 流完成', {
                 totalSteps: event.total_steps,
                 elapsedMs: event.total_elapsed_ms,
-                reasoningStepsCount: acc.reasoningChain.length,
+                reasoningStepsCount: acc.analysisTrace.length,
                 forcedStop: event.forced_stop,
               });
             }
           },
           (error: Event) => {
+            if (checkDone) {
+              clearInterval(checkDone);
+            }
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+            }
+            const activeEventSource = sseRef.current;
+            if (activeEventSource && activeEventSource === es) {
+              activeEventSource.close();
+              sseRef.current = null;
+            }
             console.error(
               '%c[ChatPage] SSE ERROR %cEventSource 连接错误',
               'color: #ff4d4f; font-weight: bold;',
@@ -228,8 +279,8 @@ export default function ChatPage() {
               { eventPhase: error.eventPhase, type: error.type },
             );
             logger.error('SSE 连接错误:', error);
-            addErrorMessage('Agent 推理服务连接失败，请稍后重试。');
-            setLoading(false);
+            if (isRequestActive()) addErrorMessage('Agent 推理服务连接失败，请稍后重试。', requestSessionId);
+            if (isRequestActive()) setLoading(false);
           },
         );
 
@@ -237,67 +288,88 @@ export default function ChatPage() {
         console.log('%c[ChatPage] SSE INIT %cEventSource 已创建，等待事件...', 'color: #1890ff; font-weight: bold;', 'color: #333;', { query: content.slice(0, 30) });
 
         // 等待 SSE 流结束 (answer 事件到达)
-        const checkDone = setInterval(() => {
-          if (fullAnswer) {
-            logger.info('SSE 收到完整答案', { answerLen: fullAnswer.length, reasoningSteps: acc.reasoningChain.length, totalElapsedMs: Date.now() - agentStartTime, forcedStop: wasForcedStop });
+        checkDone = setInterval(() => {
+          if (answerReceived) {
+            if (!isRequestActive()) return;
+            logger.info('SSE 收到完整答案', { answerLen: fullAnswer.length, reasoningSteps: acc.analysisTrace.length, totalElapsedMs: Date.now() - agentStartTime, forcedStop: wasForcedStop });
             clearInterval(checkDone);
-            if (sseRef.current) {
-              sseRef.current.close();
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+            }
+            const activeEventSource = sseRef.current;
+            if (activeEventSource && activeEventSource === es) {
+              activeEventSource.close();
               sseRef.current = null;
             }
-            // answer 事件已通过 updateLastAssistantMessage 设置内容和推理链路
+            // answer 事件已通过 updateLastAssistantMessage 设置内容和安全分析摘要
             // 推理步数达上限时，注入系统警告提示
-            if (wasForcedStop) {
+            if (wasForcedStop && isRequestActive()) {
               chatStore.getState().addErrorMessage(
-                `推理达到步数上限（${acc.reasoningChain.length} 步），部分数据可能未检索到。建议细化查询条件后重试。`
+                `分析达到步数上限（${acc.analysisTrace.length} 步），部分数据可能未检索到。建议细化查询条件后重试。`
+                , requestSessionId
               );
             }
             setLoading(false);
+            requestCleanupRef.current = null;
           }
         }, 200);
 
         // 超时保护 (120s)
-        setTimeout(() => {
+        timeoutId = setTimeout(() => {
+          if (!isRequestActive()) return;
           clearInterval(checkDone);
-          if (sseRef.current) {
-            sseRef.current.close();
+          const activeEventSource = sseRef.current;
+          if (activeEventSource && activeEventSource === es) {
+            activeEventSource.close();
             sseRef.current = null;
           }
-          if (!fullAnswer) {
-            addErrorMessage('Agent 推理超时，请尝试简化问题或关闭 Agent 模式。');
+          if (!answerReceived && isRequestActive()) {
+            addErrorMessage('Agent 推理超时，请尝试简化问题或关闭 Agent 模式。', requestSessionId);
           }
           setLoading(false);
+          requestCleanupRef.current = null;
         }, 120000);
       } else {
         // 普通 RAG 模式 (enable_rewrite 固定为 true)
         try {
           logger.debug('调用 queryQuestion API (普通RAG模式)...');
+          const controller = new AbortController();
+          ragAbortRef.current = controller;
+          requestCleanupRef.current = () => {
+            controller.abort();
+            if (ragAbortRef.current === controller) ragAbortRef.current = null;
+          };
           const res = await queryQuestion({
             query: content,
             company_name: selectedCompany || undefined,
             top_n: topN,
             conversation_id: currentSessionId,
             enable_rewrite: true, // 固定开启，不再由用户控制
-          });
+          }, controller.signal);
           logger.info('API 响应成功:', {
             answerLength: res.answer.length,
             sourcesCount: res.sources.length,
             processingTime: res.processing_time,
             conversationId: res.conversation_id,
           });
-          addAssistantMessage(res.answer, res.sources);
+          if (isRequestActive()) addAssistantMessage(res.answer, res.sources, undefined, requestSessionId, res.comparison ?? undefined);
         } catch (err: unknown) {
           const errorMsg =
             err instanceof Error ? err.message : '未知错误';
           logger.error('API 请求失败:', { error: errorMsg, query: content.slice(0, 30) });
+          if (!isRequestActive() || errorMsg.includes('canceled') || errorMsg.includes('cancelled') || errorMsg.includes('ERR_CANCELED')) return;
           if (errorMsg.includes('timeout') || errorMsg.includes('ECONNABORTED')) {
-            addErrorMessage('请求超时，请检查网络连接或稍后重试。');
+            addErrorMessage('请求超时，请检查网络连接或稍后重试。', requestSessionId);
           } else {
-            addErrorMessage(`服务暂时不可用，请稍后重试。（${errorMsg}）`);
+            addErrorMessage(`服务暂时不可用，请稍后重试。（${errorMsg}）`, requestSessionId);
           }
         } finally {
-          setLoading(false);
-          logger.debug('请求流程结束');
+          if (!ragAbortRef.current?.signal.aborted && isRequestActive()) {
+            ragAbortRef.current = null;
+            requestCleanupRef.current = null;
+            setLoading(false);
+            logger.debug('请求流程结束');
+          }
         }
       }
     },
@@ -307,26 +379,15 @@ export default function ChatPage() {
   logger.renderEnd();
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      {/* 左侧: 配置面板 - LobeChat 简洁风格 */}
-      <div
-        style={{
-          width: 280,
-          borderRight: 'none',
-          padding: '20px 16px',
-          overflow: 'auto',
-          background: isDark ? colors.bgDarkCard : colors.bgCard,
-          boxShadow: isDark
-            ? 'none'
-            : `1px 0 0 0 ${colors.border}, 4px 0 16px rgba(0, 0, 0, 0.02)`,
-          flexShrink: 0,
-        }}
+    <div className="chat-page" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      <Drawer
+        title="研究配置"
+        placement="left"
+        width={320}
+        open={activeDrawer === 'config'}
+        onClose={() => setActiveDrawer(null)}
+        styles={{ body: { background: isDark ? colors.bgDarkCard : colors.bgCard } }}
       >
-        <Title level={5} style={{ marginBottom: 20, color: isDark ? '#e8e8e8' : '#1a1a1a', fontSize: 16, fontWeight: 600 }}>
-          <SearchOutlined style={{ marginRight: 8, color: '#B8A9C9' }} />
-          检索配置
-        </Title>
-
         {/* 公司选择 */}
         <div style={{ marginBottom: 20 }}>
           <Text style={{ fontSize: 13, display: 'block', marginBottom: 6, color: isDark ? '#8c8c8c' : '#595959' }}>
@@ -334,7 +395,7 @@ export default function ChatPage() {
           </Text>
           <Select
             value={selectedCompany}
-            onChange={(val: string | undefined) => setSelectedCompany(val)}
+            onChange={(val: string | undefined) => setResearchContext({ companyName: val })}
             placeholder="全部公司"
             allowClear
             style={{ width: '100%' }}
@@ -489,27 +550,68 @@ export default function ChatPage() {
             </Card>
           ))}
         </Space>
-      </div>
+      </Drawer>
 
       {/* 右侧: 对话区域 */}
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        <ChatContainer
-          onSend={handleSend}
-          isLoading={isLoading}
-          isAgentMode={agentMode}
-          fillInputText={fillInputText}
-          onFillInputTextConsumed={() => setFillInputText(undefined)}
-          onViewReasoning={handleViewReasoning}
-          quickCommands={EXAMPLE_QUESTIONS}
+      <div className="chat-page__workspace" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <ResearchContextBar
+          companyName={selectedCompany}
+          mode={agentMode ? 'agent' : 'rag'}
+          onOpenConfig={() => setActiveDrawer('config')}
+          onOpenEvidence={() => {
+            setSelectedEvidenceMessageId(latestAssistantMessage?.id);
+            setActiveDrawer('evidence');
+          }}
         />
+        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <ChatContainer
+            onSend={handleSend}
+            isLoading={isLoading}
+            isAgentMode={agentMode}
+            fillInputText={fillInputText}
+            onFillInputTextConsumed={() => setFillInputText(undefined)}
+            onViewReasoning={handleViewReasoning}
+            onViewEvidence={(messageId) => {
+              setSelectedEvidenceMessageId(messageId);
+              setActiveDrawer('evidence');
+            }}
+            quickCommands={EXAMPLE_QUESTIONS}
+            companyName={selectedCompany}
+            researchMode={agentMode ? 'agent' : 'rag'}
+            mobileSessionsOpen={activeDrawer === 'sessions'}
+            onMobileSessionsOpenChange={(open) => setActiveDrawer(open ? 'sessions' : null)}
+          />
+        </div>
       </div>
+
+      <aside
+        className="chat-evidence-aside"
+        aria-label="回答级证据"
+        style={{
+          width: 340,
+          flexShrink: 0,
+          overflow: 'auto',
+          padding: 16,
+          background: isDark ? colors.bgDarkCard : colors.bgCard,
+          borderLeft: `1px solid ${isDark ? colors.borderDark : colors.border}`,
+        }}
+      >
+        <Tabs
+          defaultActiveKey="evidence"
+          items={[
+            { key: 'evidence', label: '证据', children: <EvidenceContent sources={latestSources} /> },
+            { key: 'analysis', label: '分析过程', children: <AnalysisTraceContent steps={selectedEvidenceMessage?.analysisTrace ?? []} /> },
+          ]}
+        />
+      </aside>
 
       {/* Phase 2: 思维链侧边抽屉 */}
       <ThoughtChainDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        open={activeDrawer === 'reasoning'}
+        onClose={() => setActiveDrawer(null)}
         steps={drawerSteps}
       />
+      <EvidencePanel open={activeDrawer === 'evidence'} onClose={() => setActiveDrawer(null)} sources={latestSources} />
     </div>
   );
 }

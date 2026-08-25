@@ -9,7 +9,7 @@
  */
 
 import { create } from 'zustand';
-import type { Message, Session, SourceInfo, AgentStepInfo, MultiAgentRunState } from '@/types/chat';
+import type { Message, Session, SourceInfo, AnalysisTraceStep, VerifiedComparison } from '@/types/chat';
 import { createLogger } from '@/utils/logger';
 
 const logger = createLogger('chatStore');
@@ -31,6 +31,24 @@ function createSession(title = '新对话'): Session {
   };
 }
 
+/** 清理历史会话中不应继续保存的原始过程字段。 */
+export function sanitizeSessions(sessions: Session[]): { sessions: Session[]; changed: boolean } {
+  let changed = false;
+  const sanitized = sessions.map((session) => ({
+    ...session,
+    messages: session.messages.map((message) => {
+      const hasReasoningChain = Object.hasOwn(message, 'reasoningChain');
+      const hasAgentRun = Object.hasOwn(message, 'agentRun');
+      if (!hasReasoningChain && !hasAgentRun) return message;
+      changed = true;
+      const legacyMessage = message as Message & { reasoningChain?: unknown; agentRun?: unknown };
+      const { reasoningChain: _reasoningChain, agentRun: _agentRun, ...safeMessage } = legacyMessage;
+      return safeMessage;
+    }),
+  }));
+  return { sessions: sanitized, changed };
+}
+
 /** 从 localStorage 恢复会话 */
 function loadSessions(): Session[] {
   try {
@@ -38,8 +56,13 @@ function loadSessions(): Session[] {
     if (raw) {
       const parsed = JSON.parse(raw) as Session[];
       if (Array.isArray(parsed) && parsed.length > 0) {
-        logger.info('从 localStorage 恢复会话:', { count: parsed.length });
-        return parsed;
+        const result = sanitizeSessions(parsed);
+        if (result.changed) {
+          saveSessions(result.sessions);
+          logger.info('已清理并回写历史会话过程字段:', { count: result.sessions.length });
+        }
+        logger.info('从 localStorage 恢复会话:', { count: result.sessions.length });
+        return result.sessions;
       }
     }
   } catch (err) {
@@ -76,13 +99,13 @@ interface ChatState {
   clearCurrentMessages: () => void;
 
   /** 添加用户消息 */
-  addUserMessage: (content: string) => void;
+  addUserMessage: (content: string, targetSessionId?: string) => void;
   /** 添加 AI 消息 */
-  addAssistantMessage: (content: string, sources?: SourceInfo[], reasoningChain?: AgentStepInfo[], agentRun?: MultiAgentRunState) => void;
-  /** 更新最后一条 AI 消息（Phase 2: SSE 流式推理实时追加 reasoningChain / agentRun） */
-  updateLastAssistantMessage: (partial: { content?: string; reasoningChain?: AgentStepInfo[]; agentRun?: MultiAgentRunState }) => void;
+  addAssistantMessage: (content: string, sources?: SourceInfo[], analysisTrace?: AnalysisTraceStep[], targetSessionId?: string, comparison?: VerifiedComparison) => void;
+  /** 更新最后一条 AI 消息的流式答案和安全分析摘要。 */
+  updateLastAssistantMessage: (partial: { content?: string; analysisTrace?: AnalysisTraceStep[] }, targetSessionId?: string) => void;
   /** 添加错误消息 */
-  addErrorMessage: (error: string) => void;
+  addErrorMessage: (error: string, targetSessionId?: string) => void;
   /** 设置加载状态 */
   setLoading: (loading: boolean) => void;
 }
@@ -134,7 +157,7 @@ export const chatStore = create<ChatState>((set) => ({
     });
   },
 
-  addUserMessage: (content) => {
+  addUserMessage: (content, targetSessionId) => {
     const message: Message = {
       id: genId(),
       role: 'user',
@@ -143,7 +166,7 @@ export const chatStore = create<ChatState>((set) => ({
     };
     set((state) => {
       const sessions = state.sessions.map((s) => {
-        if (s.id !== state.currentSessionId) return s;
+        if (s.id !== (targetSessionId ?? state.currentSessionId)) return s;
         const title =
           s.messages.length === 0
             ? content.slice(0, 30) + (content.length > 30 ? '...' : '')
@@ -160,19 +183,19 @@ export const chatStore = create<ChatState>((set) => ({
     });
   },
 
-  addAssistantMessage: (content, sources, reasoningChain, agentRun) => {
+  addAssistantMessage: (content, sources, analysisTrace, targetSessionId, comparison) => {
     const message: Message = {
       id: genId(),
       role: 'assistant',
       content,
       timestamp: Date.now(),
       sources,
-      reasoningChain,
-      agentRun,
+      analysisTrace,
+      comparison,
     };
     set((state) => {
       const sessions = state.sessions.map((s) =>
-        s.id === state.currentSessionId
+        s.id === (targetSessionId ?? state.currentSessionId)
           ? { ...s, messages: [...s.messages, message], updatedAt: Date.now() }
           : s,
       );
@@ -181,7 +204,7 @@ export const chatStore = create<ChatState>((set) => ({
     });
   },
 
-  addErrorMessage: (error) => {
+  addErrorMessage: (error, targetSessionId) => {
     const message: Message = {
       id: genId(),
       role: 'system',
@@ -191,7 +214,7 @@ export const chatStore = create<ChatState>((set) => ({
     };
     set((state) => {
       const sessions = state.sessions.map((s) =>
-        s.id === state.currentSessionId
+        s.id === (targetSessionId ?? state.currentSessionId)
           ? { ...s, messages: [...s.messages, message], updatedAt: Date.now() }
           : s,
       );
@@ -200,10 +223,10 @@ export const chatStore = create<ChatState>((set) => ({
     });
   },
 
-  updateLastAssistantMessage: (partial) => {
+  updateLastAssistantMessage: (partial, targetSessionId) => {
     set((state) => {
       const sessions = state.sessions.map((s) => {
-        if (s.id !== state.currentSessionId) return s;
+        if (s.id !== (targetSessionId ?? state.currentSessionId)) return s;
         const messages = [...s.messages];
         // 从后往前找最后一条 assistant 消息
         for (let i = messages.length - 1; i >= 0; i--) {
@@ -211,8 +234,7 @@ export const chatStore = create<ChatState>((set) => ({
             messages[i] = {
               ...messages[i],
               ...(partial.content !== undefined ? { content: partial.content } : {}),
-              ...(partial.reasoningChain !== undefined ? { reasoningChain: partial.reasoningChain } : {}),
-              ...(partial.agentRun !== undefined ? { agentRun: partial.agentRun } : {}),
+              ...(partial.analysisTrace !== undefined ? { analysisTrace: partial.analysisTrace } : {}),
             };
             break;
           }

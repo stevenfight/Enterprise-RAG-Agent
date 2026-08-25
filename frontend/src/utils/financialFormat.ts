@@ -105,7 +105,7 @@ export function isNumericCell(text: string): boolean {
   const t = text.trim();
   if (!t) return false;
   // 匹配纯数字、千分位、小数、百分比、正负号、货币符号
-  return /^[\+\-]?[\d\s,.+%¥$€£]+$/.test(t) && /\d/.test(t);
+  return /^[+-]?[\d\s,.+%¥$€£]+$/.test(t) && /\d/.test(t);
 }
 
 /** Markdown -> HTML 转换（增强版，支持表格美化） */

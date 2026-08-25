@@ -1,75 +1,56 @@
 // -*- coding: utf-8 -*-
 /**
  * 主题切换 Hook
- * 支持亮色/暗色切换，localStorage 持久化
+ * 支持亮色/暗色与主体色切换，localStorage 持久化
  */
 
-import { useCallback, useEffect } from 'react';
-import { appStore } from '@/stores/appStore';
+import { useCallback } from 'react';
+import { appStore, type ThemeMode } from '@/stores/appStore';
+import type { AccentTheme } from '@/styles/theme';
+import { saveAppearance } from '@/utils/appearancePreference';
 
-const STORAGE_KEY = 'app-theme';
-
-export type ThemeMode = 'light' | 'dark';
-
-/** 从 localStorage 读取初始主题 */
-function getStoredTheme(): ThemeMode {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'dark' || stored === 'light') {
-      return stored;
-    }
-  } catch {
-    // localStorage 不可用时忽略
-  }
-  return 'light';
-}
-
-/** 保存主题到 localStorage */
-function saveTheme(mode: ThemeMode) {
-  try {
-    localStorage.setItem(STORAGE_KEY, mode);
-  } catch {
-    // localStorage 不可用时忽略
-  }
-}
+export type { ThemeMode } from '@/stores/appStore';
 
 /** 主题切换 Hook */
 export function useTheme() {
   const themeMode = appStore((s) => s.themeMode);
   const setThemeMode = appStore((s) => s.setThemeMode);
-
-  // 初始化: 从 localStorage 恢复主题
-  useEffect(() => {
-    const stored = getStoredTheme();
-    if (stored !== themeMode) {
-      setThemeMode(stored);
-    }
-    // 仅挂载时执行一次
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const accentTheme = appStore((s) => s.accentTheme);
+  const setAccentThemeState = appStore((s) => s.setAccentTheme);
 
   // 切换主题
   const toggleTheme = useCallback(() => {
     const next: ThemeMode = themeMode === 'light' ? 'dark' : 'light';
     setThemeMode(next);
-    saveTheme(next);
-  }, [themeMode, setThemeMode]);
+    saveAppearance({ themeMode: next, accentTheme });
+  }, [accentTheme, themeMode, setThemeMode]);
 
   // 设置指定主题
   const setTheme = useCallback(
     (mode: ThemeMode) => {
       setThemeMode(mode);
-      saveTheme(mode);
+      saveAppearance({ themeMode: mode, accentTheme });
     },
-    [setThemeMode],
+    [accentTheme, setThemeMode],
+  );
+
+  // 设置指定主体色
+  const setAccentTheme = useCallback(
+    (theme: AccentTheme) => {
+      setAccentThemeState(theme);
+      saveAppearance({ themeMode, accentTheme: theme });
+    },
+    [setAccentThemeState, themeMode],
   );
 
   const isDark = themeMode === 'dark';
 
   return {
     themeMode,
+    accentTheme,
     isDark,
     toggleTheme,
     setTheme,
+    setAccentTheme,
   };
 }

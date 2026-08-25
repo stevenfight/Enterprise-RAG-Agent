@@ -1,9 +1,9 @@
 // -*- coding: utf-8 -*-
 /**
- * Agent 思维链侧边抽屉组件
- * Phase 2 - 右侧抽屉展示完整推理过程时间线
+ * Agent 分析过程侧边抽屉组件
+ * Phase 2 - 右侧抽屉展示安全分析过程时间线
  *
- * 与 MessageBubble 内嵌的折叠推理步骤配合：
+ * 与 MessageBubble 内嵌的折叠分析步骤配合：
  *   - 消息气泡内: 快速预览（折叠/展开 + 步骤摘要）
  *   - 本组件: 侧边抽屉展示完整细节（不受 60px 高度限制）
  */
@@ -15,7 +15,7 @@ import {
   ToolOutlined,
   EyeOutlined,
 } from '@ant-design/icons';
-import type { ReasoningStep } from '@/types/chat';
+import type { AnalysisTraceStep } from '@/types/chat';
 import { useTheme } from '@/hooks/useTheme';
 
 const { Text } = Typography;
@@ -23,7 +23,7 @@ const { Text } = Typography;
 interface ThoughtChainDrawerProps {
   open: boolean;
   onClose: () => void;
-  steps: ReasoningStep[];
+  steps: AnalysisTraceStep[];
 }
 
 /** 时间线节点颜色轮转 */
@@ -44,7 +44,7 @@ export default function ThoughtChainDrawer({ open, onClose, steps }: ThoughtChai
       title={
         <Space>
           <BulbOutlined style={{ color: '#B8A9C9' }} />
-          <span>推理过程 ({steps.length} 步)</span>
+          <span>分析过程 ({steps.length} 步)</span>
         </Space>
       }
       placement="right"
@@ -110,70 +110,39 @@ export default function ThoughtChainDrawer({ open, onClose, steps }: ThoughtChai
               }}
             >
               {/* 步骤编号 */}
-              <Tag
-                color="purple"
-                style={{ fontSize: 10, margin: '0 0 8px 0', borderRadius: 4 }}
-              >
-                步骤 {step.step_number}
+              <Tag color="blue" style={{ fontSize: 10, margin: '0 0 8px 0', borderRadius: 4 }}>
+                步骤 {step.stepNumber} · {step.status === 'completed' ? '已完成' : step.status === 'failed' ? '未完成' : '进行中'}
               </Tag>
 
-              {/* Thought */}
-              {step.thought && (
-                <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 8 }}>
-                  <BulbOutlined style={{
-                    fontSize: 13,
-                    color: '#B8A9C9',
-                    marginTop: 2,
-                    marginRight: 8,
-                    flexShrink: 0,
-                  }} />
-                  <Text style={{
-                    fontSize: 13,
-                    color: isDark ? '#bbb' : '#555',
-                    lineHeight: 1.7,
-                  }}>
-                    {step.thought}
-                  </Text>
+              <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 8 }}>
+                <ToolOutlined style={{
+                  fontSize: 13,
+                  color: '#52c41a',
+                  marginTop: 2,
+                  marginRight: 8,
+                  flexShrink: 0,
+                }} />
+                <div>
+                  <Tag color="green" style={{ fontSize: 10, lineHeight: '16px', borderRadius: 4 }}>
+                    {step.toolLabel}
+                  </Tag>
+                  {step.inputSummary && (
+                    <div style={{
+                      marginTop: 4,
+                      padding: '6px 10px',
+                      borderRadius: 6,
+                      background: isDark ? 'rgba(82, 196, 26, 0.06)' : 'rgba(82, 196, 26, 0.04)',
+                      fontSize: 11,
+                      color: isDark ? '#aaa' : '#666',
+                    }}>
+                      {step.inputSummary}
+                    </div>
+                  )}
                 </div>
-              )}
-
-              {/* Action */}
-              {step.action && (
-                <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 8 }}>
-                  <ToolOutlined style={{
-                    fontSize: 13,
-                    color: '#52c41a',
-                    marginTop: 2,
-                    marginRight: 8,
-                    flexShrink: 0,
-                  }} />
-                  <div>
-                    <Tag color="green" style={{ fontSize: 10, lineHeight: '16px', borderRadius: 4 }}>
-                      调用工具: {step.action}
-                    </Tag>
-                    {step.action_input && (
-                      <div style={{
-                        marginTop: 4,
-                        padding: '6px 10px',
-                        borderRadius: 6,
-                        background: isDark ? 'rgba(82, 196, 26, 0.06)' : 'rgba(82, 196, 26, 0.04)',
-                        fontSize: 11,
-                        fontFamily: "'Courier New', monospace",
-                        color: isDark ? '#aaa' : '#666',
-                        maxHeight: 80,
-                        overflow: 'auto',
-                      }}>
-                        {typeof step.action_input === 'string'
-                          ? step.action_input
-                          : JSON.stringify(step.action_input, null, 2)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              </div>
 
               {/* Observation */}
-              {step.observation && (
+              {step.observationSummary && (
                 <div style={{ display: 'flex', alignItems: 'flex-start' }}>
                   <EyeOutlined style={{
                     fontSize: 13,
@@ -196,9 +165,9 @@ export default function ThoughtChainDrawer({ open, onClose, steps }: ThoughtChai
                         lineHeight: 1.5,
                       }}
                     >
-                      {step.observation}
+                      {step.observationSummary}
                     </Text>
-                    {step.observation.length > 80 && !expandedObs.includes(idx) && (
+                    {step.observationSummary.length > 80 && !expandedObs.includes(idx) && (
                       <Text
                         style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}
                         onClick={() => toggleExpand(idx)}

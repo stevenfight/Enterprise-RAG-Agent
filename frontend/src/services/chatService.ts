@@ -21,10 +21,10 @@ import { createLogger } from '@/utils/logger';
 const logger = createLogger('chatService');
 
 /** RAG 管道问答 */
-export async function queryQuestion(params: QueryRequest): Promise<QueryResponse> {
+export async function queryQuestion(params: QueryRequest, signal?: AbortSignal): Promise<QueryResponse> {
   logger.info('POST /api/query:', { query: params.query.slice(0, 30), company: params.company_name, topN: params.top_n });
   const startTime = Date.now();
-  const res = await apiClient.post<QueryResponse>('/api/query', params);
+  const res = await apiClient.post<QueryResponse>('/api/query', params, { signal });
   logger.info('/api/query 响应:', { elapsed: Date.now() - startTime + 'ms', answerLen: res.data.answer?.length, sourcesCount: res.data.sources?.length });
   return res.data;
 }
@@ -119,7 +119,6 @@ export function streamAgentQuery(
 
     logger.debug('SSE 消息到达', {
       eventCount,
-      data: event.data,
       dataLength: event.data.length,
       readyState: es.readyState,
       elapsedMs: receiveTime - connectStartTime,
@@ -131,9 +130,7 @@ export function streamAgentQuery(
       logger.debug('SSE 事件解析结果', {
         type: data.type,
         step: data.step,
-        content: data.content ? data.content.slice(0, 120) : '(empty)',
         contentLength: data.content?.length ?? 0,
-        action_input: data.action_input,
         timestamp: data.timestamp,
         total_steps: data.total_steps,
         total_elapsed_ms: data.total_elapsed_ms,
@@ -149,7 +146,7 @@ export function streamAgentQuery(
       };
       const color = typeColors[data.type] || '#666';
       console.log(
-        `%c[${data.type.toUpperCase()}]%c step=${data.step}, content=${(data.content || '').slice(0, 60)}...`,
+        `%c[${data.type.toUpperCase()}]%c step=${data.step}, contentLength=${data.content?.length ?? 0}`,
         `color: ${color}; font-weight: bold;`,
         'color: #666;',
       );
@@ -168,7 +165,7 @@ export function streamAgentQuery(
 
       onEvent(data);
     } catch (e) {
-      logger.error('SSE 解析失败:', e, event.data);
+      logger.error('SSE 解析失败:', e, { dataLength: event.data.length });
     }
   };
 
