@@ -5,7 +5,7 @@
 - [x] A1. 已审核现有 `theme.ts`、`global.css`、`AppLayout`、`Sidebar`、`HeaderBar` 与五个路由页面，记录需保留的交互和硬编码色值。
 - [x] A2. 已新建全红 TDD，覆盖主题 token、研究上下文、证据过程、响应式和可访问性。
 - [ ] A3. 将色彩、间距、阴影、圆角和排版 token 收敛到主题与全局样式；移除主视觉中的马卡龙渐变依赖。
-- [ ] A4. 调整全局导航、顶栏与页面容器；在现有 Zustand Store 中建立仅在应用运行期间有效、刷新即重置的 `researchContext`。`HeaderBar` 在桌面端只读显示“下次提问范围”和模式，首页 `ResearchContextBar` 作为唯一编辑入口；`topN`、`agentMaxSteps` 保持为首页高级选项，不接入浏览器或后端持久化。
+- [ ] A4. 调整全局导航、顶栏与页面容器；在现有 Zustand Store 中建立仅在应用运行期间有效、刷新即重置的 `researchContext`。`HeaderBar` 在 ≥1200px 内联展示只读摘要，在 768–1199px 收纳为上下文按钮，在 <768px 打开只读底部抽屉；首页 `ResearchContextBar` 作为唯一编辑入口，三种形态均不得遮挡其他控件。`topN`、`agentMaxSteps` 保持为首页高级选项，不接入浏览器或后端持久化。
 - [ ] A5. 复用 `AppLayout` 的 `checkHealth()`，将顶栏健康状态扩展为检查中、已就绪、暂不可用三态；初始未知状态不得误报为离线。
 
 ## 工作包 B：研究工作台
@@ -13,8 +13,8 @@
 - [ ] B1. 在不改变现有请求与流式逻辑的前提下，将 `ChatPage` 拆分为研究摘要条、主研究画布、证据面板和固定输入区。
 - [ ] B2. 复用现有公司选择、Agent 开关、消息、KPI、来源和输入组件，建立 `ResearchContextBar`、`ResearchWelcome`、`EvidencePanel` 等界面组件；来源分数统一标注为检索匹配度且说明为回答级证据，KPI 保留原始数值/单位，普通数值保持中性展示。
 - [ ] B3. 将 `ThoughtChainDrawer` 与 `MessageBubble` 的过程预览共同重构为“分析过程”，只展示经允许字段筛选、截断及敏感字段脱敏后的工具、输入摘要、观测、状态和风险提示，不渲染 `thought` 或原始过程数据。
-- [ ] B4. 新增 `AnalysisTraceStep` 安全过程视图模型，并在 `agentEvent` 中于 SSE 数据进入 `chatStore` 前完成投影；`Message.reasoningChain` 与过程抽屉改用该模型，过滤单 Agent `thought`、多 Agent `thought` 步骤内容和原始过程字段。
-- [ ] B5. 在 `chat-sessions` 加载时清理历史遗留过程字段并立即回写已清理会话，保留用户问题和最终回答。
+- [ ] B4. 新增 `AnalysisTraceStep` 安全过程视图模型，并在 `agentEvent` 中于 SSE 数据进入 `chatStore` 前完成投影；`Message.reasoningChain` 与过程抽屉改用该模型，过滤单 Agent `thought`、多 Agent `thought` 步骤内容和原始过程字段。工具名、Worker 名称和输入键必须经白名单映射为受控产品标签，未知值不得透传。
+- [ ] B5. 在 `chat-sessions` 加载时清理历史遗留过程字段、原始工具名和 Worker 名称并立即回写已清理会话，保留用户问题和最终回答。
 - [ ] B6. 保留流式回答、超时、错误、会话与滚动行为，并为工作台新增空、加载、错误和强制停止状态；研究范围仅标识下次提问，不向历史消息反向归因。
 
 ## 工作包 C：辅助页面一致性
@@ -47,3 +47,4 @@
 | v1.2 | 2026-08-25 | 二次核查：明确刷新边界、财务单位/颜色语义、回答级证据范围、过程摘要脱敏与端到端验收路径。 |
 | v1.3 | 2026-08-25 | 三次核查：补齐全局上下文语义、健康状态三态、过程数据写入前安全投影及浏览器历史会话清理。 |
 | v1.4 | 2026-08-25 | 四次核查：明确安全模型在 `agentEvent` 的落点、旧会话清理回写及既有测试迁移要求。 |
+| v1.5 | 2026-08-25 | 五次核查：补齐窄屏全局上下文入口及工具/Worker 名称、输入键的白名单映射边界。 |
