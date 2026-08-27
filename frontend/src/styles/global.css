@@ -1637,6 +1637,129 @@ code {
   }
 }
 
+/* ============================================================
+   研究工作台高级视觉统一：中性表面、克制强调和紧凑信息密度
+   ============================================================ */
+.research-surface {
+  border: 1px solid var(--page-border, #DDE3E5);
+  border-radius: 14px;
+  background: var(--page-surface, #FFFFFF);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--page-text-primary, #172024) 7%, transparent);
+}
+
+.page-shell {
+  width: min(100%, 1320px);
+  padding: 32px 32px 40px;
+}
+
+.page-header {
+  margin-bottom: 22px;
+  padding-bottom: 16px;
+}
+
+.page-header-title h1 {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.page-header p {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.page-stack,
+.charts-workbench,
+.knowledge-archive {
+  gap: 16px;
+}
+
+.page-card,
+.status-overview-card,
+.dag-task-summary,
+.dag-execution-timeline {
+  background: var(--page-surface, var(--page-card-bg, #FFFFFF));
+  box-shadow: 0 5px 18px color-mix(in srgb, var(--page-text-primary, #172024) 6%, transparent);
+}
+
+.page-card {
+  border-radius: 14px;
+}
+
+.status-overview-grid--cols-5 {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.status-overview-card {
+  min-height: 104px;
+  padding: 15px 16px;
+  border-left-width: 2px;
+}
+
+.status-overview-card--compact {
+  min-height: 104px;
+}
+
+.status-overview-card__value {
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.charts-research-entry {
+  border-color: color-mix(in srgb, var(--page-primary, #0F766E) 18%, var(--page-border, #DDE3E5));
+  background: color-mix(in srgb, var(--page-primary, #0F766E) 3%, var(--page-surface, #FFFFFF));
+}
+
+.charts-workbench .page-toolbar,
+.knowledge-archive .page-toolbar {
+  box-shadow: none;
+}
+
+.page-state {
+  min-height: 172px;
+  background: color-mix(in srgb, var(--page-primary, #0F766E) 2%, var(--page-surface, #FFFFFF));
+}
+
+.ant-sender {
+  background: var(--page-input-bg, #FBFCFC) !important;
+  border-color: var(--page-border, #DDE3E5) !important;
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--page-text-primary, #172024) 8%, transparent) !important;
+}
+
+.chat-input-area {
+  padding: 0 20px 16px !important;
+  background: var(--page-background, transparent);
+}
+
+.chat-main-canvas--research {
+  background: var(--page-background, var(--page-background-light, #F4F6F7)) !important;
+}
+
+@media (max-width: 1100px) {
+  .page-shell {
+    padding: 28px 24px 36px;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-shell {
+    padding: 22px 16px 28px;
+  }
+
+  .page-header-title h1 {
+    font-size: 22px;
+  }
+
+  .status-overview-grid--cols-5 {
+    gap: 10px;
+  }
+
+  .chat-input-area {
+    padding: 0 16px max(12px, env(safe-area-inset-bottom)) !important;
+  }
+}
+
 .research-welcome__capabilities strong {
   color: var(--page-text-primary, #3D3554);
   font-size: 12px;

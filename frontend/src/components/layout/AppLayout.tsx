@@ -58,8 +58,12 @@ export default function AppLayout() {
     '--page-primary': pagePrimary,
     '--page-text-primary': isDark ? colors.textPrimaryDark : colors.textPrimary,
     '--page-text-secondary': isDark ? colors.textSecondaryDark : colors.textSecondary,
-    '--page-border': isDark ? colors.borderDark : colors.border,
+    '--page-border': isDark ? colors.pageBorderDark : colors.pageBorderLight,
     '--page-card-bg': isDark ? colors.bgDarkCard : colors.bgCard,
+    '--page-background': isDark ? colors.pageBackgroundDark : colors.pageBackgroundLight,
+    '--page-surface': isDark ? colors.pageSurfaceDark : colors.pageSurfaceLight,
+    '--page-raised': isDark ? colors.pageRaisedDark : colors.pageSurfaceLight,
+    '--page-input-bg': isDark ? colors.pageInputDark : colors.pageInputLight,
   } as CSSProperties;
   logger.renderEnd(`主题=${themeMode}, 健康状态=${systemStatus}`);
 
@@ -86,7 +90,7 @@ export default function AppLayout() {
               style={{
                 overflow: isChatRoute ? 'hidden' : 'auto',
                 padding: isChatRoute ? 0 : 24,
-                background: isDark ? '#141414' : colors.bgLight,
+                background: isDark ? colors.pageBackgroundDark : colors.pageBackgroundLight,
               }}
             >
               <Outlet />

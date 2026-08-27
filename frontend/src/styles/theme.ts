@@ -49,6 +49,12 @@ const DARK_BG = '#1A1826';            // 深紫黑底
 const DARK_CARD = '#252236';          // 暗紫卡片
 const DARK_SIDEBAR = '#1F1D2B';       // 侧边栏深紫
 
+// 研究工作台页面层级色：保留旧聊天背景常量，新增中性层级供页面表面使用。
+const PAGE_BACKGROUND_DARK = '#111418';
+const PAGE_SURFACE_DARK = '#181D23';
+const PAGE_RAISED_DARK = '#20262E';
+const PAGE_INPUT_DARK = '#151A20';
+
 // 文字色
 const TEXT_PRIMARY_LIGHT = '#3D3554';
 const TEXT_SECONDARY_LIGHT = '#9B95A9';
@@ -128,6 +134,16 @@ export const colors = {
   bgDark: DARK_BG,
   bgDarkCard: DARK_CARD,
   bgDarkSidebar: DARK_SIDEBAR,
+
+  pageBackgroundDark: PAGE_BACKGROUND_DARK,
+  pageSurfaceDark: PAGE_SURFACE_DARK,
+  pageRaisedDark: PAGE_RAISED_DARK,
+  pageInputDark: PAGE_INPUT_DARK,
+  pageBorderDark: '#303841',
+  pageBackgroundLight: '#F4F6F7',
+  pageSurfaceLight: '#FFFFFF',
+  pageInputLight: '#FBFCFC',
+  pageBorderLight: '#DDE3E5',
 
   // 聊天区域专用背景
   chatAreaLight: '#FAFAFA',
