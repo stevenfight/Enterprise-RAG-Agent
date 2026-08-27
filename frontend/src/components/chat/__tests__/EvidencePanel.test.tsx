@@ -20,7 +20,7 @@ describe('EvidencePanel', () => {
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('回答级证据')).toBeInTheDocument();
-    expect(screen.getByText('检索匹配度')).toBeInTheDocument();
+    expect(screen.getByText('检索证据')).toBeInTheDocument();
     expect(screen.getByText('中芯国际2024年报.pdf')).toBeInTheDocument();
   });
 

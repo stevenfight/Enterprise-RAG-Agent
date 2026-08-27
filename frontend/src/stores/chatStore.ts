@@ -101,9 +101,9 @@ interface ChatState {
   /** 添加用户消息 */
   addUserMessage: (content: string, targetSessionId?: string) => void;
   /** 添加 AI 消息 */
-  addAssistantMessage: (content: string, sources?: SourceInfo[], analysisTrace?: AnalysisTraceStep[], targetSessionId?: string, comparison?: VerifiedComparison) => void;
+  addAssistantMessage: (content: string, sources?: SourceInfo[], analysisTrace?: AnalysisTraceStep[], targetSessionId?: string, comparison?: VerifiedComparison, researchMeta?: Message['researchMeta']) => void;
   /** 更新最后一条 AI 消息的流式答案和安全分析摘要。 */
-  updateLastAssistantMessage: (partial: { content?: string; analysisTrace?: AnalysisTraceStep[] }, targetSessionId?: string) => void;
+  updateLastAssistantMessage: (partial: { content?: string; analysisTrace?: AnalysisTraceStep[]; sources?: SourceInfo[]; researchMeta?: Message['researchMeta'] }, targetSessionId?: string) => void;
   /** 添加错误消息 */
   addErrorMessage: (error: string, targetSessionId?: string) => void;
   /** 设置加载状态 */
@@ -183,7 +183,7 @@ export const chatStore = create<ChatState>((set) => ({
     });
   },
 
-  addAssistantMessage: (content, sources, analysisTrace, targetSessionId, comparison) => {
+  addAssistantMessage: (content, sources, analysisTrace, targetSessionId, comparison, researchMeta) => {
     const message: Message = {
       id: genId(),
       role: 'assistant',
@@ -192,6 +192,7 @@ export const chatStore = create<ChatState>((set) => ({
       sources,
       analysisTrace,
       comparison,
+      researchMeta,
     };
     set((state) => {
       const sessions = state.sessions.map((s) =>
@@ -235,6 +236,8 @@ export const chatStore = create<ChatState>((set) => ({
               ...messages[i],
               ...(partial.content !== undefined ? { content: partial.content } : {}),
               ...(partial.analysisTrace !== undefined ? { analysisTrace: partial.analysisTrace } : {}),
+              ...(partial.sources !== undefined ? { sources: partial.sources } : {}),
+              ...(partial.researchMeta !== undefined ? { researchMeta: partial.researchMeta } : {}),
             };
             break;
           }

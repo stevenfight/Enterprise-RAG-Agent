@@ -19,28 +19,33 @@ export function useTheme() {
   const setAccentThemeState = appStore((s) => s.setAccentTheme);
 
   // 切换主题
+  // 说明: 一律从 appStore.getState() 读取最新外观, 避免事件批次内闭包值过期
+  // 导致 saveAppearance 将旧主题覆盖回 localStorage(CP-R68)
   const toggleTheme = useCallback(() => {
-    const next: ThemeMode = themeMode === 'light' ? 'dark' : 'light';
+    const { themeMode: currentMode, accentTheme: currentAccent } = appStore.getState();
+    const next: ThemeMode = currentMode === 'light' ? 'dark' : 'light';
     setThemeMode(next);
-    saveAppearance({ themeMode: next, accentTheme });
-  }, [accentTheme, themeMode, setThemeMode]);
+    saveAppearance({ themeMode: next, accentTheme: currentAccent });
+  }, [setThemeMode]);
 
   // 设置指定主题
   const setTheme = useCallback(
     (mode: ThemeMode) => {
+      const { accentTheme: currentAccent } = appStore.getState();
       setThemeMode(mode);
-      saveAppearance({ themeMode: mode, accentTheme });
+      saveAppearance({ themeMode: mode, accentTheme: currentAccent });
     },
-    [accentTheme, setThemeMode],
+    [setThemeMode],
   );
 
   // 设置指定主体色
   const setAccentTheme = useCallback(
     (theme: AccentTheme) => {
+      const { themeMode: currentMode } = appStore.getState();
       setAccentThemeState(theme);
-      saveAppearance({ themeMode, accentTheme: theme });
+      saveAppearance({ themeMode: currentMode, accentTheme: theme });
     },
-    [setAccentThemeState, themeMode],
+    [setAccentThemeState],
   );
 
   const isDark = themeMode === 'dark';

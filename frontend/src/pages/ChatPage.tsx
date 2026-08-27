@@ -5,12 +5,12 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Typography, Select, Slider, Switch, Space, Card, Divider, Drawer, Radio, Tabs } from 'antd';
+import { Typography, Select, Slider, Switch, Radio, Tabs, Button } from 'antd';
 import {
-  BulbOutlined,
   RobotOutlined,
   SettingOutlined,
   DownOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 import { chatStore, selectCurrentMessages } from '@/stores/chatStore';
 import { appStore } from '@/stores/appStore';
@@ -23,12 +23,12 @@ import ResearchContextBar from '@/components/chat/ResearchContextBar';
 import EvidencePanel from '@/components/chat/EvidencePanel';
 import EvidenceContent from '@/components/chat/EvidenceContent';
 import AnalysisTraceContent from '@/components/chat/AnalysisTraceContent';
-import type { CompanyInfo, SSEEvent, AnalysisTraceStep } from '@/types/chat';
+import type { CompanyInfo, SSEEvent, AnalysisTraceStep, SourceInfo } from '@/types/chat';
 import { createLogger } from '@/utils/logger';
 import { createEmptyAccumulator, applyAgentEvent } from '@/utils/agentEvent';
 
 const logger = createLogger('ChatPage');
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 /** 示例问题 */
 const EXAMPLE_QUESTIONS = [
@@ -59,13 +59,12 @@ export default function ChatPage() {
   // SSE 连接引用 (Phase 2)
   const sseRef = useRef<EventSource | null>(null);
 
-  // 示例问题填入输入框 (Phase 2)
-  const [fillInputText, setFillInputText] = useState<string | undefined>(undefined);
-
   // Phase 2: 思维链侧边抽屉
   const [drawerSteps, setDrawerSteps] = useState<AnalysisTraceStep[]>([]);
-  const [activeDrawer, setActiveDrawer] = useState<'config' | 'sessions' | 'evidence' | 'reasoning' | null>(null);
+  const [activeDrawer, setActiveDrawer] = useState<'sessions' | 'evidence' | 'reasoning' | null>(null);
   const [selectedEvidenceMessageId, setSelectedEvidenceMessageId] = useState<string | undefined>(undefined);
+  const [highlightedEvidenceSourceIndex, setHighlightedEvidenceSourceIndex] = useState<number | undefined>(undefined);
+  const [desktopEvidenceOpen, setDesktopEvidenceOpen] = useState(false);
 
   const handleViewReasoning = useCallback((steps: AnalysisTraceStep[]) => {
     setDrawerSteps(steps);
@@ -100,7 +99,31 @@ export default function ChatPage() {
 
   useEffect(() => {
     setSelectedEvidenceMessageId(undefined);
+    setHighlightedEvidenceSourceIndex(undefined);
+    setDesktopEvidenceOpen(false);
   }, [currentSessionId]);
+
+  /** 1200px 以下延续既有 Drawer，桌面端才打开右侧证据工作栏。 */
+  const openEvidenceWorkspace = useCallback((messageId?: string, sourceIndex?: number) => {
+    const targetMessageId = messageId ?? latestAssistantMessage?.id;
+    const targetMessage = currentMessages.find(
+      (message) => message.id === targetMessageId && message.role === 'assistant',
+    );
+    if (sourceIndex !== undefined && !targetMessage?.sources?.some((source) => source.index === sourceIndex)) return;
+
+    setSelectedEvidenceMessageId(targetMessageId);
+    setHighlightedEvidenceSourceIndex(sourceIndex);
+    const useDrawer = typeof window !== 'undefined'
+      && typeof window.matchMedia === 'function'
+      && window.matchMedia('(max-width: 1199px)').matches;
+    if (useDrawer) {
+      setDesktopEvidenceOpen(false);
+      setActiveDrawer('evidence');
+      return;
+    }
+    setActiveDrawer(null);
+    setDesktopEvidenceOpen(true);
+  }, [currentMessages, latestAssistantMessage?.id]);
 
   logger.renderStart({
     isLoading,
@@ -216,19 +239,25 @@ export default function ChatPage() {
             // 首次出现安全分析步骤时创建 assistant 占位消息。
             if (!assistantMessageCreated && acc.analysisTrace.length > 0) {
               if (!isRequestActive()) return;
-              addAssistantMessage('分析中...', [], [...acc.analysisTrace], requestSessionId);
+              addAssistantMessage('分析中...', [], [...acc.analysisTrace], requestSessionId, undefined, { mode: 'agent', companyName: selectedCompany ?? '全部公司' });
               assistantMessageCreated = true;
               return;
             }
 
             // 同步事件到 store
-            const partial: { content?: string; analysisTrace?: AnalysisTraceStep[] } = {};
+            const partial: { content?: string; analysisTrace?: AnalysisTraceStep[]; sources?: SourceInfo[]; researchMeta?: { mode: 'rag' | 'agent'; companyName: string; processingTimeMs?: number } } = {};
             if (acc.analysisTrace.length > 0) partial.analysisTrace = acc.analysisTrace;
 
             if (event.type === 'answer_chunk') {
               partial.content = acc.answer;
             } else if (event.type === 'answer') {
               partial.content = acc.answer;
+              partial.sources = event.sources ?? [];
+              partial.researchMeta = {
+                mode: 'agent',
+                companyName: selectedCompany ?? '全部公司',
+                ...(event.total_elapsed_ms !== undefined ? { processingTimeMs: event.total_elapsed_ms } : {}),
+              };
               fullAnswer = acc.answer;
               answerReceived = true;
               logger.info('ON ANSWER 最终答案到达', { contentLen: acc.answer.length, elapsedMs: Date.now() - agentStartTime });
@@ -238,9 +267,11 @@ export default function ChatPage() {
               if (!isRequestActive()) return;
               addAssistantMessage(
                 partial.content,
-                [],
+                partial.sources ?? [],
                 partial.analysisTrace ? [...partial.analysisTrace] : undefined,
                 requestSessionId,
+                undefined,
+                partial.researchMeta,
               );
               assistantMessageCreated = true;
             } else if (Object.keys(partial).length > 0) {
@@ -258,6 +289,11 @@ export default function ChatPage() {
                 reasoningStepsCount: acc.analysisTrace.length,
                 forcedStop: event.forced_stop,
               });
+              if (event.total_elapsed_ms !== undefined && assistantMessageCreated && isRequestActive()) {
+                updateLastAssistantMessage({
+                  researchMeta: { mode: 'agent', companyName: selectedCompany ?? '全部公司', processingTimeMs: event.total_elapsed_ms },
+                }, requestSessionId);
+              }
             }
           },
           (error: Event) => {
@@ -352,7 +388,14 @@ export default function ChatPage() {
             processingTime: res.processing_time,
             conversationId: res.conversation_id,
           });
-          if (isRequestActive()) addAssistantMessage(res.answer, res.sources, undefined, requestSessionId, res.comparison ?? undefined);
+            if (isRequestActive()) addAssistantMessage(
+              res.answer,
+              res.sources,
+              undefined,
+              requestSessionId,
+              res.comparison ?? undefined,
+              { mode: 'rag', companyName: selectedCompany ?? '全部公司', processingTimeMs: Math.round(res.processing_time * 1000) },
+            );
         } catch (err: unknown) {
           const errorMsg =
             err instanceof Error ? err.message : '未知错误';
@@ -380,200 +423,77 @@ export default function ChatPage() {
 
   return (
     <div className="chat-page" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      <Drawer
-        title="研究配置"
-        placement="left"
-        size={320}
-        open={activeDrawer === 'config'}
-        onClose={() => setActiveDrawer(null)}
-        styles={{ body: { background: isDark ? colors.bgDarkCard : colors.bgCard } }}
-      >
-        {/* 公司选择 */}
-        <div style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 13, display: 'block', marginBottom: 6, color: isDark ? '#8c8c8c' : '#595959' }}>
-            选择公司
-          </Text>
-          <Select
-            value={selectedCompany}
-            onChange={(val: string | undefined) => setResearchContext({ companyName: val })}
-            placeholder="全部公司"
-            allowClear
-            style={{ width: '100%' }}
-            options={companies.map((c) => ({
-              value: c.name,
-              label: c.display_name,
-            }))}
-            notFoundContent={companiesLoaded ? '暂无数据' : '加载中...'}
-          />
-        </div>
-
-        {/* 检索返回条数 - Phase 2: 移入高级选项折叠面板 */}
-        <div style={{ marginBottom: 12 }}>
-          <div
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              padding: '8px 0',
-              userSelect: 'none',
-            }}
-          >
-            <Space size={6}>
-              <SettingOutlined style={{ color: isDark ? '#8c8c8c' : '#595959' }} />
-              <Text style={{ fontSize: 13, color: isDark ? '#8c8c8c' : '#595959' }}>
-                高级选项
-              </Text>
-            </Space>
-            <DownOutlined
-              style={{
-                fontSize: 10,
-                color: isDark ? '#8c8c8c' : '#595959',
-                transform: showAdvanced ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.3s',
-              }}
-            />
-          </div>
-          <div
-            style={{
-              maxHeight: showAdvanced ? 200 : 0,
-              overflow: 'hidden',
-              opacity: showAdvanced ? 1 : 0,
-              transition: 'max-height 0.3s ease, opacity 0.3s ease',
-            }}
-          >
-            <div style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 13, display: 'block', marginBottom: 6, color: isDark ? '#8c8c8c' : '#595959' }}>
-                检索返回条数: {topN}
-              </Text>
-              <Slider
-                min={1}
-                max={10}
-                value={topN}
-                onChange={setTopN}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Agent 深度推理开关 (Phase 2) */}
-        <div style={{ marginBottom: 16 }}>
-          <Space>
-            <Switch
-              checked={agentMode}
-              onChange={setAgentMode}
-              size="small"
-            />
-            <Text style={{ fontSize: 13, color: isDark ? '#8c8c8c' : '#595959' }}>
-              <RobotOutlined style={{ marginRight: 4 }} />
-              Agent 深度推理
-            </Text>
-          </Space>
-          {agentMode && (
-            <>
-              <Text
-                style={{
-                  display: 'block',
-                  marginTop: 4,
-                  fontSize: 11,
-                  color: '#B8A9C9',
-                }}
-              >
-                开启后将实时展示 AI 推理过程
-              </Text>
-              {/* 推理步数选择 (Phase 2) */}
-              <div style={{ marginTop: 10 }}>
-                <Text style={{ fontSize: 12, color: isDark ? '#8c8c8c' : '#595959' }}>
-                  推理步数上限
-                </Text>
-                <Radio.Group
-                  value={agentMaxSteps}
-                  onChange={(e) => setAgentMaxSteps(e.target.value)}
-                  size="small"
-                  style={{ marginTop: 6, display: 'flex', gap: 8 }}
-                >
-                  <Radio.Button value={5}>5 步</Radio.Button>
-                  <Radio.Button value={10}>10 步</Radio.Button>
-                </Radio.Group>
-                <Text
-                  style={{
-                    display: 'block',
-                    marginTop: 4,
-                    fontSize: 11,
-                    color: isDark ? '#6b6b6b' : '#b0b0b0',
-                  }}
-                >
-                  步数越多检索越充分，但耗时更长
-                </Text>
-              </div>
-            </>
-          )}
-        </div>
-
-        <Divider style={{ margin: '16px 0' }} />
-
-        {/* 示例问题 - LobeChat 卡片按钮风格 */}
-        <Title level={5} style={{ marginBottom: 12, color: isDark ? '#e8e8e8' : '#1a1a1a', fontSize: 16, fontWeight: 600 }}>
-          <BulbOutlined style={{ marginRight: 8, color: '#98D8C8' }} />
-          示例问题
-        </Title>
-        <Space orientation="vertical" size={8} style={{ width: '100%' }}>
-          {EXAMPLE_QUESTIONS.map((q, i) => (
-            <Card
-              key={i}
-              size="small"
-              hoverable
-              onClick={() => {
-                logger.info('示例问题点击，填入输入框:', q);
-                setFillInputText(q);
-              }}
-              style={{
-                borderRadius: 12,
-                fontSize: 13,
-                cursor: 'pointer',
-                border: `1px solid ${isDark ? colors.borderDark : colors.border}`,
-                boxShadow: 'none',
-                transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
-              }}
-              styles={{
-                body: {
-                  padding: '10px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                },
-              }}
-            >
-              <BulbOutlined style={{ fontSize: 12, color: '#B8A9C9' }} />
-              <Text style={{ fontSize: 13, color: isDark ? '#e8e8e8' : '#3d3554' }}>{q}</Text>
-            </Card>
-          ))}
-        </Space>
-      </Drawer>
-
-      {/* 右侧: 对话区域 */}
       <div className="chat-page__workspace" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <ResearchContextBar
           companyName={selectedCompany}
           mode={agentMode ? 'agent' : 'rag'}
-          onOpenConfig={() => setActiveDrawer('config')}
-          onOpenEvidence={() => {
-            setSelectedEvidenceMessageId(latestAssistantMessage?.id);
-            setActiveDrawer('evidence');
-          }}
+          configuration={(
+            <section aria-label="研究配置" className="research-context-bar__configuration">
+              <div className="research-context-bar__company-field">
+                <Text className="research-context-bar__config-label">选择公司</Text>
+                <Select
+                  aria-label="选择公司"
+                  value={selectedCompany}
+                  onChange={(val: string | undefined) => setResearchContext({ companyName: val })}
+                  placeholder="全部公司"
+                  allowClear
+                  className="research-context-bar__company-select"
+                  options={companies.map((c) => ({ value: c.name, label: c.display_name }))}
+                  notFoundContent={companiesLoaded ? '暂无数据' : '加载中...'}
+                />
+              </div>
+              <div className="research-context-bar__agent-field">
+                <Switch checked={agentMode} onChange={setAgentMode} size="small" aria-label="启用 Agent 深度推理" />
+                <Text className="research-context-bar__agent-label"><RobotOutlined /> Agent</Text>
+              </div>
+              <div className="research-context-bar__advanced-field">
+                <Button
+                  type="text"
+                  size="small"
+                  className="research-context-bar__advanced-trigger"
+                  icon={<SettingOutlined />}
+                  aria-label="高级选项"
+                  aria-expanded={showAdvanced}
+                  onClick={() => setShowAdvanced((open) => !open)}
+                >
+                  高级选项 <DownOutlined className={showAdvanced ? 'research-context-bar__arrow research-context-bar__arrow--open' : 'research-context-bar__arrow'} />
+                </Button>
+                {showAdvanced && (
+                  <div className="research-context-bar__advanced-content">
+                    <Text className="research-context-bar__config-label">检索返回条数: {topN}</Text>
+                    <Slider min={1} max={10} value={topN} onChange={setTopN} />
+                    {agentMode && (
+                      <div className="research-context-bar__steps">
+                        <Text className="research-context-bar__config-label">推理步数上限</Text>
+                        <Radio.Group value={agentMaxSteps} onChange={(e) => setAgentMaxSteps(e.target.value)} size="small">
+                          <Radio.Button value={5}>5 步</Radio.Button>
+                          <Radio.Button value={10}>10 步</Radio.Button>
+                        </Radio.Group>
+                        <Text className="research-context-bar__help">步数越多检索越充分，但耗时更长</Text>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+          onOpenEvidence={() => openEvidenceWorkspace()}
         />
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <ChatContainer
             onSend={handleSend}
             isLoading={isLoading}
             isAgentMode={agentMode}
-            fillInputText={fillInputText}
-            onFillInputTextConsumed={() => setFillInputText(undefined)}
             onViewReasoning={handleViewReasoning}
-            onViewEvidence={(messageId) => {
-              setSelectedEvidenceMessageId(messageId);
-              setActiveDrawer('evidence');
+            onViewEvidence={openEvidenceWorkspace}
+            onViewCharts={(criteria) => {
+              const params = new URLSearchParams({
+                metric: criteria.metric_key,
+                year: String(criteria.fiscal_year),
+                unit: criteria.unit,
+              });
+              window.history.pushState({}, '', `/charts?${params.toString()}`);
+              window.dispatchEvent(new PopStateEvent('popstate'));
             }}
             quickCommands={EXAMPLE_QUESTIONS}
             companyName={selectedCompany}
@@ -584,26 +504,35 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <aside
-        className="chat-evidence-aside"
-        aria-label="回答级证据"
-        style={{
-          width: 340,
-          flexShrink: 0,
-          overflow: 'auto',
-          padding: 16,
-          background: isDark ? colors.bgDarkCard : colors.bgCard,
-          borderLeft: `1px solid ${isDark ? colors.borderDark : colors.border}`,
-        }}
-      >
-        <Tabs
-          defaultActiveKey="evidence"
-          items={[
-            { key: 'evidence', label: '证据', children: <EvidenceContent sources={latestSources} /> },
-            { key: 'analysis', label: '分析过程', children: <AnalysisTraceContent steps={selectedEvidenceMessage?.analysisTrace ?? []} /> },
-          ]}
-        />
-      </aside>
+      {desktopEvidenceOpen && (
+        <aside
+          className="chat-evidence-aside"
+          aria-label="回答级证据"
+          style={{
+            width: 340,
+            flexShrink: 0,
+            overflow: 'auto',
+            padding: 16,
+            background: isDark ? colors.bgDarkCard : colors.bgCard,
+            borderLeft: `1px solid ${isDark ? colors.borderDark : colors.border}`,
+          }}
+        >
+          <div className="chat-evidence-aside__header">
+            <Text strong>证据工作栏</Text>
+            <Button type="text" size="small" icon={<CloseOutlined />} aria-label="关闭证据栏" onClick={() => {
+              setHighlightedEvidenceSourceIndex(undefined);
+              setDesktopEvidenceOpen(false);
+            }} />
+          </div>
+          <Tabs
+            defaultActiveKey="evidence"
+            items={[
+              { key: 'evidence', label: '证据', children: <EvidenceContent sources={latestSources} highlightedSourceIndex={highlightedEvidenceSourceIndex} /> },
+              { key: 'analysis', label: '分析过程', children: <AnalysisTraceContent steps={selectedEvidenceMessage?.analysisTrace ?? []} /> },
+            ]}
+          />
+        </aside>
+      )}
 
       {/* Phase 2: 思维链侧边抽屉 */}
       <ThoughtChainDrawer
@@ -611,7 +540,15 @@ export default function ChatPage() {
         onClose={() => setActiveDrawer(null)}
         steps={drawerSteps}
       />
-      <EvidencePanel open={activeDrawer === 'evidence'} onClose={() => setActiveDrawer(null)} sources={latestSources} />
+      <EvidencePanel
+        open={activeDrawer === 'evidence'}
+        onClose={() => {
+          setHighlightedEvidenceSourceIndex(undefined);
+          setActiveDrawer(null);
+        }}
+        sources={latestSources}
+        highlightedSourceIndex={highlightedEvidenceSourceIndex}
+      />
     </div>
   );
 }

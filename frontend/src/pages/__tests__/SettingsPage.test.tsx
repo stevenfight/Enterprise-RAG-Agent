@@ -24,4 +24,19 @@ describe('SettingsPage', () => {
     expect(screen.getByText('运行配置')).toBeInTheDocument();
     expect(screen.queryByText('忽略')).toBeNull();
   });
+
+  it('CP-R63: 系统状态以真实研究可用性摘要作为首要信息，保留只读分组', async () => {
+    getSystemStatus.mockResolvedValue({
+      model: { name: '模型A', status: 'loaded', temperature: 0.2, max_steps: 5 },
+      vector_db: { path: '忽略', status: 'available', company_count: 3 },
+      memory: { long_term_enabled: true, working_memory_limit: 10 },
+      monitoring: { langsmith_available: false, langsmith_project: '', langsmith_endpoint: '' },
+      tools: { retrieve: true },
+    });
+    const { container } = render(<SettingsPage />);
+
+    expect(await screen.findByText('研究服务可用')).toBeInTheDocument();
+    expect(container.querySelector('.settings-availability-brief')).toBeInTheDocument();
+    expect(screen.getByText('研究可用性')).toBeInTheDocument();
+  });
 });

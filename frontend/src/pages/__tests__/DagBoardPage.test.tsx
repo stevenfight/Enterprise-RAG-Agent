@@ -30,4 +30,13 @@ describe('DagBoardPage', () => {
 
     expect(screen.getByRole('textbox').closest('.page-toolbar')).toBeInTheDocument();
   });
+
+  it('CP-R62: DAG 空态解释待生成的真实流程阶段，不伪造任务结果', () => {
+    const { container } = render(<DagBoardPage />);
+    expect(container.querySelector('.dag-empty-stage')).toBeInTheDocument();
+    expect(screen.getByText('任务拆解')).toBeInTheDocument();
+    expect(screen.getByText('依赖编排')).toBeInTheDocument();
+    expect(screen.getByText('批次执行')).toBeInTheDocument();
+    expect(screen.queryByText('已生成任务计划')).toBeNull();
+  });
 });

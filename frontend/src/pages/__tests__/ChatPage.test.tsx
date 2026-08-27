@@ -54,11 +54,23 @@ describe('ChatPage Agent SSE', () => {
   });
 
   it('RW-R05-01: 首事件为 answer 时仍创建并写入助手消息', () => {
+    const sources = [{ index: 1, source_file: '移动2024年度报告.pdf', pages: [3], company_name: '中国移动', scores: {} }];
+    streamAgentQuery.mockImplementation((_query, _options, onEvent) => {
+      onEvent({ type: 'answer', content: '直接返回的最终答案', sources });
+      return { close: vi.fn() };
+    });
     render(<ChatPage />);
     fireEvent.click(screen.getByRole('button', { name: '发起测试' }));
 
     expect(state.addUserMessage).toHaveBeenCalledWith('测试问题', 'session-1');
-    expect(state.addAssistantMessage).toHaveBeenCalledWith('直接返回的最终答案', [], undefined, 'session-1');
+    expect(state.addAssistantMessage).toHaveBeenCalledWith(
+      '直接返回的最终答案',
+      sources,
+      undefined,
+      'session-1',
+      undefined,
+      { mode: 'agent', companyName: '全部公司' },
+    );
   });
 
   it('RW-R05-02: SSE 连接错误后清理超时计时器，不重复提示错误', () => {
@@ -106,16 +118,28 @@ describe('ChatPage Agent SSE', () => {
     render(<ChatPage />);
     fireEvent.click(screen.getByRole('button', { name: /查看证据/ }));
 
-    expect(within(screen.getByRole('dialog')).getByText('当前回答暂无引用来源')).toBeInTheDocument();
+    expect(within(screen.getByRole('complementary', { name: '回答级证据' })).getByText('当前回答暂无引用来源')).toBeInTheDocument();
     expect(screen.queryByText('较早年报.pdf')).toBeNull();
   });
 
-  it('CP-R01-01: 不再渲染常驻配置栏，研究配置由唯一入口打开', () => {
+  it('CP-R48: 初始工作台在顶栏右侧直接提供研究配置，不打开抽屉', () => {
     const { container } = render(<ChatPage />);
 
     expect(container.querySelector('.chat-page__config')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '打开研究配置' }));
-    expect(screen.getByRole('dialog')).toHaveTextContent('研究配置');
+    const config = screen.getByRole('region', { name: '研究配置' });
+    expect(config).toHaveTextContent('选择公司');
+    expect(screen.getByRole('switch', { name: '启用 Agent 深度推理' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '高级选项' })).toHaveAttribute('aria-expanded', 'false');
+    expect(config).not.toHaveTextContent('检索返回条数');
+    fireEvent.click(screen.getByRole('button', { name: '高级选项' }));
+    expect(config).toHaveTextContent('检索返回条数');
+    expect(screen.queryByRole('dialog', { name: '研究配置' })).not.toBeInTheDocument();
+  });
+
+  it('CP-R45: 研究配置不重复展示首页示例问题', () => {
+    render(<ChatPage />);
+
+    expect(screen.getByRole('region', { name: '研究配置' })).not.toHaveTextContent('示例问题');
   });
 
   it('CP-R03-01: 桌面证据侧栏提供证据与分析过程标签', () => {
@@ -125,10 +149,37 @@ describe('ChatPage Agent SSE', () => {
     }];
     render(<ChatPage />);
 
+    fireEvent.click(screen.getByRole('button', { name: '查看证据' }));
     fireEvent.click(screen.getByRole('tab', { name: '分析过程' }));
 
     expect(screen.getByRole('tab', { name: '证据' })).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByText('资料检索')).toBeInTheDocument();
+  });
+
+  it('CP-R34: 桌面证据工作栏默认关闭，仅由查看证据入口打开并可关闭', () => {
+    state.messages = [{
+      id: 'answer-1', role: 'assistant', content: '回答', timestamp: 1,
+      sources: [{ index: 1, source_file: '移动2024年度报告.pdf', pages: [3], company_name: '中国移动', scores: { hybrid: 0.9 } }],
+    }];
+    const { container } = render(<ChatPage />);
+
+    expect(container.querySelector('.chat-evidence-aside')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '查看证据' }));
+    expect(container.querySelector('.chat-evidence-aside')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '关闭证据栏' }));
+    expect(container.querySelector('.chat-evidence-aside')).toBeNull();
+  });
+
+  it('CP-R35: 1024px 以下查看证据继续打开既有 Drawer，不渲染桌面工作栏', () => {
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as unknown as typeof window.matchMedia;
+    state.messages = [{ id: 'answer-1', role: 'assistant', content: '回答', timestamp: 1 }];
+    const { container } = render(<ChatPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: '查看证据' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('证据面板');
+    expect(container.querySelector('.chat-evidence-aside')).toBeNull();
+    window.matchMedia = originalMatchMedia;
   });
 
   it('CP-R24-01: 研究配置抽屉不使用已弃用的 width 属性', () => {

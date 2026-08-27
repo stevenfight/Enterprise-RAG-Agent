@@ -120,9 +120,10 @@ export function formatMarkdown(text: string, isDark = false): string {
     ? 'border-collapse:separate;width:100%;margin:12px 0;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.2);border-spacing:0;background:#252236'
     : 'border-collapse:separate;width:100%;margin:12px 0;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);border-spacing:0;background:#FFFFFF';
 
+  // 表头使用主体色语义变量（A3 品牌硬编码迁移），暗端通过混黑保持渐变层次
   const headerStyle = isDark
-    ? 'padding:10px 14px;color:#FFFFFF;font-size:13px;font-weight:600;text-align:left;background:linear-gradient(135deg,#7A6B9C 0%,#5A4B7C 100%)'
-    : 'padding:10px 14px;color:#FFFFFF;font-size:13px;font-weight:600;text-align:left;background:linear-gradient(135deg,#B8A9C9 0%,#9B8EC4 100%)';
+    ? 'padding:10px 14px;color:#FFFFFF;font-size:13px;font-weight:600;text-align:left;background:linear-gradient(135deg,var(--page-primary,#0F766E) 0%,color-mix(in srgb,var(--page-primary,#0F766E) 62%,#000) 100%)'
+    : 'padding:10px 14px;color:#FFFFFF;font-size:13px;font-weight:600;text-align:left;background:linear-gradient(135deg,var(--page-primary,#0F766E) 0%,color-mix(in srgb,var(--page-primary,#0F766E) 72%,#000) 100%)';
 
   const rowEven = isDark ? '#2A2740' : '#FAF8FC';
   const rowOdd = isDark ? '#252236' : '#FFFFFF';
@@ -176,7 +177,7 @@ export function formatMarkdown(text: string, isDark = false): string {
     // 渲染数据行（斑马纹）
     const tbodyHtml = `<tbody>${rows.map((row, rIdx) => {
       const bg = rIdx % 2 === 0 ? rowOdd : rowEven;
-      return `<tr style="background:${bg};transition:background 0.2s" onmouseout="this.style.background='${bg}'" onmouseover="this.style.background='${isDark ? 'rgba(184,169,201,0.12)' : 'rgba(184,169,201,0.08)'}'">${row.map((c, cIdx) => {
+      return `<tr style="background:${bg};transition:background 0.2s" onmouseout="this.style.background='${bg}'" onmouseover="this.style.background='color-mix(in srgb, var(--page-primary, #0F766E) ${isDark ? 12 : 8}%, transparent)'">${row.map((c, cIdx) => {
         const align = numericCols.has(cIdx) ? 'text-align:right' : 'text-align:left';
         const font = numericCols.has(cIdx) ? `font-family:${monoFont}` : '';
         // 数字颜色：正值绿、负值红

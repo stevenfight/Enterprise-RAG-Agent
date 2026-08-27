@@ -14,12 +14,13 @@ import {
 import { chatStore, selectCurrentMessages } from '@/stores/chatStore';
 import { useTheme } from '@/hooks/useTheme';
 import { colors } from '@/styles/theme';
-import type { AnalysisTraceStep } from '@/types/chat';
+import type { AnalysisTraceStep, VerifiedComparison } from '@/types/chat';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
 import ResearchWelcome from './ResearchWelcome';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { createLogger } from '@/utils/logger';
+import { getPreferredScrollBehavior } from '@/utils/motionPreference';
 
 const logger = createLogger('ChatContainer');
 
@@ -37,7 +38,9 @@ interface ChatContainerProps {
   /** Phase 2: 查看推理详情回调 */
   onViewReasoning?: (steps: AnalysisTraceStep[]) => void;
   /** 查看指定回答的完整证据 */
-  onViewEvidence?: (messageId: string) => void;
+  onViewEvidence?: (messageId: string, sourceIndex?: number) => void;
+  /** 基于已核验比较打开成果浏览。 */
+  onViewCharts?: (criteria: Pick<VerifiedComparison, 'metric_key' | 'fiscal_year' | 'unit'>) => void;
   /** 欢迎页快捷指令（点击直接发送） */
   quickCommands?: string[];
   /** 当前运行期研究范围，仅用于空会话启动页展示 */
@@ -50,7 +53,7 @@ interface ChatContainerProps {
   onMobileSessionsOpenChange?: (open: boolean) => void;
 }
 
-export default function ChatContainer({ onSend, isLoading = false, isAgentMode = false, fillInputText, onFillInputTextConsumed, onViewReasoning, onViewEvidence, quickCommands, companyName, researchMode, mobileSessionsOpen, onMobileSessionsOpenChange }: ChatContainerProps) {
+export default function ChatContainer({ onSend, isLoading = false, isAgentMode = false, fillInputText, onFillInputTextConsumed, onViewReasoning, onViewEvidence, onViewCharts, quickCommands, companyName, researchMode, mobileSessionsOpen, onMobileSessionsOpenChange }: ChatContainerProps) {
   const { isDark } = useTheme();
   const [localMobileSessionsOpen, setLocalMobileSessionsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -72,9 +75,11 @@ export default function ChatContainer({ onSend, isLoading = false, isAgentMode =
   });
 
   // 自动滚动到最新消息
+  // 减少动画偏好下降级为即时滚动(CP-R12)
   useEffect(() => {
+    if (currentMessages.length === 0 && !isLoading) return;
     logger.debug('自动滚动到最新消息, messagesCount=' + currentMessages.length);
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: getPreferredScrollBehavior() });
   }, [currentMessages.length, isLoading]);
 
   const renderConversations = (onSelected?: () => void) => (
@@ -136,7 +141,7 @@ export default function ChatContainer({ onSend, isLoading = false, isAgentMode =
       </div>
 
       {/* 右侧: 消息区域 + 输入框 */}
-      <div className="chat-main-canvas" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: isDark ? colors.chatAreaDark : colors.chatAreaLight }}>
+      <div className="chat-main-canvas chat-main-canvas--research" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: isDark ? colors.chatAreaDark : colors.chatAreaLight }}>
         <Button
           className="chat-mobile-session-trigger"
           type="text"
@@ -149,7 +154,7 @@ export default function ChatContainer({ onSend, isLoading = false, isAgentMode =
         </Button>
         {/* 消息列表 */}
         <div
-          className="chat-scroll-area"
+          className="chat-scroll-area chat-scroll-area--refined"
           style={{ flex: 1, overflow: 'auto', padding: '24px 0' }}
         >
           {currentMessages.length === 0 && !isLoading && (
@@ -166,6 +171,7 @@ export default function ChatContainer({ onSend, isLoading = false, isAgentMode =
                 message={msg}
                 onViewReasoning={onViewReasoning}
                 onViewEvidence={onViewEvidence}
+                onViewCharts={onViewCharts}
                 isStreaming={isStreaming}
               />
             );

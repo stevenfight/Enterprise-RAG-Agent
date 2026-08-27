@@ -1699,30 +1699,38 @@ class RAGGenerator:
         logger.info("[RAGGenerator] 阶段2: 构建 LLM 上下文")
         context, used_count, used_result_indices, used_result_texts = self._build_context(retrieved_results)
 
-        logger.info("[RAGGenerator] 阶段3: 构建 Prompt")
-        conversation_context = ""
-        if self.conversation_manager:
-            conversation_context = self.conversation_manager.get_context_string()
-            if conversation_context:
-                logger.info("[RAGGenerator] 注入对话历史上下文 (%d 字符)", len(conversation_context))
-        if intent == "comparison":
-            prompt = self._build_comparison_prompt(query, context, conversation_context)
-            logger.info("[RAGGenerator] 使用对比分析 Prompt")
-        elif intent == "financial_data":
-            prompt = self._build_financial_data_prompt(query, context, conversation_context)
-            logger.info("[RAGGenerator] 使用财务数据专用 Prompt")
-        elif intent == "trend":
-            prompt = self._build_trend_prompt(query, context, conversation_context)
-            logger.info("[RAGGenerator] 使用趋势分析专用 Prompt")
-        elif intent == "business_analysis":
-            prompt = self._build_business_analysis_prompt(query, context, conversation_context)
-            logger.info("[RAGGenerator] 使用业务分析专用 Prompt")
-        else:
-            prompt = self._build_prompt(query, context, conversation_context)
-            logger.info("[RAGGenerator] 使用通用 Prompt")
+        from src.verified_financial_facts import VerifiedFinancialFactRegistry
+        verified_registry = VerifiedFinancialFactRegistry()
+        comparison = verified_registry.get_comparison_for_query(query)
 
-        logger.info("[RAGGenerator] 阶段4: LLM 生成答案")
-        answer = self._generate_answer(prompt)
+        if comparison["available"]:
+            logger.info("[RAGGenerator] 阶段3: 使用已核验比较事实生成正文")
+            answer = verified_registry.build_comparison_answer(comparison)
+        else:
+            logger.info("[RAGGenerator] 阶段3: 构建 Prompt")
+            conversation_context = ""
+            if self.conversation_manager:
+                conversation_context = self.conversation_manager.get_context_string()
+                if conversation_context:
+                    logger.info("[RAGGenerator] 注入对话历史上下文 (%d 字符)", len(conversation_context))
+            if intent == "comparison":
+                prompt = self._build_comparison_prompt(query, context, conversation_context)
+                logger.info("[RAGGenerator] 使用对比分析 Prompt")
+            elif intent == "financial_data":
+                prompt = self._build_financial_data_prompt(query, context, conversation_context)
+                logger.info("[RAGGenerator] 使用财务数据专用 Prompt")
+            elif intent == "trend":
+                prompt = self._build_trend_prompt(query, context, conversation_context)
+                logger.info("[RAGGenerator] 使用趋势分析专用 Prompt")
+            elif intent == "business_analysis":
+                prompt = self._build_business_analysis_prompt(query, context, conversation_context)
+                logger.info("[RAGGenerator] 使用业务分析专用 Prompt")
+            else:
+                prompt = self._build_prompt(query, context, conversation_context)
+                logger.info("[RAGGenerator] 使用通用 Prompt")
+
+            logger.info("[RAGGenerator] 阶段4: LLM 生成答案")
+            answer = self._generate_answer(prompt)
 
         logger.info("[RAGGenerator] 阶段5: 构建来源摘要")
         used_results = [
@@ -1744,8 +1752,6 @@ class RAGGenerator:
             "retrieved_count": len(retrieved_results),
             "context_used_count": used_count,
         }
-        from src.verified_financial_facts import VerifiedFinancialFactRegistry
-        comparison = VerifiedFinancialFactRegistry().get_comparison_for_query(query)
         if comparison["available"]:
             result["comparison"] = comparison
 

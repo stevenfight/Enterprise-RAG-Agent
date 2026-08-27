@@ -126,6 +126,7 @@ export interface AgentQueryResponse {
   answer: string;
   success: boolean;
   reasoning_chain: AgentStepInfo[];
+  sources: SourceInfo[];
   total_steps: number;
   total_elapsed_ms: number;
   forced_stop: boolean;
@@ -144,6 +145,12 @@ export interface Message {
   analysisTrace?: AnalysisTraceStep[];
   /** 回答随附的受限已核验比较事实。 */
   comparison?: VerifiedComparison;
+  /** 回答生成时的真实研究条件与服务端耗时。 */
+  researchMeta?: {
+    mode: 'rag' | 'agent';
+    companyName: string;
+    processingTimeMs?: number;
+  };
   error?: string;
 }
 
@@ -233,6 +240,8 @@ export interface SSEEvent {
   workers?: number;
   /** 多 Agent: 聚合 Token 用量 (answer) */
   total_tokens?: number;
+  /** 当前最终回答实际使用的回答级来源。 */
+  sources?: SourceInfo[];
 }
 
 /** 知识库文档 (对应后端 KnowledgeDocument) */

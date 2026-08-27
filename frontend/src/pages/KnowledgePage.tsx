@@ -147,6 +147,12 @@ export default function KnowledgePage() {
         description="上传财务年报，并查看当前资料的索引可用状态"
       />
 
+      <section className="knowledge-archive" aria-label="证据资产工作区">
+      <div className="knowledge-archive__heading">
+        <span>证据资产</span>
+        <p>已接入资料会在完成索引后用于回答核验与来源定位</p>
+      </div>
+
       <KnowledgeOverview documents={documents} />
 
       <Card
@@ -191,7 +197,7 @@ export default function KnowledgePage() {
           showIcon
         />
       ) : (
-        <Card className="page-card" title={`资料清单（${documents.length}）`}>
+        <Card className="page-card knowledge-archive__list" title={`资料清单（${documents.length}）`}>
           <Table
             columns={columns}
             dataSource={documents}
@@ -207,6 +213,7 @@ export default function KnowledgePage() {
           />
         </Card>
       )}
+      </section>
     </PageShell>
   );
 }

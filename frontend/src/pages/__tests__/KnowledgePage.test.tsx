@@ -29,4 +29,14 @@ describe('KnowledgePage', () => {
     expect(screen.getByText('资料清单（2）')).toBeInTheDocument();
     expect(screen.queryByText(/公司|年度|章节/)).toBeNull();
   });
+
+  it('CP-R61: 资料页以证据资产工作区组织上传和清单，不推断文件属性', async () => {
+    getDocuments.mockResolvedValue({ total: 0, documents: [] });
+    const { container } = render(<KnowledgePage />);
+
+    expect(await screen.findByText('上传资料')).toBeInTheDocument();
+    expect(container.querySelector('.knowledge-archive')).toBeInTheDocument();
+    expect(container.querySelector('.knowledge-archive__list')).toBeInTheDocument();
+    expect(screen.queryByText(/公司|年度|章节/)).toBeNull();
+  });
 });

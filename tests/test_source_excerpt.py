@@ -129,6 +129,25 @@ class TestSourceExcerpt(unittest.TestCase):
         self.assertEqual(result["comparison"]["items"][0]["value"], 10408)
         self.assertEqual(result["comparison"]["items"][0]["source_file"], "移动2024年度报告.pdf")
 
+    def test_supported_question_uses_verified_answer_instead_of_model_conversion(self):
+        generator = RAGGenerator("data/stock_data/databases/vector_dbs")
+        retriever = MagicMock()
+        retriever.search.return_value = [{
+            "source_file": "移动2024年度报告.pdf",
+            "pages": [3],
+            "company_name": "中国移动",
+            "parent_text": "2024 年，营业收入达到人民币 10,408 亿元。",
+            "scores": {},
+        }]
+        generator._get_retriever = MagicMock(return_value=retriever)
+        generator._generate_answer = MagicMock(return_value="中国移动营业收入为104.08亿元")
+
+        result = generator.query("对比三大运营商2024年的营业收入")
+
+        self.assertIn("中国移动：10,408亿元", result["answer"])
+        self.assertNotIn("104.08亿元", result["answer"])
+        generator._generate_answer.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

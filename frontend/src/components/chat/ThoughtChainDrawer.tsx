@@ -43,7 +43,7 @@ export default function ThoughtChainDrawer({ open, onClose, steps }: ThoughtChai
     <Drawer
       title={
         <Space>
-          <BulbOutlined style={{ color: '#B8A9C9' }} />
+          <BulbOutlined style={{ color: 'var(--page-primary, #0F766E)' }} />
           <span>分析过程 ({steps.length} 步)</span>
         </Space>
       }

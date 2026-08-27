@@ -57,7 +57,12 @@ export default function ChatInput({ onSend, disabled = false, fillText, onFillTe
       disabled={disabled}
       placeholder="请输入您的问题，Enter 发送 / Shift+Enter 换行"
       autoSize={{ minRows: 1, maxRows: 4 }}
-      className="chat-sender"
+      suffix={(_, { components: { LoadingButton, SendButton } }) => (
+        disabled
+          ? <LoadingButton aria-label="停止生成" title="停止生成" />
+          : <SendButton aria-label="发送研究问题" title="发送研究问题" />
+      )}
+      className="chat-sender chat-sender--research"
       style={{
         background: isDark
           ? 'rgba(30, 28, 45, 0.9)'

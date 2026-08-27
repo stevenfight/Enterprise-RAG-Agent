@@ -25,7 +25,6 @@ Agent 用法示例:
 
 import json
 import logging
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -96,7 +95,8 @@ class ChartTool(BaseTool):
     name = "chart"
     description = (
         "生成财务数据可视化图表。支持柱状图(bar)、折线图(line)、饼图(pie)、横向柱状图(hbar)。"
-        "返回结果中包含 url 字段，请在 Final Answer 中用 Markdown 图片语法 ![标题](url) 展示图表。"
+        "成功结果中的 markdown_image 是唯一可直接写入 Final Answer 的图表 Markdown，必须原样使用。"
+        "不要根据文件名或其他字段拼接图片地址。"
     )
     parameters = {
         "type": "object",
@@ -216,12 +216,6 @@ class ChartTool(BaseTool):
             logger.error("[ChartTool] 图表渲染异常: %s", str(e))
             return ToolResult(success=False, error="图表生成失败: %s" % str(e))
 
-        # ---- 获取相对路径 ----
-        try:
-            rel_path = os.path.relpath(str(filepath), str(filepath.parent.parent.parent.parent))
-        except Exception:
-            rel_path = str(filepath)
-
         logger.info("[ChartTool] ====== 图表生成完成 ======")
         logger.info("[ChartTool] 文件: %s (%.1f KB)", filepath.name, filepath.stat().st_size / 1024)
 
@@ -241,18 +235,18 @@ class ChartTool(BaseTool):
         json_path.write_text(json.dumps(chart_data, ensure_ascii=False, indent=2), encoding="utf-8")
         logger.info("[ChartTool] JSON 数据文件: %s", json_path.name)
 
+        image_url = "/api/charts/images/%s" % filepath.name
+
         return ToolResult(
             success=True,
             data={
                 "chart_type": chart_type,
                 "title": title,
-                "file_path": str(filepath),
-                "relative_path": rel_path,
                 "file_name": filepath.name,
                 "file_size_kb": round(filepath.stat().st_size / 1024, 1),
-                "url": "/api/charts/images/%s" % filepath.name,
-                "json_url": "/api/charts/images/%s" % json_path.name,
-                "message": "图表已生成，可通过 URL 访问: /api/charts/images/%s" % filepath.name,
+                "url": image_url,
+                "markdown_image": "![%s](%s)" % (title, image_url),
+                "message": "图表已生成。Final Answer 必须原样使用 markdown_image 展示图表。",
                 "chart_data": chart_data,  # 结构化数据，供前端直接使用
             }
         )

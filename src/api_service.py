@@ -279,6 +279,39 @@ class SourceInfo(BaseModel):
     excerpt: str = ""
 
 
+def _build_agent_answer_sources(raw_sources: List[dict]) -> List[dict]:
+    """将 Agent 实际检索到的来源转换为回答级证据。"""
+    normalized_sources = []
+    seen = set()
+    for raw_source in raw_sources:
+        source_file = str(raw_source.get("source_file") or raw_source.get("source") or "").strip()
+        if not source_file:
+            continue
+        raw_pages = raw_source.get("pages", [])
+        if isinstance(raw_pages, str):
+            pages = [int(page) for page in re.findall(r"\d+", raw_pages)]
+        elif isinstance(raw_pages, list):
+            pages = [int(page) for page in raw_pages if isinstance(page, (int, float, str)) and str(page).isdigit()]
+        else:
+            pages = []
+        pages = list(dict.fromkeys(pages))
+        company_name = str(raw_source.get("company_name") or "").strip()
+        source_key = (source_file, tuple(pages), company_name)
+        if source_key in seen:
+            continue
+        seen.add(source_key)
+        excerpt = re.sub(r"\s+", " ", str(raw_source.get("content") or raw_source.get("text") or "")).strip()[:240]
+        normalized_sources.append({
+            "index": len(normalized_sources) + 1,
+            "source_file": source_file,
+            "pages": pages,
+            "company_name": company_name,
+            "scores": {},
+            "excerpt": excerpt,
+        })
+    return normalized_sources
+
+
 class QueryResponse(BaseModel):
     """RAG 问答响应"""
     answer: str
@@ -369,6 +402,7 @@ class AgentQueryResponse(BaseModel):
     answer: str
     success: bool
     reasoning_chain: List[AgentStepInfo] = []
+    sources: List[SourceInfo] = []
     total_steps: int = 0
     total_elapsed_ms: float = 0.0
     forced_stop: bool = False
@@ -985,6 +1019,7 @@ async def _handle_multi_agent_query(
             reflection = None
 
     # 构建响应
+    answer_sources = _build_agent_answer_sources(shared_memory.get_all_sources())
     response = AgentQueryResponse(
         success=result.success,
         answer=result.answer,
@@ -993,6 +1028,7 @@ async def _handle_multi_agent_query(
         forced_stop=result.forced_stop,
         error=result.error,
         reasoning_chain=result.reasoning_chain if result.reasoning_chain else [],
+        sources=answer_sources,
         reflection=reflection,
     )
     logger.info("[api_service] 多 Agent 执行完成: success=%s, workers=%d, total_tokens=%d",
@@ -1044,12 +1080,15 @@ async def _stream_single_agent(
     await _asyncio.sleep(0)
 
     final_answer = ""
+    answer_sources: List[dict] = []
     has_error = False
     try:
         for event in agent.run_stream(query, company_name=company_name):
             event_type = event.get("type", "")
             if event_type == "answer":
                 final_answer = event.get("content", "") or event.get("answer", "")
+                answer_sources = _build_agent_answer_sources(getattr(agent, "_sources", []))
+                event["sources"] = answer_sources
                 # answer 前逐句推送 answer_chunk，与多 Agent 保持一致的打字机效果
                 for chunk in _split_answer_chunks(final_answer):
                     yield f"data: {json.dumps({'type': 'answer_chunk', 'content': chunk}, ensure_ascii=False)}\n\n"
@@ -1067,7 +1106,7 @@ async def _stream_single_agent(
         reflector = _shared_state.get("reflector")
         if reflector:
             try:
-                ref_result = reflector.verify(final_answer, [], query)
+                ref_result = reflector.verify(final_answer, getattr(agent, "_sources", []), query)
                 reflection_event = {
                     "type": "reflection",
                     "score": ref_result.overall_confidence,
@@ -1200,7 +1239,8 @@ async def _stream_multi_agent(
             yield f"data: {json.dumps({'type': 'answer_chunk', 'content': chunk}, ensure_ascii=False)}\n\n"
 
         # ---- 事件: answer ----
-        yield f"data: {json.dumps({'type': 'answer', 'content': result.answer, 'workers': worker_count, 'total_tokens': shared_memory.get_total_tokens()}, ensure_ascii=False, default=str)}\n\n"
+        answer_sources = _build_agent_answer_sources(shared_memory.get_all_sources())
+        yield f"data: {json.dumps({'type': 'answer', 'content': result.answer, 'workers': worker_count, 'total_tokens': shared_memory.get_total_tokens(), 'sources': answer_sources}, ensure_ascii=False, default=str)}\n\n"
 
         # ---- 新增事件: reflection（独立事件，阶段四新增）----
         reflector = _shared_state.get("reflector")
@@ -1320,20 +1360,7 @@ async def api_agent_query(request: AgentQueryRequest):
         reflector = _shared_state.get("reflector")
         if reflector is not None and result.answer:
             logger.info("[api_service] 阶段 3/3: 反思验证")
-            # 从推理链提取来源
-            sources = []
-            for step in result.reasoning_chain:
-                obs = step.get("observation", "")
-                if obs and "来源" in obs:
-                    try:
-                        import json as _json
-                        obs_data = _json.loads(obs) if isinstance(obs, str) else obs
-                        if isinstance(obs_data, dict) and "results" in obs_data:
-                            sources.extend(obs_data["results"])
-                    except Exception:
-                        pass
-
-            ref_result = reflector.verify(result.answer, sources, request.query)
+            ref_result = reflector.verify(result.answer, result.sources, request.query)
             reflection = {
                 "has_hallucination": ref_result.has_hallucination,
                 "hallucination_count": ref_result.hallucination_count,
@@ -1372,6 +1399,7 @@ async def api_agent_query(request: AgentQueryRequest):
             answer=result.answer,
             success=result.success,
             reasoning_chain=chain,
+            sources=_build_agent_answer_sources(result.sources),
             total_steps=result.total_steps,
             total_elapsed_ms=result.total_elapsed_ms,
             forced_stop=result.forced_stop,
@@ -1670,13 +1698,17 @@ async def api_charts_list():
     每个条目包含 chart_type, title, labels, values 等结构化数据，
     前端 ChartsPage 可直接用于 ECharts 交互式渲染。
     """
+    from src.verified_financial_facts import VerifiedFinancialFactRegistry
+
     charts = []
+    fact_registry = VerifiedFinancialFactRegistry()
     if _charts_dir.exists():
         for json_file in sorted(_charts_dir.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True):
             try:
                 data = json.loads(json_file.read_text(encoding="utf-8"))
-                data["image_url"] = "/api/charts/images/%s" % json_file.with_suffix(".png").name
-                charts.append(data)
+                projected_data = fact_registry.project_chart_artifact(data)
+                projected_data["image_url"] = "/api/charts/images/%s" % json_file.with_suffix(".png").name
+                charts.append(projected_data)
             except Exception as e:
                 logger.warning("[api_service] 读取图表 JSON 失败: %s, %s", json_file.name, e)
     return {"charts": charts, "total": len(charts)}

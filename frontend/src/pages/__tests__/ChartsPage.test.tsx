@@ -7,7 +7,7 @@ const getCharts = vi.hoisted(() => vi.fn());
 
 vi.mock('@/hooks/useTheme', () => ({ useTheme: () => ({ isDark: false }) }));
 vi.mock('@/services/chartService', () => ({ getCharts }));
-vi.mock('@/components/charts/ChartContainer', () => ({ default: () => <div>图表画布</div> }));
+vi.mock('@/components/charts/ChartContainer', () => ({ default: ({ data }: { data: { title: string } }) => <div>{data.title}</div> }));
 vi.mock('@/components/charts/ChartMeta', () => ({ default: () => null }));
 
 import ChartsPage from '@/pages/ChartsPage';
@@ -35,5 +35,29 @@ describe('ChartsPage', () => {
 
     await screen.findByText('暂无图表数据');
     expect(screen.getByRole('radio', { name: /全部/ }).closest('.page-toolbar')).toBeInTheDocument();
+  });
+
+  it('CP-R60: 真实图表以研究成果工作区组织，摘要和浏览区同时保留', async () => {
+    getCharts.mockResolvedValue([{ chart_type: 'bar', title: '营收对比' }]);
+    const { container } = render(<ChartsPage />);
+
+    await screen.findByText('成果总数');
+    expect(container.querySelector('.research-output-strip')).toBeInTheDocument();
+    expect(container.querySelector('.charts-workbench')).toBeInTheDocument();
+  });
+
+  it('CP-R65: 研究入口仅优先展示标题可匹配的真实候选成果', async () => {
+    window.history.pushState({}, '', '/charts?metric=operating_revenue&year=2024&unit=%E4%BA%BF%E5%85%83');
+    getCharts.mockResolvedValue([
+      { chart_type: 'bar', title: '2024年三大运营商营收对比' },
+      { chart_type: 'line', title: '中芯国际研发费用趋势' },
+    ]);
+
+    const { container } = render(<ChartsPage />);
+
+    expect(await screen.findByRole('region', { name: '研究成果浏览条件' })).toHaveTextContent('2024 · 营业收入（亿元）');
+    expect(screen.getByText('2024年三大运营商营收对比')).toBeInTheDocument();
+    expect(screen.queryByText('中芯国际研发费用趋势')).toBeNull();
+    expect(container.querySelector('.charts-research-entry')).toBeInTheDocument();
   });
 });

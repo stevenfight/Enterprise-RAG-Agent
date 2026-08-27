@@ -25,12 +25,24 @@ const CHART_TYPE_LABELS: Record<string, string> = {
   table: '表格',
 };
 
+const RESEARCH_METRIC_BROWSE_CONFIG: Record<string, { label: string; titleTerms: string[] }> = {
+  operating_revenue: { label: '营业收入', titleTerms: ['营业收入', '营收'] },
+};
+
 export default function ChartsPage() {
   const { isDark } = useTheme();
   const [charts, setCharts] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeType, setActiveType] = useState<string>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('chart');
+  const searchParams = new URLSearchParams(window.location.search);
+  const metricKey = searchParams.get('metric') ?? '';
+  const fiscalYear = searchParams.get('year') ?? '';
+  const unit = searchParams.get('unit') ?? '';
+  const researchMetric = RESEARCH_METRIC_BROWSE_CONFIG[metricKey];
+  const researchCriteria = researchMetric && fiscalYear && unit
+    ? { label: researchMetric.label, fiscalYear, unit }
+    : undefined;
 
   useEffect(() => {
     const fetchCharts = async () => {
@@ -45,9 +57,13 @@ export default function ChartsPage() {
     fetchCharts();
   }, []);
 
+  const researchCandidates = researchCriteria
+    ? charts.filter((chart) => researchMetric.titleTerms.some((term) => chart.title.includes(term)))
+    : [];
+  const browseCharts = researchCriteria && researchCandidates.length > 0 ? researchCandidates : charts;
   const filtered = activeType === 'all'
-    ? charts
-    : charts.filter(c => c.chart_type === activeType);
+    ? browseCharts
+    : browseCharts.filter(c => c.chart_type === activeType);
   const chartTypeCounts = charts.reduce<Record<string, number>>((counts, chart) => {
     counts[chart.chart_type] = (counts[chart.chart_type] ?? 0) + 1;
     return counts;
@@ -62,8 +78,20 @@ export default function ChartsPage() {
         description="浏览由财务分析生成的图表与数据表格；仅展示当前可用成果"
       />
 
+      <section className="charts-workbench" aria-label="分析成果工作区">
+      {researchCriteria && (
+        <section className="charts-research-entry" aria-label="研究成果浏览条件">
+          <div>
+            <span>来自已核验比较</span>
+            <strong>{researchCriteria.fiscalYear} · {researchCriteria.label}（{researchCriteria.unit}）</strong>
+          </div>
+          <p>{researchCandidates.length > 0
+            ? `已按图表标题中的指标关键词筛选 ${researchCandidates.length} 项候选成果。`
+            : '未在图表标题中找到可核验的指标候选，以下展示全部可用成果。'}</p>
+        </section>
+      )}
       {!loading && (
-        <section className="status-overview-grid status-overview-grid--cols-5" aria-label="成果摘要">
+        <section className="status-overview-grid status-overview-grid--cols-5 research-output-strip" aria-label="成果摘要">
           <Card className="status-overview-card status-overview-card--compact">
             <Statistic title="成果总数" value={charts.length} />
           </Card>
@@ -83,7 +111,7 @@ export default function ChartsPage() {
             onChange={e => setActiveType(e.target.value)}
             size="small"
           >
-            <Radio.Button value="all">全部 ({charts.length})</Radio.Button>
+            <Radio.Button value="all">全部 ({browseCharts.length})</Radio.Button>
             <Radio.Button value="bar"><BarChartOutlined /> 柱状图</Radio.Button>
             <Radio.Button value="hbar"><AlignLeftOutlined /> 横向柱状图</Radio.Button>
             <Radio.Button value="line"><LineChartOutlined /> 折线图</Radio.Button>
@@ -148,6 +176,7 @@ export default function ChartsPage() {
           ))}
         </div>
       )}
+      </section>
     </PageShell>
   );
 }

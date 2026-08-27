@@ -1,8 +1,14 @@
 /* -*- coding: utf-8 -*- */
 /**
  * 响应式适配样式
- * 移动端断点: 768px
+ * 中窄屏断点: 1199px，移动端断点: 768px
  */
+
+/* 移动会话触发器默认隐藏，由各断点媒体规则按需显示。
+   基础规则必须位于媒体块之前，避免同级 !important 按文档顺序覆盖。 */
+.chat-mobile-session-trigger {
+  display: none !important;
+}
 
 @media (max-width: 1100px) {
   .page-shell {
@@ -22,7 +28,8 @@
   }
 }
 
-/* 研究工作台在中等宽度优先保留阅读与输入画布。 */
+/* 研究工作台在中等宽度优先保留阅读与输入画布。
+   对应 design 断点表：768–1199px 侧栏默认收起，会话列表由抽屉触发器打开。 */
 @media (max-width: 1199px) {
   .chat-page__config {
     display: none !important;
@@ -30,6 +37,16 @@
 
   .chat-evidence-aside {
     display: none !important;
+  }
+
+  .chat-session-sidebar {
+    display: none !important;
+  }
+
+  .chat-mobile-session-trigger {
+    display: inline-flex !important;
+    align-self: flex-start;
+    margin: 12px 16px 0;
   }
 }
 
@@ -104,16 +121,6 @@
     min-height: 120px !important;
   }
 
-  .chat-session-sidebar {
-    display: none !important;
-  }
-
-  .chat-mobile-session-trigger {
-    display: inline-flex !important;
-    align-self: flex-start;
-    margin: 12px 16px 0;
-  }
-
   .chat-input-area {
     padding: 0 16px max(16px, env(safe-area-inset-bottom)) !important;
   }
@@ -175,8 +182,4 @@
   .research-context-bar__action-label {
     display: none;
   }
-}
-
-.chat-mobile-session-trigger {
-  display: none !important;
 }

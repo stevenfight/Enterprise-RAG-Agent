@@ -123,4 +123,48 @@ describe('ChatContainer', () => {
     expect(state.switchSession).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '打开会话列表' })).toBeDisabled();
   });
+
+  it('CP-R54: 主消息区具有研究画布滚动样式钩子', () => {
+    const { container } = render(<ChatContainer {...defaultProps} />);
+    expect(container.querySelector('.chat-scroll-area--refined')).toBeInTheDocument();
+  });
+
+  it('CP-R55: 空会话启动页不自动滚离首屏', () => {
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView });
+
+    try {
+      render(<ChatContainer {...defaultProps} />);
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView });
+    }
+  });
+
+  it('CP-R12-01: prefers-reduced-motion 下自动滚动不使用平滑动画', () => {
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView });
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes('prefers-reduced-motion'),
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+
+    try {
+      state.currentSessionId = 's2';
+      render(<ChatContainer {...defaultProps} />);
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto' });
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView });
+      window.matchMedia = originalMatchMedia;
+    }
+  });
 });

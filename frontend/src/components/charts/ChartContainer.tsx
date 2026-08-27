@@ -273,7 +273,7 @@ export default function ChartContainer({ data, height = 360, dark = false }: Cha
         padding: '16px 12px 8px',
         background: palette.cardBg,
         border: `1px solid ${palette.cardBorder}`,
-        boxShadow: '0 2px 8px rgba(184, 169, 201, 0.1)',
+        boxShadow: '0 2px 8px color-mix(in srgb, var(--page-primary, #0F766E) 10%, transparent)',
         marginBottom: 16,
       }}>
         <div style={{
@@ -296,7 +296,7 @@ export default function ChartContainer({ data, height = 360, dark = false }: Cha
       padding: '16px 12px 8px',
       background: palette.cardBg,
       border: `1px solid ${palette.cardBorder}`,
-      boxShadow: '0 2px 8px rgba(184, 169, 201, 0.1)',
+      boxShadow: '0 2px 8px color-mix(in srgb, var(--page-primary, #0F766E) 10%, transparent)',
       marginBottom: 16,
     }}>
       <ReactEChartsCore

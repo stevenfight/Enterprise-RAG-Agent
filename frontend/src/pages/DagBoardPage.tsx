@@ -154,6 +154,11 @@ export default function DagBoardPage() {
           <div style={{ fontSize: 12, marginTop: 4 }}>
             支持: 营收对比、趋势分析、复合计算等
           </div>
+          <div className="dag-empty-stage" aria-label="待生成分析流程">
+            <span>任务拆解</span>
+            <span>依赖编排</span>
+            <span>批次执行</span>
+          </div>
         </div>
       )}
     </PageShell>

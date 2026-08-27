@@ -21,6 +21,10 @@ const { Text } = Typography;
 
 interface SourceCardProps {
   source: SourceInfo;
+  /** Agent 来源没有检索分数时，分组标题已说明为回答证据，不重复显示空分数。 */
+  showScoreStatus?: boolean;
+  /** 由正文来源编号定位时，短暂强调当前来源。 */
+  highlighted?: boolean;
 }
 
 /** 计算检索匹配度百分比
@@ -39,7 +43,7 @@ function calcScorePercent(scores: Record<string, SourceScoreValue>): number | nu
   return null;
 }
 
-export default function SourceCard({ source }: SourceCardProps) {
+export default function SourceCard({ source, showScoreStatus = true, highlighted = false }: SourceCardProps) {
   logger.renderStart({ sourceFile: source.source_file, company: source.company_name, pages: source.pages });
   const [expanded, setExpanded] = useState(false);
   const [showScores, setShowScores] = useState(false);
@@ -53,7 +57,8 @@ export default function SourceCard({ source }: SourceCardProps) {
   return (
     <Card
       size="small"
-      className="card-hover"
+      className={`card-hover source-card${highlighted ? ' source-card--highlighted' : ''}`}
+      data-testid={`source-card-${source.index}`}
       style={{
         marginBottom: 8,
         borderRadius: 10,
@@ -72,9 +77,10 @@ export default function SourceCard({ source }: SourceCardProps) {
             width: 26,
             height: 26,
             borderRadius: 8,
+            // 浅色分支使用主体色语义变量（A3 品牌硬编码迁移），暗色分支为既有可读性对照色
             background: isDark
               ? 'rgba(152, 216, 200, 0.15)'
-              : 'rgba(184, 169, 201, 0.12)',
+              : 'color-mix(in srgb, var(--page-primary, #0F766E) 12%, transparent)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -96,11 +102,11 @@ export default function SourceCard({ source }: SourceCardProps) {
           >
             {scorePercent}%
           </Tag>
-        ) : (
+        ) : showScoreStatus ? (
           <Text type="secondary" style={{ fontSize: 11 }}>
             匹配度未提供
           </Text>
-        )}
+        ) : null}
       </Space>
 
       <div style={{ marginTop: 6, marginLeft: 34 }}>

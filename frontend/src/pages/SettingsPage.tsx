@@ -80,6 +80,7 @@ export default function SettingsPage() {
   }
 
   if (!status) return null;
+  const researchAvailable = status.model.status === 'loaded' && status.vector_db.status === 'available';
 
   return (
     <PageShell>
@@ -90,8 +91,17 @@ export default function SettingsPage() {
         description="当前运行状态（只读监控，修改配置请编辑 config/agent_config.json）"
       />
 
-      <Space direction="vertical" className="page-stack"
+      <Space orientation="vertical" className="page-stack"
              style={{ width: '100%' }}>
+        <section className={`settings-availability-brief settings-availability-brief--${researchAvailable ? 'ready' : 'attention'}`} aria-label="研究服务可用性摘要">
+          {researchAvailable ? <CheckCircleOutlined aria-hidden="true" /> : <ExclamationCircleOutlined aria-hidden="true" />}
+          <div>
+            <strong>{researchAvailable ? '研究服务可用' : '研究服务需关注'}</strong>
+            <span>
+              模型{status.model.status === 'loaded' ? '已加载' : '未加载'} · 向量数据库{status.vector_db.status === 'available' ? '可用' : '不可用'}
+            </span>
+          </div>
+        </section>
         <SettingsOverview status={status} />
 
         {/* ===== 研究可用性 ===== */}

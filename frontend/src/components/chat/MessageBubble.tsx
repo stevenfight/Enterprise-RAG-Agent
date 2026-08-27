@@ -17,9 +17,9 @@ import {
   RedoOutlined,
   CheckOutlined,
 } from '@ant-design/icons';
-import type { Message, AnalysisTraceStep } from '@/types/chat';
+import type { Message, AnalysisTraceStep, VerifiedComparison } from '@/types/chat';
 import { useTheme } from '@/hooks/useTheme';
-import { colors, gradients } from '@/styles/theme';
+import { colors } from '@/styles/theme';
 import { formatMarkdown, extractFinancialKPIs } from '@/utils/financialFormat';
 import FinancialKPICards from './FinancialKPICards';
 import VerifiedComparisonCard from './VerifiedComparisonCard';
@@ -36,10 +36,12 @@ interface MessageBubbleProps {
   /** 重新生成回调 */
   onRegenerate?: (messageId: string) => void;
   /** 打开该回答的完整证据面板 */
-  onViewEvidence?: (messageId: string) => void;
+  onViewEvidence?: (messageId: string, sourceIndex?: number) => void;
+  /** 基于已核验比较打开成果浏览。 */
+  onViewCharts?: (criteria: Pick<VerifiedComparison, 'metric_key' | 'fiscal_year' | 'unit'>) => void;
 }
 
-export default function MessageBubble({ message, onViewReasoning, isStreaming = false, onRegenerate, onViewEvidence }: MessageBubbleProps) {
+export default function MessageBubble({ message, onViewReasoning, isStreaming = false, onRegenerate, onViewEvidence, onViewCharts }: MessageBubbleProps) {
   logger.renderStart({ role: message.role, id: message.id, contentLen: message.content.length, sourcesCount: message.sources?.length });
   const { isDark } = useTheme();
   const [showReasoning, setShowReasoning] = useState(false); // Agent 推理链路展开/收起
@@ -64,25 +66,63 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
 
   // 消息文本内容（用户纯文本，AI 走 Markdown 渲染）
   // 流式输出时在内容末尾追加打字机光标
-  const rawHtml = isUser ? message.content : formatMarkdown(message.content, isDark);
+  const formattedHtml = isUser ? message.content : formatMarkdown(message.content, isDark);
+  const rawHtml = !isUser ? enhanceAnswerReadingHtml(linkCurrentMessageCitations(formattedHtml, message)) : formattedHtml;
   const cursorHtml = isStreaming && !isUser ? '<span class="typing-cursor"></span>' : '';
 
   // AI 消息自动提取财务 KPI 并展示卡片
   const kpis = !isUser ? extractFinancialKPIs(message.content) : [];
+  const researchMeta = message.researchMeta;
+  const sourceCount = message.sources?.length ?? 0;
+  const deliveryStatus = message.comparison?.available ? '已核验比较' : '已生成回答';
+  const processingTimeLabel = researchMeta?.processingTimeMs === undefined
+    ? '未提供'
+    : `${(researchMeta.processingTimeMs / 1000).toFixed(1)} 秒`;
 
-  const messageContent = (
-    <div style={{ fontSize: 14, lineHeight: 1.7, fontFamily: 'inherit' }}>
+  const answerBody = (
+    <>
       {!isUser && kpis.length > 0 && (
         <FinancialKPICards kpis={kpis} isDark={isDark} />
       )}
-      {!isUser && <VerifiedComparisonCard comparison={message.comparison} />}
+      {!isUser && <VerifiedComparisonCard comparison={message.comparison} sources={message.sources} onViewEvidence={(sourceIndex) => onViewEvidence?.(message.id, sourceIndex)} onViewCharts={onViewCharts} />}
       <div
         className="markdown-body"
+        onClick={(event) => {
+          const target = event.target as Element;
+          const citation = target.closest<HTMLButtonElement>('[data-source-index]');
+          if (!citation) return;
+          const sourceIndex = Number(citation.dataset.sourceIndex);
+          if (Number.isInteger(sourceIndex)) onViewEvidence?.(message.id, sourceIndex);
+        }}
         dangerouslySetInnerHTML={{
           __html: rawHtml + cursorHtml,
         }}
       />
-    </div>
+    </>
+  );
+
+  const messageContent = researchMeta && !isUser ? (
+    <article className="research-answer-card research-answer-card--editorial" aria-label="研究报告">
+      <section className="research-delivery-summary research-delivery-summary--inline" aria-label="研究交付摘要">
+        <div className="research-delivery-summary__header">
+          <span className="research-answer-card__eyebrow">研究交付摘要</span>
+          <span className="research-delivery-summary__status">{deliveryStatus}</span>
+        </div>
+        <div className="research-delivery-summary__brief" aria-label="本次研究交付信息">
+          <Text strong>{researchMeta.mode === 'agent' ? 'Agent 深度分析' : 'RAG 问答'}</Text>
+          <span aria-hidden="true">·</span>
+          <Text>{researchMeta.companyName}</Text>
+          <span aria-hidden="true">·</span>
+          <Text>{sourceCount} 条证据</Text>
+          <span aria-hidden="true">·</span>
+          <Text>{processingTimeLabel}</Text>
+        </div>
+      </section>
+      <div className="research-answer-card__section-title">研究结论</div>
+      <div className="research-answer-card__body research-answer-card__reading-surface">{answerBody}</div>
+    </article>
+  ) : (
+    <div style={{ fontSize: 14, lineHeight: 1.7, fontFamily: 'inherit' }}>{answerBody}</div>
   );
 
   // 气泡底部插槽: 推理链 + 多 Agent 状态 + 引用来源 + 时间戳
@@ -91,6 +131,7 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
       {/* Hover 操作按钮: 复制 + 重新生成 */}
       {!isUser && hovered && (
         <div
+          className="message-bubble__actions"
           style={{
             display: 'flex',
             justifyContent: 'flex-end',
@@ -161,15 +202,15 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
               style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flex: 1 }}
             >
               <Space size={6}>
-                <BulbOutlined style={{ fontSize: 13, color: '#B8A9C9' }} />
-                <Text style={{ fontSize: 12, color: '#B8A9C9' }}>
+                <BulbOutlined style={{ fontSize: 13, color: 'var(--page-primary, #0F766E)' }} />
+                <Text style={{ fontSize: 12, color: 'var(--page-primary, #0F766E)' }}>
                   分析过程 ({message.analysisTrace.length} 步)
                 </Text>
               </Space>
               <CaretDownOutlined
                 style={{
                   fontSize: 10,
-                  color: '#B8A9C9',
+                  color: 'var(--page-primary, #0F766E)',
                   marginLeft: 6,
                   transform: showReasoning ? 'rotate(180deg)' : 'rotate(0deg)',
                   transition: 'transform 0.2s',
@@ -178,7 +219,7 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
             </div>
             {/* Phase 2: 侧边抽屉入口 */}
             <Text
-              style={{ fontSize: 11, color: '#B8A9C9', cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ fontSize: 11, color: 'var(--page-primary, #0F766E)', cursor: 'pointer', textDecoration: 'underline' }}
               onClick={() => onViewReasoning?.(message.analysisTrace ?? [])}
             >
               展开详情
@@ -194,8 +235,8 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
                     padding: '8px 10px',
                     borderRadius: 8,
                     background: isDark
-                      ? 'rgba(184, 169, 201, 0.08)'
-                      : 'rgba(184, 169, 201, 0.06)',
+                      ? 'color-mix(in srgb, var(--page-primary, #0F766E) 8%, transparent)'
+                      : 'color-mix(in srgb, var(--page-primary, #0F766E) 6%, transparent)',
                     borderLeft: `2px solid ${['#B8A9C9', '#98D8C8', '#A8D8EA', '#F4B8C8', '#FAD4B8'][idx % 5]}`,
                   }}
                 >
@@ -286,11 +327,11 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
                 width: 40,
                 height: 40,
                 borderRadius: 14,
-                background: gradients.hero,
+                background: 'var(--page-primary, #0F766E)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(184, 169, 201, 0.3)',
+                boxShadow: '0 3px 10px color-mix(in srgb, var(--page-primary, #0F766E) 28%, transparent)',
               }}
             >
               <UserOutlined style={{ fontSize: 20, color: '#ffffff' }} />
@@ -315,20 +356,20 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
         }
         content={messageContent}
         footer={footer}
-        rootClassName="fade-in-up-smooth"
+        rootClassName={`fade-in-up-smooth${researchMeta && !isUser ? ' message-bubble--research' : ''}${isUser ? ' message-bubble--user' : ''}`}
         styles={{
           content: {
-            maxWidth: '70%',
+            maxWidth: researchMeta && !isUser ? '100%' : '70%',
             borderRadius: 20,
             padding: '12px 18px',
             background: isUser
-              ? 'linear-gradient(135deg, #C4B5E0 0%, #B8A9C9 100%)'
+              ? 'var(--page-primary, #0F766E)'
               : (isDark
                 ? colors.bgDarkCard
                 : colors.bgCard),
             color: isUser ? '#ffffff' : (isDark ? colors.textPrimaryDark : colors.textPrimary),
             boxShadow: isUser
-              ? '0 2px 8px rgba(184, 169, 201, 0.25)'
+              ? '0 4px 12px color-mix(in srgb, var(--page-primary, #0F766E) 24%, transparent)'
               : (isDark
                 ? '0 1px 3px rgba(0,0,0,0.3)'
                 : '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)'),
@@ -344,4 +385,26 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
 function formatTime(ts: number): string {
   const d = new Date(ts);
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+}
+
+/** 仅将当前回答已携带来源的编号转成定位入口，避免从正文补造证据。 */
+function linkCurrentMessageCitations(html: string, message: Message): string {
+  const sourceIndexes = new Set((message.sources ?? []).map((source) => source.index));
+  return html.replace(/\[来源(\d+)\]/g, (citation, sourceIndexText) => {
+    const sourceIndex = Number(sourceIndexText);
+    if (!sourceIndexes.has(sourceIndex)) return citation;
+    return `<button type="button" class="citation-link" data-source-index="${sourceIndex}" aria-label="查看来源 ${sourceIndex}">${citation}</button>`;
+  });
+}
+
+/** 为现有 Markdown 结果补充阅读容器，不改变回答文本或来源编号。 */
+function enhanceAnswerReadingHtml(html: string): string {
+  const tableWrappedHtml = html.replace(/<table\b[\s\S]*?<\/table>/g, (table) => (
+    `<div class="markdown-table-scroll" tabindex="0" aria-label="回答数据表格">${table}</div>`
+  ));
+
+  return tableWrappedHtml.replace(
+    /(<br\/>\s*)((?:<button\b[^>]*class="citation-link"[^>]*>[\s\S]*?<\/button>\s*)+)(?=<br\/>|$)/g,
+    '$1<div class="markdown-citation-row" aria-label="回答引用">$2</div>',
+  );
 }

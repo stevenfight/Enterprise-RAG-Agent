@@ -79,4 +79,14 @@ describe('ChatInput', () => {
     render(<ChatInput onSend={vi.fn()} />);
     expect(screen.getByPlaceholderText(PLACEHOLDER)).toBeInTheDocument();
   });
+
+  it('CP-R51: 输入框保留 Sender 功能并具有研究入口样式钩子', () => {
+    const { container } = render(<ChatInput onSend={vi.fn()} />);
+    expect(container.querySelector('.chat-sender--research')).toBeInTheDocument();
+  });
+
+  it('CP-R59: 研究输入框提供明确的发送语义，同时不改变 Sender 提交行为', () => {
+    const { container } = render(<ChatInput onSend={vi.fn()} />);
+    expect(container.querySelector('button[aria-label="发送研究问题"]')).toBeInTheDocument();
+  });
 });

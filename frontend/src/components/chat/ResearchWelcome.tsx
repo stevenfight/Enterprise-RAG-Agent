@@ -21,12 +21,9 @@ const CAPABILITIES = [
   { icon: <NodeIndexOutlined />, title: '分析过程', description: '深度分析时查看已脱敏的执行摘要' },
 ];
 
-export default function ResearchWelcome({ quickCommands, companyName, mode = 'rag', onSend }: ResearchWelcomeProps) {
-  const scope = companyName ?? '全部公司';
-  const modeLabel = mode === 'agent' ? 'Agent 深度分析' : 'RAG 问答';
-
+export default function ResearchWelcome({ quickCommands, onSend }: ResearchWelcomeProps) {
   return (
-    <section className="research-welcome" aria-label="研究启动页">
+    <section className="research-welcome research-welcome--desktop-compact research-welcome--focused" aria-label="研究启动页">
       <div className="research-welcome__hero">
         <div className="research-welcome__emblem" aria-hidden="true">
           <SafetyCertificateOutlined />
@@ -34,13 +31,6 @@ export default function ResearchWelcome({ quickCommands, companyName, mode = 'ra
         <span className="research-welcome__eyebrow">证据驱动研究</span>
         <h1>从一个问题开始，<br />完成可核验的财务研究</h1>
         <p>基于已接入的年报资料生成回答，并在研究过程中保留可回看的来源和分析摘要。</p>
-      </div>
-
-      <div className="research-welcome__scope" aria-label="当前研究范围">
-        <span>当前研究范围</span>
-        <strong>{scope}</strong>
-        <i aria-hidden="true" />
-        <span>{modeLabel}</span>
       </div>
 
       <div className="research-welcome__launchpad">
@@ -63,17 +53,16 @@ export default function ResearchWelcome({ quickCommands, companyName, mode = 'ra
         )}
       </div>
 
-      <ul className="research-welcome__capabilities" aria-label="研究能力">
+      <p className="research-welcome__direct-prompt">也可以直接在下方输入框提出研究问题</p>
+
+      <div className="research-welcome__proof-line" aria-label="研究能力">
         {CAPABILITIES.map((capability) => (
-          <li key={capability.title}>
+          <span className="research-welcome__proof-item" key={capability.title} title={capability.description}>
             <span className="research-welcome__capability-icon" aria-hidden="true">{capability.icon}</span>
-            <div>
-              <strong>{capability.title}</strong>
-              <span>{capability.description}</span>
-            </div>
-          </li>
+            <strong>{capability.title}</strong>
+          </span>
         ))}
-      </ul>
+      </div>
     </section>
   );
 }

@@ -58,3 +58,57 @@ class VerifiedFinancialFactRegistry:
             fiscal_year=2024,
             companies=["中国移动", "中国联通", "中国电信"],
         )
+
+    def build_comparison_answer(self, comparison):
+        """使用已核验的比较事实生成正文，避免模型再次执行单位换算。"""
+        if not comparison.get("available"):
+            return ""
+
+        fiscal_year = comparison["fiscal_year"]
+        unit = comparison["unit"]
+        items = comparison["items"]
+        lines = [f"根据已核验的 {fiscal_year} 年年报事实，三大运营商营业收入对比如下：", ""]
+        for item in items:
+            pages = "、".join(f"P{page}" for page in item["pages"])
+            report_name = item["source_file"].removesuffix(".pdf")
+            lines.append(
+                f"- {item['company_name']}：{item['value']:,}{unit}（《{report_name}》{pages}）"
+            )
+
+        ranked_items = sorted(items, key=lambda item: item["value"], reverse=True)
+        ranking = "、".join(
+            f"{item['company_name']}（{item['value']:,}{unit}）" for item in ranked_items
+        )
+        lines.extend(["", f"结论：按营业收入从高到低依次为{ranking}。"])
+        return "\n".join(lines)
+
+    def project_chart_artifact(self, artifact):
+        """仅将已登记完整比较的图表产物投影为同一份核验事实。"""
+        title = str(artifact.get("title", ""))
+        labels = artifact.get("labels") or []
+        comparison = self.get_comparison_for_query(f"{title}{''.join(map(str, labels))}")
+        if not comparison.get("available"):
+            return artifact
+
+        items = comparison["items"]
+        projected = dict(artifact)
+        if artifact.get("chart_type") == "table":
+            projected["columns"] = ["运营商", "2024年营业收入（亿元）", "年报页码"]
+            projected["rows"] = [
+                [
+                    item["company_name"],
+                    f"{item['value']:,}",
+                    "、".join(f"P{page}" for page in item["pages"]),
+                ]
+                for item in items
+            ]
+            return projected
+
+        projected["labels"] = [item["company_name"] for item in items]
+        projected["values"] = [item["value"] for item in items]
+        projected["data"] = {
+            item["company_name"]: item["value"]
+            for item in items
+        }
+        projected["ylabel"] = "营业收入（亿元）"
+        return projected

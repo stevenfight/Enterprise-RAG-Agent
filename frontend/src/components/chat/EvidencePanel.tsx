@@ -10,9 +10,10 @@ interface EvidencePanelProps {
   open: boolean;
   onClose: () => void;
   sources: SourceInfo[];
+  highlightedSourceIndex?: number;
 }
 
-export default function EvidencePanel({ open, onClose, sources }: EvidencePanelProps) {
+export default function EvidencePanel({ open, onClose, sources, highlightedSourceIndex }: EvidencePanelProps) {
   const { isDark } = useTheme();
 
   return (
@@ -24,7 +25,7 @@ export default function EvidencePanel({ open, onClose, sources }: EvidencePanelP
       onClose={onClose}
       styles={{ body: { background: isDark ? '#141414' : '#fafafa' } }}
     >
-      <EvidenceContent sources={sources} />
+      <EvidenceContent sources={sources} highlightedSourceIndex={highlightedSourceIndex} />
     </Drawer>
   );
 }
