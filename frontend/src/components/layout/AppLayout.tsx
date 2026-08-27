@@ -64,6 +64,7 @@ export default function AppLayout() {
     '--page-surface': isDark ? colors.pageSurfaceDark : colors.pageSurfaceLight,
     '--page-raised': isDark ? colors.pageRaisedDark : colors.pageSurfaceLight,
     '--page-input-bg': isDark ? colors.pageInputDark : colors.pageInputLight,
+    '--page-sidebar-bg': isDark ? colors.pageSidebarDark : colors.pageSidebarLight,
   } as CSSProperties;
   logger.renderEnd(`主题=${themeMode}, 健康状态=${systemStatus}`);
 

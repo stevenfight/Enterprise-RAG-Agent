@@ -140,10 +140,12 @@ export const colors = {
   pageRaisedDark: PAGE_RAISED_DARK,
   pageInputDark: PAGE_INPUT_DARK,
   pageBorderDark: '#303841',
+  pageSidebarDark: '#151A20',
   pageBackgroundLight: '#F4F6F7',
   pageSurfaceLight: '#FFFFFF',
   pageInputLight: '#FBFCFC',
   pageBorderLight: '#DDE3E5',
+  pageSidebarLight: '#FFFFFF',
 
   // 聊天区域专用背景
   chatAreaLight: '#FAFAFA',

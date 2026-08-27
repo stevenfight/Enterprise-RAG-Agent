@@ -128,7 +128,7 @@ export default function ChatContainer({ onSend, isLoading = false, isAgentMode =
           borderRight: isDark ? `1px solid ${colors.borderDark}` : `1px solid ${colors.border}`,
           display: 'flex',
           flexDirection: 'column',
-          background: isDark ? colors.bgDarkSidebar : colors.bgCard,
+          background: isDark ? colors.pageSidebarDark : colors.bgCard,
           flexShrink: 0,
         }}
       >

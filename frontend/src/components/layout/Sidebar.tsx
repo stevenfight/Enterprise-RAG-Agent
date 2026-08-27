@@ -79,7 +79,7 @@ export default function Sidebar() {
         top: 0,
         left: 0,
         background: isDark
-          ? colors.bgDarkSidebar
+          ? colors.pageSidebarDark
           : 'linear-gradient(180deg, #FFF9F5 0%, #F8F4FA 50%, #F5F8FA 100%)',
       }}
     >

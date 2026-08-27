@@ -1736,6 +1736,10 @@ code {
   background: var(--page-background, var(--page-background-light, #F4F6F7)) !important;
 }
 
+.ant-layout-sider {
+  background: var(--page-sidebar-bg, var(--page-surface, #FFFFFF)) !important;
+}
+
 @media (max-width: 1100px) {
   .page-shell {
     padding: 28px 24px 36px;
