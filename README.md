@@ -1,6 +1,6 @@
 # 企业知识库智能问答系统 (RAG-Agent)
 
-> **当前状态**: RAG-Agent 智能体架构、现代化前端、Docker 容器化和 API 鉴权已完成；财务研究工作台已完成高级视觉统一。管道模式 (Streamlit + FastAPI) 和 Agent 模式 (ReAct + 工具调用 + 自我反思) 均可用。
+> **当前状态**: RAG-Agent 智能体架构、现代化前端、Docker 容器化和 API 鉴权已完成；财务研究工作台已完成高级视觉统一，并支持回答级证据链。管道模式 (Streamlit + FastAPI) 和 Agent 模式 (ReAct + 工具调用 + 自我反思) 均可用。
 > **验证状态**: 本轮前端 Vitest `43 files / 232 tests passed`，后端 `186 passed, 1 skipped`，oxlint 与生产构建通过；本地前后端入口均返回 200，图表、知识库、DAG、设置页逐页核查通过。GitHub Actions Quality Gate 与镜像构建已通过；main 分支保护和服务器受控部署仍待完成。
 
 > 基于 RAG 技术的企业年报智能 Agent 系统，从管道 RAG 进化而来，支持 ReAct 自主推理 + 工具调用。

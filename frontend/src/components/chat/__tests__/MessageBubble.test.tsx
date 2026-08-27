@@ -80,6 +80,24 @@ describe('MessageBubble', () => {
     expect(onViewEvidence).toHaveBeenCalledWith('m1');
   });
 
+  it('CP-R86: 证据链入口展开当前回答的来源关系', () => {
+    const onViewEvidence = vi.fn();
+    render(<MessageBubble
+      onViewEvidence={onViewEvidence}
+      message={{
+        ...baseMessage,
+        content: '结论内容[来源1]',
+        sources: [{ index: 1, source_file: '报告.pdf', pages: [3], company_name: '中国移动', scores: {} }],
+      }}
+    />);
+
+    expect(screen.queryByRole('region', { name: '回答级证据链' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '查看证据链' }));
+    expect(screen.getByRole('region', { name: '回答级证据链' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /报告\.pdf/ }));
+    expect(onViewEvidence).toHaveBeenCalledWith('m1', 1);
+  });
+
   it('CP-R39: 正文来源编号可打开并定位当前回答的对应证据', () => {
     const onViewEvidence = vi.fn();
     render(

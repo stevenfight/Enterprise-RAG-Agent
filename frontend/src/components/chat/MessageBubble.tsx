@@ -23,6 +23,7 @@ import { colors } from '@/styles/theme';
 import { formatMarkdown, extractFinancialKPIs } from '@/utils/financialFormat';
 import FinancialKPICards from './FinancialKPICards';
 import VerifiedComparisonCard from './VerifiedComparisonCard';
+import EvidenceChainGraph from './EvidenceChainGraph';
 import { createLogger } from '@/utils/logger';
 
 const logger = createLogger('MessageBubble');
@@ -45,6 +46,7 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
   logger.renderStart({ role: message.role, id: message.id, contentLen: message.content.length, sourcesCount: message.sources?.length });
   const { isDark } = useTheme();
   const [showReasoning, setShowReasoning] = useState(false); // Agent 推理链路展开/收起
+  const [showEvidenceChain, setShowEvidenceChain] = useState(false); // 回答级证据链展开/收起
   const [hovered, setHovered] = useState(false); // 气泡 hover 状态
   const [copied, setCopied] = useState(false); // 复制成功状态
   const isUser = message.role === 'user';
@@ -291,6 +293,22 @@ export default function MessageBubble({ message, onViewReasoning, isStreaming = 
           >
             查看 {message.sources.length} 条证据
           </Button>
+          <Button
+            type="link"
+            size="small"
+            style={{ padding: '0 0 0 12px' }}
+            aria-expanded={showEvidenceChain}
+            onClick={() => setShowEvidenceChain((visible) => !visible)}
+          >
+            {showEvidenceChain ? '收起证据链' : '查看证据链'}
+          </Button>
+          {showEvidenceChain && (
+            <EvidenceChainGraph
+              answer={message.content}
+              sources={message.sources}
+              onViewEvidence={(sourceIndex) => onViewEvidence?.(message.id, sourceIndex)}
+            />
+          )}
         </div>
       )}
 
