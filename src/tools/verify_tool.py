@@ -28,6 +28,7 @@ import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import BaseTool, ToolResult
+from ..financial_unit_rules import VERIFY_UNIT_MULTIPLIERS
 
 logger = logging.getLogger("verify_tool")
 logger.setLevel(logging.INFO)
@@ -43,16 +44,13 @@ if not logger.handlers:
 TOLERANCE = 0.05
 
 # 量级单位换算系数（按从大到小排列，避免正则匹配冲突）
-UNIT_MULTIPLIERS = {
-    "十亿": 1e9,
-    "亿": 1e8,
-    "百万": 1e6,
-    "万": 1e4,
-    "千": 1e3,
-}
+UNIT_MULTIPLIERS = VERIFY_UNIT_MULTIPLIERS
 
 # 货币后缀（不影响数值换算，仅用于跨币种匹配时判定不可比）
 CURRENCY_SUFFIXES = {"美元", "港元", "欧元", "日元", "人民币"}
+
+# 百分比与每股金额不是可与总金额互换的量纲，只允许同单位比较。
+NON_AMOUNT_UNITS = {"%", "元/股"}
 
 # 置信度阈值
 HIGH_CONFIDENCE = 0.9
@@ -202,12 +200,19 @@ class VerifyTool(BaseTool):
                 source_str = sn["raw"]
                 source_currency = sn.get("currency", "")
 
+                if (
+                    claim_unit in NON_AMOUNT_UNITS or source_unit in NON_AMOUNT_UNITS
+                ) and claim_unit != source_unit:
+                    continue
+
                 # 统一单位后比较
                 claim_scaled = self._scale_to_unit(claim_val, claim_unit, source_unit)
                 distance = abs(claim_scaled - source_val)
 
                 if source_val != 0:
                     relative_error = distance / abs(source_val)
+                elif claim_scaled == 0:
+                    relative_error = 0.0
                 else:
                     relative_error = float("inf")
 
@@ -223,7 +228,7 @@ class VerifyTool(BaseTool):
                         "source_value": source_val,
                         "source_unit": source_unit,
                         "source_currency": source_currency,
-                        "relative_error": round(relative_error, 4),
+                        "relative_error": relative_error,
                     }
 
             # 跨币种检测：声明和来源货币不同时标记警告
@@ -329,12 +334,15 @@ class VerifyTool(BaseTool):
 
         # 量级单位按长到短排列，确保"十亿"优先于"亿"匹配
         magnitude_units = "|".join(
-            sorted(UNIT_MULTIPLIERS.keys(), key=lambda x: -len(x))
+            sorted(
+                set(UNIT_MULTIPLIERS) | NON_AMOUNT_UNITS,
+                key=lambda x: -len(x),
+            )
         )
         currency_units = "|".join(sorted(CURRENCY_SUFFIXES, key=lambda x: -len(x)))
 
         # 匹配模式: 数字 + 可选量级单位(十亿/百万/亿/万/千) + 可选货币后缀
-        pattern = r"([\d,，]+\.?[\d]*)\s*(%s)?\s*(%s)?" % (magnitude_units, currency_units)
+        pattern = r"(-?[\d,，]+\.?[\d]*)\s*(%s)?\s*(%s)?" % (magnitude_units, currency_units)
         matches = re.finditer(pattern, text)
 
         for m in matches:
@@ -357,7 +365,7 @@ class VerifyTool(BaseTool):
                 continue
 
             # 跳过过于小或过于大的异常值（可能是页码或股票代码）
-            if value < 0.001 or value > 1e15:
+            if value != 0 and (abs(value) < 0.001 or abs(value) > 1e15):
                 continue
 
             results.append({

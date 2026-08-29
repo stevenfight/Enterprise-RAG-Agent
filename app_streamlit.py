@@ -15,11 +15,11 @@ from pathlib import Path
 import streamlit as st
 
 project_root = Path(__file__).resolve().parent
-sys.path.insert(0, str(project_root / "src"))
+sys.path.insert(0, str(project_root))
 
-from retrieval import RAGGenerator, HybridRetriever, COMPANY_ABBREV_MAP
-from query_processor import QueryProcessor, OUT_OF_DOMAIN_REPLY
-from conversation import ConversationManager
+from src.retrieval import RAGGenerator, HybridRetriever, COMPANY_ABBREV_MAP
+from src.query_processor import QueryProcessor, OUT_OF_DOMAIN_REPLY
+from src.conversation import ConversationManager
 
 logger = logging.getLogger("streamlit_app")
 logger.setLevel(logging.INFO)
@@ -96,14 +96,14 @@ def _init_agent_mode():
     if st.session_state.agent_registry is not None:
         return  # 已初始化
 
-    from tools import ToolRegistry
-    from tools.retrieve_tool import RetrieveTool
-    from tools.calculator_tool import CalculatorTool
-    from tools.compare_tool import CompareTool
-    from tools.chart_tool import ChartTool
-    from tools.verify_tool import VerifyTool
-    from agent_core import ReActAgent
-    from agent_memory import AgentMemory
+    from src.tools import ToolRegistry
+    from src.tools.retrieve_tool import RetrieveTool
+    from src.tools.calculator_tool import CalculatorTool
+    from src.tools.compare_tool import CompareTool
+    from src.tools.chart_tool import ChartTool
+    from src.tools.verify_tool import VerifyTool
+    from src.agent_core import ReActAgent
+    from src.agent_memory import AgentMemory
 
     registry = ToolRegistry()
     registry.register(RetrieveTool())
@@ -384,8 +384,8 @@ def main():
 
 def _run_agent_query(prompt):
     """Agent 模式: ReAct 推理 + 工具调用 + 反思验证"""
-    from planner import TaskPlanner
-    from reflector import AnswerReflector
+    from src.planner import TaskPlanner
+    from src.reflector import AnswerReflector
 
     # 显示任务规划
     planner = TaskPlanner()

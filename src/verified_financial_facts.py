@@ -31,6 +31,8 @@ class VerifiedFinancialFactRegistry:
     def get_comparison(self, metric_key, fiscal_year, companies):
         """按完整公司集合返回同口径比较，缺少任一事实则明确不可用。"""
         requested_companies = list(dict.fromkeys(companies))
+        if not requested_companies:
+            return {"available": False, "items": []}
         items = [
             fact for fact in self._FACTS
             if fact["metric_key"] == metric_key

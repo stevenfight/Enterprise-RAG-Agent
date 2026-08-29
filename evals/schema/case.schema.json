@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Financial Agent Evaluation Case",
+  "type": "object",
+  "required": ["id", "category", "query", "companies", "expected_answer", "expected_facts", "expected_sources", "expected_pages", "numeric_tolerance", "expected_behavior", "expected_tools", "risk_level", "review_status", "dataset_version"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "category": {"type": "string", "minLength": 1},
+    "query": {"type": "string", "minLength": 1},
+    "companies": {"type": "array", "items": {"type": "string"}},
+    "expected_answer": {"type": "string"},
+    "expected_facts": {"type": "array", "items": {"type": "object"}},
+    "expected_sources": {"type": "array", "items": {"type": "object"}},
+    "expected_pages": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+    "numeric_tolerance": {"type": "number", "minimum": 0},
+    "expected_behavior": {"enum": ["answer", "refuse"]},
+    "expected_tools": {"type": "array", "items": {"type": "string"}},
+    "risk_level": {"type": "string", "enum": ["low", "medium", "high"]},
+    "review_status": {"type": "string", "enum": ["draft", "pending_review", "verified"]},
+    "dataset_version": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

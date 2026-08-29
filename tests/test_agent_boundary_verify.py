@@ -16,16 +16,16 @@ import os
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from tools import ToolRegistry
-from tools.retrieve_tool import RetrieveTool
-from tools.calculator_tool import CalculatorTool
-from tools.compare_tool import CompareTool
-from tools.chart_tool import ChartTool
-from tools.verify_tool import VerifyTool
-from agent_memory import AgentMemory
-from agent_core import ReActAgent
+from src.tools import ToolRegistry
+from src.tools.retrieve_tool import RetrieveTool
+from src.tools.calculator_tool import CalculatorTool
+from src.tools.compare_tool import CompareTool
+from src.tools.chart_tool import ChartTool
+from src.tools.verify_tool import VerifyTool
+from src.agent_memory import AgentMemory
+from src.agent_core import ReActAgent
 
 
 @pytest.fixture(scope="module")

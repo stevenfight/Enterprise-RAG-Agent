@@ -2,9 +2,11 @@
 """reflector 快速验证"""
 
 import sys
-sys.path.insert(0, "src")
+import os
+# 指向项目根目录, 统一使用 src 包导入模式 (与生产装配一致)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from reflector import AnswerReflector
+from src.reflector import AnswerReflector
 
 r = AnswerReflector()
 
@@ -86,12 +88,12 @@ for s in suggestions:
     print("  %s" % s[:80])
 
 print("\n9. 管道回归 + 模块导入验证")
-from tools import ToolRegistry
-from tools.retrieve_tool import RetrieveTool
-from tools.calculator_tool import CalculatorTool
-from tools.compare_tool import CompareTool
-from tools.chart_tool import ChartTool
-from tools.verify_tool import VerifyTool
+from src.tools import ToolRegistry
+from src.tools.retrieve_tool import RetrieveTool
+from src.tools.calculator_tool import CalculatorTool
+from src.tools.compare_tool import CompareTool
+from src.tools.chart_tool import ChartTool
+from src.tools.verify_tool import VerifyTool
 registry = ToolRegistry()
 registry.register(RetrieveTool())
 registry.register(CalculatorTool())

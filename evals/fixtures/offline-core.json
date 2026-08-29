@@ -1,0 +1,8 @@
+{
+  "seed-revenue-001": {
+    "answer": "2024年营业收入为100亿元。",
+    "facts": [{"metric_key":"revenue","value":100,"unit":"亿元","currency":"CNY","period":"2024"}],
+    "sources": [{"source_file":"示例公司.pdf","pages":[12]}],
+    "tools": ["retrieve"]
+  }
+}

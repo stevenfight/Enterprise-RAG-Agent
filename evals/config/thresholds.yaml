@@ -1,0 +1,5 @@
+# v7 首版评测门禁。B2.7 起声明级证据支持率硬门禁已启用（spec-evaluation-quality-gate.md 分阶段证据指标场景）。
+minimum_pass_rate: 0.98
+high_risk_failure_limit: 0
+answer_level_source_hit: baseline_only
+claim_level_evidence_support: enabled

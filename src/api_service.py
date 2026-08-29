@@ -203,6 +203,34 @@ def _load_agent_config() -> dict:
                      "***" if result["api_key"] != "no-key-needed" else "no-key-needed",
                      result["api_max_steps_hard_limit"])
 
+        result["pdf_hot_load_enabled"] = bool(
+            hot_load_cfg.get("directory_sync_enabled", default_config["pdf_hot_load_enabled"])
+        )
+        result["pdf_hot_load_interval_seconds"] = float(
+            hot_load_cfg.get("interval_seconds", default_config["pdf_hot_load_interval_seconds"])
+        )
+        result["pdf_hot_load_indexing_enabled"] = bool(
+            hot_load_cfg.get("indexing_enabled", default_config["pdf_hot_load_indexing_enabled"])
+        )
+        result["pdf_hot_load_max_attempts"] = int(
+            hot_load_cfg.get("max_attempts", default_config["pdf_hot_load_max_attempts"])
+        )
+        result["pdf_hot_load_parse_timeout_seconds"] = float(
+            hot_load_cfg.get(
+                "parse_timeout_seconds",
+                default_config["pdf_hot_load_parse_timeout_seconds"],
+            )
+        )
+        logger.info(
+            "[config_loader] hot_load: directory_sync_enabled=%s, indexing_enabled=%s, interval=%s, max_attempts=%s, parse_timeout=%s | 来源=%s",
+            result["pdf_hot_load_enabled"],
+            result["pdf_hot_load_indexing_enabled"],
+            result["pdf_hot_load_interval_seconds"],
+            result["pdf_hot_load_max_attempts"],
+            result["pdf_hot_load_parse_timeout_seconds"],
+            "文件[hot_load]" if hot_load_cfg else "默认",
+        )
+
         # ---- 新增：读取多 Agent 模型分配配置 ----
         result["models"] = agent_cfg.get("models", {})
         if result["models"]:
@@ -235,6 +263,28 @@ def _load_agent_config() -> dict:
         logger.error("[config_loader] 读取失败 | 路径=%s | 错误=%s | 使用默认配置",
                      config_path, e)
         return default_config
+
+
+def _get_verified_financial_fact_registry(agent_config: dict | None = None):
+    """仅在 financial_trust_enabled 开启时创建 V7 已核验事实链。"""
+    from src.financial_fact_registry_provider import get_verified_financial_fact_registry
+    from src.v7_feature_flags import FeatureFlagConfigurationError, V7FeatureFlags
+
+    config = agent_config if agent_config is not None else _load_agent_config()
+    raw_flags = config.get("v7_feature_flags")
+    try:
+        flags = (
+            raw_flags
+            if isinstance(raw_flags, V7FeatureFlags)
+            else V7FeatureFlags.from_mapping(raw_flags)
+        )
+    except FeatureFlagConfigurationError as exc:
+        logger.error("[api_service] v7 功能开关无效，已核验事实保持 legacy | 错误=%s", exc)
+        flags = V7FeatureFlags()
+    return get_verified_financial_fact_registry(
+        flags=flags,
+        metadata_database_path=project_root / "data" / "stock_data" / "v7_metadata.sqlite3",
+    )
 
 
 # Agent 模式全局实例
@@ -1681,10 +1731,8 @@ async def api_filter_reload():
 @app.get("/api/comparisons/verified", summary="获取已核验的财务比较事实")
 async def api_verified_comparison(metric_key: str, fiscal_year: int, companies: str):
     """只返回具备逐项官方年报来源的受限比较事实。"""
-    from src.verified_financial_facts import VerifiedFinancialFactRegistry
-
     company_list = [company.strip() for company in companies.split(",") if company.strip()]
-    return VerifiedFinancialFactRegistry().get_comparison(
+    return _get_verified_financial_fact_registry().get_comparison(
         metric_key=metric_key,
         fiscal_year=fiscal_year,
         companies=company_list,
@@ -1698,10 +1746,8 @@ async def api_charts_list():
     每个条目包含 chart_type, title, labels, values 等结构化数据，
     前端 ChartsPage 可直接用于 ECharts 交互式渲染。
     """
-    from src.verified_financial_facts import VerifiedFinancialFactRegistry
-
     charts = []
-    fact_registry = VerifiedFinancialFactRegistry()
+    fact_registry = _get_verified_financial_fact_registry()
     if _charts_dir.exists():
         for json_file in sorted(_charts_dir.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True):
             try:

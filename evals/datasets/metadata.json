@@ -1,0 +1,8 @@
+{
+  "dataset_version": "v1-seed",
+  "status": "draft",
+  "case_file": "core.jsonl",
+  "case_count": 1,
+  "source_evidence_status": "pending_review",
+  "note": "当前仅用于验证 schema、确定性评估器和离线 Runner。示例样本不是 v5.19 真实基线，不得用于发布准入或产品质量结论。"
+}

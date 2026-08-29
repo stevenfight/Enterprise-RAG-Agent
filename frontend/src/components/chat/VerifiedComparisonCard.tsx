@@ -2,6 +2,7 @@
 /** 回答级已核验比较卡片，仅展示后端登记并随回答返回的事实。 */
 import { Button, Card, Typography } from 'antd';
 import type { SourceInfo, VerifiedComparison } from '@/types/chat';
+import ClaimEvidenceDetails from './ClaimEvidenceDetails';
 import { useTheme } from '@/hooks/useTheme';
 import { colors } from '@/styles/theme';
 
@@ -85,6 +86,8 @@ export default function VerifiedComparisonCard({ comparison, sources, onViewEvid
             );
           })}
         </div>
+        {/* B2.6：携带声明级可选载荷时追加原始值、归一值、公式与冲突原因明细，旧载荷不渲染。 */}
+        <ClaimEvidenceDetails comparison={comparison} />
         {onViewCharts && (
           <Button type="link" size="small" className="verified-comparison-card__output-link" onClick={() => onViewCharts({
             metric_key: comparison.metric_key,
