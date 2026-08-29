@@ -274,6 +274,18 @@ class V7MetadataStore:
                 """CREATE TABLE v7_evidence_bundles (bundle_id TEXT PRIMARY KEY, claim_id TEXT NOT NULL, fact_ids_json TEXT NOT NULL, calculation_ids_json TEXT NOT NULL, conflict_ids_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(claim_id) REFERENCES v7_claims(claim_id) ON DELETE RESTRICT)""",
             ),
         ),
+        (
+            11,
+            (
+                """CREATE TABLE v7_execution_runs (run_id TEXT PRIMARY KEY, status TEXT NOT NULL, revision INTEGER NOT NULL, cancellation_token TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                """CREATE TABLE v7_step_attempts (attempt_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_id TEXT NOT NULL, attempt_token TEXT NOT NULL UNIQUE, owner_token TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, completed_at TEXT, FOREIGN KEY(run_id) REFERENCES v7_execution_runs(run_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_leases (run_id TEXT NOT NULL, step_id TEXT NOT NULL, attempt_id TEXT NOT NULL UNIQUE, owner_token TEXT NOT NULL, expires_at REAL NOT NULL, PRIMARY KEY(run_id, step_id), FOREIGN KEY(run_id) REFERENCES v7_execution_runs(run_id) ON DELETE RESTRICT, FOREIGN KEY(attempt_id) REFERENCES v7_step_attempts(attempt_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_execution_checkpoints (checkpoint_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_id TEXT NOT NULL, attempt_id TEXT NOT NULL, schema_version INTEGER NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(run_id) REFERENCES v7_execution_runs(run_id) ON DELETE RESTRICT, FOREIGN KEY(attempt_id) REFERENCES v7_step_attempts(attempt_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_execution_invocations (idempotency_key TEXT PRIMARY KEY, run_id TEXT NOT NULL, step_id TEXT NOT NULL, attempt_id TEXT NOT NULL, status TEXT NOT NULL, details_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(run_id) REFERENCES v7_execution_runs(run_id) ON DELETE RESTRICT, FOREIGN KEY(attempt_id) REFERENCES v7_step_attempts(attempt_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_task_events (event_id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, revision INTEGER NOT NULL, event_type TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(run_id) REFERENCES v7_execution_runs(run_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_execution_commands (command_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, target_status TEXT NOT NULL, expected_revision INTEGER NOT NULL, result_revision INTEGER NOT NULL, result_status TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(run_id) REFERENCES v7_execution_runs(run_id) ON DELETE RESTRICT)""",
+            ),
+        ),
     )
 
     def __init__(

@@ -98,22 +98,22 @@
 
 ## C0. 通用可恢复执行基础
 
-- [ ] C0.1 在 V7MetadataStore 定义 ExecutionRun、StepAttempt、Checkpoint、Invocation、TaskEvent、Lease 及其外键。
-- [ ] C0.2 实现带 revision 的状态迁移与 CAS；暂停、恢复、取消命令携带 command_id 并可安全重复。
-- [ ] C0.3 实现运行租约、续租、过期接管和同一步骤单执行者约束。
-- [ ] C0.4 实现检查点、调用账本、步骤状态和事件序号同事务提交；并行事件由单写入器分配 ID。
-- [ ] C0.5 幂等键纳入规范化输入、代码/工具、模型、提示词、事实/制品版本和 index generation。
-- [ ] C0.6 实现 cancellation/attempt token；超时或取消后的晚到结果记录 discarded，禁止提交事实、索引或 completed。
-- [ ] C0.7 明确外部线程/模型调用超时不等于真实取消，并在步骤边界停止后续工作。
-- [ ] C0.8 用模拟 PDF 入库步骤完成进程中断、租约接管、重复命令和晚到结果故障演练。
+- [x] C0.1 已在 V7MetadataStore 定义 ExecutionRun、StepAttempt、Checkpoint、Invocation、TaskEvent、Lease 及其外键。
+- [x] C0.2 已实现带 revision 的状态迁移与 CAS；暂停、恢复、取消命令携带 command_id 并可安全重复。
+- [x] C0.3 已实现运行租约、续租、过期接管和同一步骤单执行者约束。
+- [x] C0.4 已实现检查点、调用账本、步骤状态和事件序号同事务提交；并行事件由单写入器分配 ID。
+- [x] C0.5 幂等键已纳入规范化输入、代码/工具、模型、提示词、事实/制品版本和 index generation。
+- [x] C0.6 已实现 cancellation/attempt token；超时或取消后的晚到结果记录 discarded，禁止提交事实、索引或 completed。
+- [x] C0.7 已明确外部线程/模型调用超时不等于真实取消，并在步骤边界停止后续工作。
+- [x] C0.8 已用模拟 PDF 入库步骤完成进程中断、租约接管、重复命令和晚到结果故障演练。
 - [ ] C0.9 运行 C0 回归和代码审查，提交 `feat(execution): add durable run foundation`。
 
 ### C0 包退出条件
 
-- [ ] C0-GATE-1 同一步骤在任意时刻只有一个有效租约执行者。
-- [ ] C0-GATE-2 状态 CAS、重复命令和事件序号测试全绿。
-- [ ] C0-GATE-3 超时/取消后的晚到结果无法改变当前状态或可见数据。
-- [ ] C0-GATE-4 M 可直接复用该基础执行模拟入库，不新增平行状态机。
+- [x] C0-GATE-1 同一步骤在任意时刻只有一个有效租约执行者。
+- [x] C0-GATE-2 状态 CAS、重复命令和事件序号测试全绿。
+- [x] C0-GATE-3 超时/取消后的晚到结果无法改变当前状态或可见数据。
+- [x] C0-GATE-4 M 可直接复用该基础执行模拟入库，不新增平行状态机。
 
 ## M. 可验证多模态财报理解
 

@@ -61,16 +61,16 @@
 
 | ID | 状态 | 测试目标 | 预期 RED 原因 |
 |---|---|---|---|
-| C0-T01 | 🔴 RED | 同一步骤只有一个有效 lease 执行者 | 租约仓储不存在 |
-| C0-T02 | 🔴 RED | lease 过期后新 attempt 可接管 | 接管逻辑不存在 |
-| C0-T03 | 🔴 RED | 原 attempt 晚到结果被标记 discarded | attempt token 校验不存在 |
-| C0-T04 | 🔴 RED | 并发暂停与取消只有一个 revision CAS 成功 | revision/CAS 不存在 |
-| C0-T05 | 🔴 RED | 相同 command_id 重复提交返回原结果 | 命令幂等账本不存在 |
-| C0-T06 | 🔴 RED | 并行事件由单写入器生成单调唯一 event ID | 持久事件写入器不存在 |
-| C0-T07 | 🔴 RED | 幂等键包含模型、提示词、事实/制品和索引代际 | 依赖版本未纳入 |
-| C0-T08 | 🔴 RED | 超时线程晚到结果不能写事实、索引或 completed | 提交守卫不存在 |
-| C0-T09 | 🔴 RED | 模拟入库进程中断后从检查点恢复且不重复成功调用 | 通用执行器不存在 |
-| C0-T10 | 🔴 RED | M 复用 C0 表与仓储而不建立平行状态机 | M 尚未集成执行基础 |
+| C0-T01 | 绿色（通过） | `tests/test_durable_execution.py`：同一步骤只有一个有效 lease 执行者 | 首次 RED 为 9 failed（模块不存在）；GREEN 25 passed |
+| C0-T02 | 绿色（通过） | `tests/test_durable_execution.py`：lease 过期后新 attempt 可接管 | 首次 RED 为 9 failed（模块不存在）；GREEN 25 passed |
+| C0-T03 | 绿色（通过） | `tests/test_durable_execution.py`：原 attempt 晚到结果被标记 discarded | 首次 RED 为 9 failed（模块不存在）；GREEN 25 passed |
+| C0-T04 | 绿色（通过） | `tests/test_durable_execution.py`：并发暂停与取消只有一个 revision CAS 成功 | 首次 RED 为 9 failed（模块不存在）；GREEN 25 passed |
+| C0-T05 | 绿色（通过） | `tests/test_durable_execution.py`：相同 command_id 重复提交返回原结果 | 首次 RED 为 9 failed（模块不存在）；GREEN 25 passed |
+| C0-T06 | 绿色（通过） | `tests/test_durable_execution.py`：并行事件由单写入器生成单调唯一 event ID | 首次 RED 为 9 failed（模块不存在）；GREEN 25 passed |
+| C0-T07 | 绿色（通过） | `tests/test_durable_execution.py`：幂等键包含模型、提示词、事实/制品和索引代际 | 首次 RED 为 9 failed（模块不存在）；GREEN 25 passed |
+| C0-T08 | 绿色（通过） | `tests/test_durable_execution.py`：超时线程晚到结果不能写事实、索引或 completed | 首次 RED 为 9 failed（模块不存在）；GREEN 25 passed |
+| C0-T09 | 绿色（通过） | `tests/test_durable_execution.py`：模拟入库进程中断后从检查点恢复且不重复成功调用 | 首次 RED 为 9 failed（模块不存在）；GREEN 25 passed |
+| C0-T10 | 绿色（通过） | `tests/test_durable_execution.py`：M 复用 C0 表与仓储而不建立平行状态机 | RED 为协调器构造参数不存在；GREEN 25 passed |
 | C0-T11 | 绿色（通过） | multimodal/research_tasks 缺少显式前置开关时 fail closed | `python -m pytest -q tests/test_v7_feature_flags.py`：RED 5 failed → GREEN 5 passed |
 
 ## S. 源文件、索引迁移与关系型溯源

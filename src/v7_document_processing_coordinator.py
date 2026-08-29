@@ -11,6 +11,7 @@ from .document_asset_manifest_repository import (
     DocumentAssetManifestRepository,
     ManifestPageImageCompleteness,
 )
+from .durable_execution import AttemptClaim, DurableExecutionStore
 from .page_artifact_repository import PageArtifactRepository, RegisteredPageArtifact
 from .page_image_renderer import PageImageRenderer
 from .parse_batch_repository import ParseBatchRecord, ParseBatchRepository
@@ -26,6 +27,7 @@ class V7DocumentProcessingCoordinator:
         parse_batch_repository: ParseBatchRepository,
         page_image_renderer: PageImageRenderer,
         page_artifact_repository: PageArtifactRepository,
+        durable_execution_store: DurableExecutionStore | None = None,
     ) -> None:
         stores = {
             id(manifest_repository.store),
@@ -39,6 +41,30 @@ class V7DocumentProcessingCoordinator:
         self.page_image_renderer = page_image_renderer
         self.page_artifact_repository = page_artifact_repository
         self.store = manifest_repository.store
+        if (
+            durable_execution_store is not None
+            and durable_execution_store.metadata_store is not self.store
+        ):
+            raise ValueError("V7 协调器的执行仓储必须复用同一个 metadata store")
+        self.execution_store = durable_execution_store
+
+    def claim_processing_attempt(
+        self,
+        run_id: str,
+        document_version_id: str,
+        owner_token: str,
+        *,
+        now: float | None = None,
+    ) -> AttemptClaim:
+        """为文档处理领取 C0 租约，不在 M 内维护平行步骤状态。"""
+        if self.execution_store is None:
+            raise RuntimeError("未配置 C0 DurableExecutionStore，拒绝启动文档处理")
+        return self.execution_store.acquire_lease(
+            run_id,
+            f"document:{document_version_id}",
+            owner_token,
+            now=now,
+        )
 
     def start(
         self,
