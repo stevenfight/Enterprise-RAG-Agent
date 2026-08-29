@@ -42,6 +42,11 @@ from .tools.verify_tool import VerifyTool
 from .planner import TaskPlanner
 from .reflector import AnswerReflector
 from .orchestrator_agent import OrchestratorAgent
+from .pdf_hot_loader import (
+    MineruHotLoadPipeline,
+    PdfDirectorySyncWorker,
+    PdfHotLoadScheduler,
+)
 
 logger = logging.getLogger("api_service")
 logger.setLevel(logging.INFO)
@@ -151,6 +156,11 @@ def _load_agent_config() -> dict:
         "enable_hallucination_check": True,
         "auto_correct": True,
         "hallucination_threshold": 0.05,
+        "pdf_hot_load_enabled": False,
+        "pdf_hot_load_interval_seconds": 15.0,
+        "pdf_hot_load_indexing_enabled": False,
+        "pdf_hot_load_max_attempts": 3,
+        "pdf_hot_load_parse_timeout_seconds": 600.0,
     }
     config_path = project_root / "config" / "agent_config.json"
     logger.info("[config_loader] 开始加载 Agent 配置 | 路径=%s", config_path)
@@ -169,12 +179,21 @@ def _load_agent_config() -> dict:
         reflector_cfg = config.get("reflector", {})
         memory_cfg = config.get("memory", {})
         api_cfg = config.get("api", {})
+        hot_load_cfg = config.get("hot_load", {})
 
         if not agent_cfg:
             logger.warning("[config_loader] agent 配置节为空 | 使用默认配置")
 
         result = {}
         for key, default_val in default_config.items():
+            if key in (
+                "pdf_hot_load_enabled",
+                "pdf_hot_load_interval_seconds",
+                "pdf_hot_load_indexing_enabled",
+                "pdf_hot_load_max_attempts",
+                "pdf_hot_load_parse_timeout_seconds",
+            ):
+                continue
             # reflector 开头的 key 从 reflector 配置节读取
             if key in ("enable_verification", "enable_hallucination_check",
                        "auto_correct", "hallucination_threshold"):
@@ -242,6 +261,16 @@ def _load_agent_config() -> dict:
         if multi_agent_cfg:
             logger.info("[config_loader] multi_agent 配置已加载: %s", list(multi_agent_cfg.keys()))
 
+        from src.v7_feature_flags import FeatureFlagConfigurationError, V7FeatureFlags
+
+        try:
+            result["v7_feature_flags"] = V7FeatureFlags.from_mapping(
+                config.get("v7_feature_flags")
+            )
+        except FeatureFlagConfigurationError as exc:
+            logger.error("[config_loader] v7 功能开关无效，按关闭处理 | 错误=%s", exc)
+            result["v7_feature_flags"] = V7FeatureFlags()
+
         # 检查是否有未识别的配置项
         # models 是 agent 节内的嵌套配置，已被单独读取，不视为未识别项
         unexpected_agent = set(agent_cfg.keys()) - set(default_config.keys()) - {"models"}
@@ -297,6 +326,8 @@ conversation_store: ConversationStore = ConversationStore(max_conversations=100)
 # API 鉴权配置（在 _init_globals() 中设置）
 _api_key: str = ""
 _max_steps_hard_limit: int = 15
+pdf_hot_load_scheduler: Optional[PdfHotLoadScheduler] = None
+pdf_hot_load_pipeline: Optional[MineruHotLoadPipeline] = None
 
 
 # ==================== 请求模型 ====================
@@ -324,6 +355,7 @@ class SourceInfo(BaseModel):
     index: int
     source_file: str
     pages: List[int]
+    document_pages: List[str] = Field(default_factory=list)
     company_name: str
     scores: dict
     excerpt: str = ""
@@ -337,7 +369,8 @@ def _build_agent_answer_sources(raw_sources: List[dict]) -> List[dict]:
         source_file = str(raw_source.get("source_file") or raw_source.get("source") or "").strip()
         if not source_file:
             continue
-        raw_pages = raw_source.get("pages", [])
+        raw_pages = raw_source.get("physical_pages", raw_source.get("pages", []))
+        raw_document_pages = raw_source.get("document_pages", [])
         if isinstance(raw_pages, str):
             pages = [int(page) for page in re.findall(r"\d+", raw_pages)]
         elif isinstance(raw_pages, list):
@@ -345,6 +378,10 @@ def _build_agent_answer_sources(raw_sources: List[dict]) -> List[dict]:
         else:
             pages = []
         pages = list(dict.fromkeys(pages))
+        if isinstance(raw_document_pages, list):
+            document_pages = [str(page).strip() for page in raw_document_pages if str(page).strip()]
+        else:
+            document_pages = []
         company_name = str(raw_source.get("company_name") or "").strip()
         source_key = (source_file, tuple(pages), company_name)
         if source_key in seen:
@@ -355,6 +392,7 @@ def _build_agent_answer_sources(raw_sources: List[dict]) -> List[dict]:
             "index": len(normalized_sources) + 1,
             "source_file": source_file,
             "pages": pages,
+            "document_pages": list(dict.fromkeys(document_pages)),
             "company_name": company_name,
             "scores": {},
             "excerpt": excerpt,
@@ -469,6 +507,11 @@ class KnowledgeDocument(BaseModel):
     size_mb: float
     upload_time: str
     indexed: bool
+    index_status: str = "not_indexed"
+    sha256: Optional[str] = None
+    index_generation: Optional[str] = None
+    index_error: Optional[str] = None
+    index_attempts: int = 0
 
 
 class KnowledgeListResponse(BaseModel):
@@ -483,6 +526,9 @@ class KnowledgeUploadResponse(BaseModel):
     filename: str = ""
     size: int = 0
     size_mb: float = 0.0
+    sha256: Optional[str] = None
+    index_status: str = "pending_index"
+    idempotent: bool = False
 
 
 class SystemStatusResponse(BaseModel):
@@ -495,6 +541,45 @@ class SystemStatusResponse(BaseModel):
 
 
 # ==================== 生命周期管理 ====================
+
+def _create_pdf_hot_load_scheduler(ag_cfg: dict) -> Optional[PdfHotLoadScheduler]:
+    """按配置创建 PDF 热加载调度器，目录登记与实际索引明确分离。"""
+    global pdf_hot_load_pipeline
+    if not ag_cfg.get("pdf_hot_load_enabled"):
+        return None
+
+    if ag_cfg.get("pdf_hot_load_indexing_enabled"):
+        pdf_hot_load_pipeline = MineruHotLoadPipeline(
+            vector_db_dir,
+            parse_timeout_seconds=ag_cfg.get("pdf_hot_load_parse_timeout_seconds", 600.0),
+        )
+        worker = pdf_hot_load_pipeline.create_worker(
+            max_attempts=ag_cfg.get("pdf_hot_load_max_attempts", 3)
+        )
+    else:
+        worker = PdfDirectorySyncWorker()
+
+    scheduler = PdfHotLoadScheduler(
+        worker,
+        interval_seconds=ag_cfg.get("pdf_hot_load_interval_seconds", 15.0),
+    )
+    scheduler.start()
+    return scheduler
+
+
+def _close_pdf_hot_load_resources(scheduler: Optional[PdfHotLoadScheduler]) -> None:
+    """停止调度并释放可能持有的 MinerU 客户端。"""
+    global pdf_hot_load_pipeline
+    stopped = True
+    if scheduler is not None:
+        stopped = scheduler.stop(timeout=5)
+    if not stopped:
+        logger.warning("[api_service] PDF 热加载线程仍在处理，暂不关闭 MinerU 客户端")
+        return
+    if pdf_hot_load_pipeline is not None:
+        pdf_hot_load_pipeline.close()
+        pdf_hot_load_pipeline = None
+
 
 def _init_globals():
     """初始化所有全局变量（必须在普通函数中执行，@asynccontextmanager 会破坏 global 声明）"""
@@ -536,6 +621,15 @@ def _init_globals():
 
     # 从 config 文件加载 Agent 配置参数
     ag_cfg = _load_agent_config()
+
+    global pdf_hot_load_scheduler
+    pdf_hot_load_scheduler = _create_pdf_hot_load_scheduler(ag_cfg)
+    if pdf_hot_load_scheduler is not None:
+        logger.info(
+            "[api_service] PDF 热加载已启动 | indexing=%s | interval=%s 秒",
+            ag_cfg.get("pdf_hot_load_indexing_enabled", False),
+            ag_cfg.get("pdf_hot_load_interval_seconds"),
+        )
 
     agent_reflector = AnswerReflector(
         enable_verification=ag_cfg["enable_verification"],
@@ -645,6 +739,11 @@ async def lifespan(app: FastAPI):
 
     logger.info("=" * 60)
     logger.info("[api_service] FastAPI 应用关闭中...")
+    global pdf_hot_load_scheduler
+    if pdf_hot_load_scheduler is not None or pdf_hot_load_pipeline is not None:
+        _close_pdf_hot_load_resources(pdf_hot_load_scheduler)
+        pdf_hot_load_scheduler = None
+        logger.info("[api_service] PDF 热加载已停止")
     global rag_generator, agent, agent_registry, agent_planner, agent_reflector
     rag_generator = None
     _shared_state["query_processor"] = None
@@ -2097,7 +2196,7 @@ def _stream_response(non_stream_resp: dict):
 
 # ==================== 知识库管理 & 系统状态 API ====================
 
-from .knowledge_service import get_documents, upload_pdf, delete_pdf
+from .knowledge_service import get_documents, upload_pdf, delete_pdf, retry_pdf_index
 
 
 @app.get("/api/knowledge/documents",
@@ -2168,6 +2267,17 @@ async def api_knowledge_delete(filename: str):
                             detail=f"文档不存在: {filename}")
     logger.info("[api_service] 删除成功 | 文件名: %s", filename)
     return {"success": True, "filename": filename}
+
+
+@app.post("/api/knowledge/documents/{filename}/retry-index",
+          summary="重新触发 PDF 索引")
+async def api_knowledge_retry_index(filename: str):
+    """显式重置失败文档的索引尝试次数，交由热加载 worker 再次处理。"""
+    from urllib.parse import unquote
+    filename = unquote(filename)
+    if not retry_pdf_index(filename):
+        raise HTTPException(status_code=409, detail="文档当前不可重新索引")
+    return {"success": True, "filename": filename, "index_status": "pending_index"}
 
 
 @app.get("/api/system/status",

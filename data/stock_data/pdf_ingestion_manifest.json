@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "documents": {
+    "【上海证券】中芯国际深度研究报告：晶圆制造龙头，领航国产芯片新征程.pdf": {
+      "filename": "【上海证券】中芯国际深度研究报告：晶圆制造龙头，领航国产芯片新征程.pdf",
+      "sha256": "1a86effe2c723529738c4e2a9a1bbf61c9479ad742cbe2bd623ac6e74e9e4e24",
+      "size": 2201991,
+      "index_status": "indexed",
+      "index_generation": "legacy",
+      "index_error": null,
+      "index_attempts": 0,
+      "version": 1
+    },
+    "【东方证券】产能利用率提升，持续推进工艺迭代和产品性能升级.pdf": {
+      "filename": "【东方证券】产能利用率提升，持续推进工艺迭代和产品性能升级.pdf",
+      "sha256": "89339930311f929c22bc5d85da6d7b1694a0bfbbc29257bace106363f3e75706",
+      "size": 676704,
+      "index_status": "indexed",
+      "index_generation": "legacy",
+      "index_error": null,
+      "index_attempts": 0,
+      "version": 1
+    },
+    "【中原证券】产能利用率显著提升，持续推进工艺迭代升级——中芯国际(688981)季报点评.pdf": {
+      "filename": "【中原证券】产能利用率显著提升，持续推进工艺迭代升级——中芯国际(688981)季报点评.pdf",
+      "sha256": "01f6f583308c331092886504dfec2c32e6f0c83ca5308d16b121971a52b29305",
+      "size": 362300,
+      "index_status": "indexed",
+      "index_generation": "legacy",
+      "index_error": null,
+      "index_attempts": 0,
+      "version": 1
+    },
+    "【光大证券】中芯国际2025年一季度业绩点评：1Q突发生产问题，2Q业绩有望筑底，自主可控趋势不改.pdf": {
+      "filename": "【光大证券】中芯国际2025年一季度业绩点评：1Q突发生产问题，2Q业绩有望筑底，自主可控趋势不改.pdf",
+      "sha256": "7ce307cd2fa5ac679c3a171c35a91ed2cae49deb4e153ca03290de9f8b1c83fb",
+      "size": 733242,
+      "index_status": "indexed",
+      "index_generation": "legacy",
+      "index_error": null,
+      "index_attempts": 0,
+      "version": 1
+    },
+    "【兴证国际】季度盈利低于预期，看好国产芯片长期空间.pdf": {
+      "filename": "【兴证国际】季度盈利低于预期，看好国产芯片长期空间.pdf",
+      "sha256": "1a7947bc658b8ac68d068432862617b4ccceb2d4b9655a55529eab5c889efefb",
+      "size": 413045,
+      "index_status": "indexed",
+      "index_generation": "legacy",
+      "index_error": null,
+      "index_attempts": 0,
+      "version": 1
+    },
+    "【华泰证券】中芯国际（688981）：上调港股目标价到63港币，看好DeepSeek推动代工需求强劲增长.pdf": {
+      "filename": "【华泰证券】中芯国际（688981）：上调港股目标价到63港币，看好DeepSeek推动代工需求强劲增长.pdf",
+      "sha256": "07cf6e6f2d8419afbe141121a2080ae5889ed75c2eb55058e03473e561ff6edd",
+      "size": 1523833,
+      "index_status": "indexed",
+      "index_generation": "legacy",
+      "index_error": null,
+      "index_attempts": 0,
+      "version": 1
+    },
+    "【国信证券】工业与汽车触底反弹，良率影响短期营收.pdf": {
+      "filename": "【国信证券】工业与汽车触底反弹，良率影响短期营收.pdf",
+      "sha256": "40dede2d4ca0024e62f550c5a29a9f7b951be75cdee6f3c7c53c10bb78cbf53c",
+      "size": 743201,
+      "index_status": "indexed",
+      "index_generation": "legacy",
+      "index_error": null,
+      "index_attempts": 0,
+      "version": 1
+    },
+    "【财报】中芯国际：中芯国际2024年年度报告.pdf": {
+      "filename": "【财报】中芯国际：中芯国际2024年年度报告.pdf",
+      "sha256": "d0d08d761acb9c16f88343e313a893be17469d21e96042556378631d069924d1",
+      "size": 3678523,
+      "index_status": "indexed",
+      "index_generation": "legacy",
+      "index_error": null,
+      "index_attempts": 0,
+      "version": 1
+    },
+    "中芯国际机构调研纪要.pdf": {
+      "filename": "中芯国际机构调研纪要.pdf",
+      "sha256": "d022d0a840aac048674597d7db4d4ebf2d0f7753ef836030a74c0fc525ef91b3",
+      "size": 3287778,
+      "index_status": "indexed",
+      "index_generation": "legacy",
+      "index_error": null,
+      "index_attempts": 0,
+      "version": 1
+    },
+    "电信2024年度报告.pdf": {
+      "filename": "电信2024年度报告.pdf",
+      "sha256": "7cb13ffbf8cf97b8ad5d794d0402f31a274a648f7c1827ed9132596dac9deebd",
+      "size": 6108517,
+      "index_status": "indexed",
+      "index_generation": "legacy",
+      "index_error": null,
+      "index_attempts": 0,
+      "version": 1
+    },
+    "移动2024年度报告.pdf": {
+      "filename": "移动2024年度报告.pdf",
+      "sha256": "9320df7bbb9de076b0fcf8ac9286457792d048f957c9ed908b31a7d9b39e7c5a",
+      "size": 3199524,
+      "index_status": "indexed",
+      "index_generation": "legacy",
+      "index_error": null,
+      "index_attempts": 0,
+      "version": 1
+    },
+    "联通2024年度报告.pdf": {
+      "filename": "联通2024年度报告.pdf",
+      "sha256": "7042aab8d1bd3b1583c216e7757d107c7db627d5284854eb18def52434c44d8b",
+      "size": 8083821,
+      "index_status": "indexed",
+      "index_generation": "legacy",
+      "index_error": null,
+      "index_attempts": 0,
+      "version": 1
+    }
+  }
+}

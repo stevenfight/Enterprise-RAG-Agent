@@ -242,6 +242,7 @@ class VectorRetriever:
                 "parent_text": parent_text,
                 "source_file": meta["source_file"],
                 "pages": meta.get("pages", []),
+                "document_pages": meta.get("document_pages", []),
                 "company_name": meta["company_name"],
                 "child_id": meta["child_id"],
                 "parent_key": parent_key,
@@ -414,6 +415,7 @@ class BM25Retriever:
                 "parent_text": parent_text,
                 "source_file": meta["source_file"],
                 "pages": meta.get("pages", []),
+                "document_pages": meta.get("document_pages", []),
                 "company_name": meta["company_name"],
                 "child_id": meta["child_id"],
                 "parent_key": parent_key,
@@ -442,6 +444,7 @@ class HybridRetriever:
         self._api_key = api_key
         self._vector_retrievers = {}
         self._bm25_retrievers = {}
+        self._retriever_generations = {}
         self._company_registry = None
 
         logger.info("[HybridRetriever] 初始化，向量数据库目录: %s", self.vector_db_dir)
@@ -454,33 +457,64 @@ class HybridRetriever:
 
     def _load_company_registry(self):
         registry_path = self.vector_db_dir / "company_registry.json"
-        if not registry_path.exists():
-            logger.error("[HybridRetriever] 公司注册表不存在: %s", registry_path)
-            raise FileNotFoundError(f"公司注册表不存在: {registry_path}")
-
-        self._company_registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        if registry_path.exists():
+            self._company_registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        else:
+            self._company_registry = {"companies": {}}
+            logger.warning("[HybridRetriever] 旧式公司注册表不存在，将仅从 active 指针发现公司: %s", registry_path)
+        active_dir = self.vector_db_dir / "active"
+        if active_dir.exists():
+            for pointer_path in active_dir.glob("*.json"):
+                company_name = pointer_path.stem
+                try:
+                    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    logger.warning("[HybridRetriever] 跳过不可读 active 指针: %s", pointer_path)
+                    continue
+                if pointer.get("company_name") == company_name and pointer.get("generation_id"):
+                    self._company_registry.setdefault("companies", {}).setdefault(
+                        company_name,
+                        {"generation_id": pointer["generation_id"], "source": "active_pointer"},
+                    )
+        if not self._company_registry.get("companies"):
+            logger.error("[HybridRetriever] 未发现任何可用公司索引: %s", self.vector_db_dir)
+            raise FileNotFoundError(f"公司注册表不存在且没有 active 索引: {registry_path}")
         companies = list(self._company_registry.get("companies", {}).keys())
         logger.info("[HybridRetriever] 公司注册表加载完成，已注册公司: %s", ", ".join(companies))
         return self._company_registry
 
+    def _resolve_company_dir(self, company_name):
+        """优先读取已发布 generation；没有发布指针时保持旧目录契约。"""
+        pointer_path = self.vector_db_dir / "active" / f"{company_name}.json"
+        if pointer_path.exists():
+            try:
+                pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RuntimeError(f"active generation 指针不可读: {company_name}") from exc
+            generation_id = pointer.get("generation_id")
+            if not generation_id or Path(generation_id).name != generation_id:
+                raise RuntimeError(f"active generation 指针无效: {company_name}")
+            company_dir = self.vector_db_dir / "generations" / generation_id / company_name
+            return company_dir, generation_id
+        return self.vector_db_dir / company_name, "legacy"
+
     def _get_retrievers(self, company_name):
-        company_dir = self.vector_db_dir / company_name
+        company_dir, generation_id = self._resolve_company_dir(company_name)
         if not company_dir.exists():
             logger.error("[HybridRetriever] 公司目录不存在: %s", company_dir)
             raise FileNotFoundError(f"公司目录不存在: {company_dir}")
 
-        if company_name not in self._vector_retrievers:
+        if self._retriever_generations.get(company_name) != generation_id:
             api_key = self._ensure_api_key()
-            logger.info("[HybridRetriever] 首次加载公司 '%s' 的向量检索器", company_name)
+            logger.info("[HybridRetriever] 加载公司 '%s' 的向量检索器 | generation=%s", company_name, generation_id)
             vr = VectorRetriever(company_dir, api_key)
             vr.load()
             self._vector_retrievers[company_name] = vr
-
-        if company_name not in self._bm25_retrievers:
-            logger.info("[HybridRetriever] 首次加载公司 '%s' 的 BM25 检索器", company_name)
+            logger.info("[HybridRetriever] 加载公司 '%s' 的 BM25 检索器 | generation=%s", company_name, generation_id)
             br = BM25Retriever(company_dir)
             br.load()
             self._bm25_retrievers[company_name] = br
+            self._retriever_generations[company_name] = generation_id
 
         return self._vector_retrievers[company_name], self._bm25_retrievers[company_name]
 
@@ -735,6 +769,7 @@ class HybridRetriever:
                     "parent_text": r["parent_text"],
                     "source_file": r["source_file"],
                     "pages": r["pages"],
+                    "document_pages": r.get("document_pages", []),
                     "company_name": r["company_name"],
                     "parent_key": pk,
                     "tags": r.get("tags", []),
@@ -755,6 +790,7 @@ class HybridRetriever:
                     "parent_text": r["parent_text"],
                     "source_file": r["source_file"],
                     "pages": r["pages"],
+                    "document_pages": r.get("document_pages", []),
                     "company_name": r["company_name"],
                     "parent_key": pk,
                     "tags": r.get("tags", []),

@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "documents": [
+    {
+      "filename": "【上海证券】中芯国际深度研究报告：晶圆制造龙头，领航国产芯片新征程.pdf",
+      "source_sha256": "1a86effe2c723529738c4e2a9a1bbf61c9479ad742cbe2bd623ac6e74e9e4e24",
+      "physical_page_count": 29,
+      "decision": "ENRICH",
+      "reasons": [
+        "missing_parser_provenance",
+        "missing_local_assets"
+      ],
+      "error_status": "missing_local_assets"
+    },
+    {
+      "filename": "【东方证券】产能利用率提升，持续推进工艺迭代和产品性能升级.pdf",
+      "source_sha256": "89339930311f929c22bc5d85da6d7b1694a0bfbbc29257bace106363f3e75706",
+      "physical_page_count": 6,
+      "decision": "ENRICH",
+      "reasons": [
+        "missing_parser_provenance",
+        "missing_local_assets"
+      ],
+      "error_status": "missing_local_assets"
+    },
+    {
+      "filename": "【中原证券】产能利用率显著提升，持续推进工艺迭代升级——中芯国际(688981)季报点评.pdf",
+      "source_sha256": "01f6f583308c331092886504dfec2c32e6f0c83ca5308d16b121971a52b29305",
+      "physical_page_count": 5,
+      "decision": "ENRICH",
+      "reasons": [
+        "missing_parser_provenance",
+        "missing_local_assets"
+      ],
+      "error_status": "missing_local_assets"
+    },
+    {
+      "filename": "【光大证券】中芯国际2025年一季度业绩点评：1Q突发生产问题，2Q业绩有望筑底，自主可控趋势不改.pdf",
+      "source_sha256": "7ce307cd2fa5ac679c3a171c35a91ed2cae49deb4e153ca03290de9f8b1c83fb",
+      "physical_page_count": 8,
+      "decision": "ENRICH",
+      "reasons": [
+        "missing_parser_provenance",
+        "missing_local_assets"
+      ],
+      "error_status": "missing_local_assets"
+    },
+    {
+      "filename": "【兴证国际】季度盈利低于预期，看好国产芯片长期空间.pdf",
+      "source_sha256": "1a7947bc658b8ac68d068432862617b4ccceb2d4b9655a55529eab5c889efefb",
+      "physical_page_count": 5,
+      "decision": "ENRICH",
+      "reasons": [
+        "missing_parser_provenance"
+      ],
+      "error_status": null
+    },
+    {
+      "filename": "【华泰证券】中芯国际（688981）：上调港股目标价到63港币，看好DeepSeek推动代工需求强劲增长.pdf",
+      "source_sha256": "07cf6e6f2d8419afbe141121a2080ae5889ed75c2eb55058e03473e561ff6edd",
+      "physical_page_count": 12,
+      "decision": "ENRICH",
+      "reasons": [
+        "missing_parser_provenance",
+        "missing_local_assets"
+      ],
+      "error_status": "missing_local_assets"
+    },
+    {
+      "filename": "【国信证券】工业与汽车触底反弹，良率影响短期营收.pdf",
+      "source_sha256": "40dede2d4ca0024e62f550c5a29a9f7b951be75cdee6f3c7c53c10bb78cbf53c",
+      "physical_page_count": 6,
+      "decision": "ENRICH",
+      "reasons": [
+        "missing_parser_provenance",
+        "missing_local_assets"
+      ],
+      "error_status": "missing_local_assets"
+    },
+    {
+      "filename": "【财报】中芯国际：中芯国际2024年年度报告.pdf",
+      "source_sha256": "d0d08d761acb9c16f88343e313a893be17469d21e96042556378631d069924d1",
+      "physical_page_count": 222,
+      "decision": "ENRICH",
+      "reasons": [
+        "missing_parser_provenance",
+        "missing_local_assets"
+      ],
+      "error_status": "missing_local_assets"
+    },
+    {
+      "filename": "中芯国际机构调研纪要.pdf",
+      "source_sha256": "d022d0a840aac048674597d7db4d4ebf2d0f7753ef836030a74c0fc525ef91b3",
+      "physical_page_count": 22,
+      "decision": "ENRICH",
+      "reasons": [
+        "missing_parser_provenance",
+        "missing_local_assets"
+      ],
+      "error_status": "missing_local_assets"
+    },
+    {
+      "filename": "电信2024年度报告.pdf",
+      "source_sha256": "7cb13ffbf8cf97b8ad5d794d0402f31a274a648f7c1827ed9132596dac9deebd",
+      "physical_page_count": 218,
+      "decision": "ENRICH",
+      "reasons": [
+        "missing_parser_provenance",
+        "missing_local_assets"
+      ],
+      "error_status": "missing_local_assets"
+    },
+    {
+      "filename": "移动2024年度报告.pdf",
+      "source_sha256": "9320df7bbb9de076b0fcf8ac9286457792d048f957c9ed908b31a7d9b39e7c5a",
+      "physical_page_count": 222,
+      "decision": "ENRICH",
+      "reasons": [
+        "missing_parser_provenance",
+        "missing_local_assets"
+      ],
+      "error_status": "missing_local_assets"
+    },
+    {
+      "filename": "联通2024年度报告.pdf",
+      "source_sha256": "7042aab8d1bd3b1583c216e7757d107c7db627d5284854eb18def52434c44d8b",
+      "physical_page_count": 216,
+      "decision": "ENRICH",
+      "reasons": [
+        "missing_parser_provenance",
+        "missing_local_assets"
+      ],
+      "error_status": "missing_local_assets"
+    }
+  ]
+}

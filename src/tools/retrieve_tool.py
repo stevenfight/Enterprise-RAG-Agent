@@ -175,10 +175,15 @@ class RetrieveTool(BaseTool):
         for i, r in enumerate(results):
             # 页码格式化: [23, 24, 25] → "第23-25页"
             pages = r.get("pages", [])
-            if pages and len(pages) >= 2:
-                pages_str = "第%d-%d页" % (pages[0], pages[-1])
+            document_pages = r.get("document_pages", [])
+            if document_pages and len(document_pages) >= 2:
+                pages_str = "文档第%s-%s页" % (document_pages[0], document_pages[-1])
+            elif document_pages:
+                pages_str = "文档第%s页" % document_pages[0]
+            elif pages and len(pages) >= 2:
+                pages_str = "PDF物理第%d-%d页" % (pages[0], pages[-1])
             elif pages:
-                pages_str = "第%d页" % pages[0]
+                pages_str = "PDF物理第%d页" % pages[0]
             else:
                 pages_str = "页码未知"
 
@@ -187,6 +192,8 @@ class RetrieveTool(BaseTool):
                 "company_name": r.get("company_name", "未知"),
                 "source_file": r.get("source_file", "未知"),
                 "pages": pages_str,
+                "physical_pages": pages,
+                "document_pages": document_pages,
                 "doc_type": DOC_TYPE_LABELS.get(
                     _classify_doc_type(r.get("source_file"), r.get("tags")), "其他"
                 ),

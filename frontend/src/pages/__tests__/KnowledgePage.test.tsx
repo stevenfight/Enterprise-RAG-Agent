@@ -1,14 +1,16 @@
 // -*- coding: utf-8 -*-
 /** 资料库页面层级与字段边界回归测试。 */
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 const getDocuments = vi.hoisted(() => vi.fn());
+const retryDocumentIndex = vi.hoisted(() => vi.fn());
 
 vi.mock('@/services/knowledgeService', () => ({
   getDocuments,
   uploadDocument: vi.fn(),
   deleteDocument: vi.fn(),
+  retryDocumentIndex,
 }));
 
 import KnowledgePage from '@/pages/KnowledgePage';
@@ -38,5 +40,34 @@ describe('KnowledgePage', () => {
     expect(container.querySelector('.knowledge-archive')).toBeInTheDocument();
     expect(container.querySelector('.knowledge-archive__list')).toBeInTheDocument();
     expect(screen.queryByText(/公司|年度|章节/)).toBeNull();
+  });
+
+  it('HL-UI-01: 存在待处理文档时定时刷新索引状态', async () => {
+    vi.useFakeTimers();
+    getDocuments.mockClear();
+    getDocuments
+      .mockResolvedValueOnce({
+        total: 1,
+        documents: [
+          { filename: '处理中.pdf', size: 1, size_mb: 1, upload_time: '2026-08-28', indexed: false, index_status: 'pending_index' },
+        ],
+      })
+      .mockResolvedValueOnce({
+        total: 1,
+        documents: [
+          { filename: '处理中.pdf', size: 1, size_mb: 1, upload_time: '2026-08-28', indexed: true, index_status: 'indexed' },
+        ],
+      });
+
+    try {
+      render(<KnowledgePage />);
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.getByText('处理中')).toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(getDocuments).toHaveBeenCalledTimes(2);
+      expect(screen.getAllByText('已索引').length).toBeGreaterThanOrEqual(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

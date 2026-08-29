@@ -30,6 +30,7 @@
 
 import csv
 import json
+import re
 from pathlib import Path
 
 import tiktoken
@@ -107,7 +108,12 @@ def load_subset_csv(csv_path):
     return mapping
 
 
-def build_line_page_map(pdf_path):
+_PHYSICAL_PAGE_RANGE_RE = re.compile(
+    r"<!--\s*pdf-physical-page-range:\s*(\d+)\s*-\s*(\d+)\s*-->"
+)
+
+
+def build_line_page_map(pdf_path, md_path=None):
     try:
         import fitz
     except ImportError:
@@ -134,11 +140,12 @@ def build_line_page_map(pdf_path):
     doc.close()
 
     md_text = ""
+    md_file = Path(md_path) if md_path else None
+    if md_file is None:
+        md_stem = pdf_path.stem
+        md_file = pdf_path.parent.parent / "debug_data" / "03_reports_markdown" / (md_stem + ".md")
     for encoding in ["utf-8", "gbk"]:
         try:
-            md_stem = pdf_path.stem
-            md_dir = pdf_path.parent.parent / "debug_data" / "03_reports_markdown"
-            md_file = md_dir / (md_stem + ".md")
             if md_file.exists():
                 md_text = md_file.read_text(encoding=encoding)
             break
@@ -148,6 +155,29 @@ def build_line_page_map(pdf_path):
     def line_to_page(line_number, md_lines):
         if not page_char_ranges:
             return None
+        marker_ranges = []
+        for marker_line, marker_text in enumerate(md_lines, start=1):
+            match = _PHYSICAL_PAGE_RANGE_RE.fullmatch(marker_text.strip())
+            if match:
+                marker_ranges.append((marker_line, int(match.group(1)), int(match.group(2))))
+        if marker_ranges:
+            active = None
+            for marker in marker_ranges:
+                if marker[0] <= line_number:
+                    active = marker
+                else:
+                    break
+            if active:
+                marker_line, start_page, end_page = active
+                next_marker_line = next(
+                    (marker[0] for marker in marker_ranges if marker[0] > marker_line),
+                    len(md_lines) + 1,
+                )
+                local_start = marker_line + 1
+                local_end = max(local_start, next_marker_line - 1)
+                ratio = (line_number - local_start) / max(local_end - local_start, 1)
+                ratio = max(0.0, min(1.0, ratio))
+                return min(end_page, start_page + int(round(ratio * (end_page - start_page))))
         char_offset = 0
         for i, line in enumerate(md_lines):
             if i + 1 == line_number:
@@ -163,6 +193,124 @@ def build_line_page_map(pdf_path):
         return page_char_ranges[-1][2] if page_char_ranges else None
 
     return line_to_page
+
+
+_PAGE_LABEL_LINE_RE = re.compile(
+    r"(?:^|[\s|])(?:第\s*)?([0-9]{1,4}|[ivxlcdm]{1,8})(?:\s*页)?\s*$",
+    re.IGNORECASE,
+)
+_EXPLICIT_PAGE_LABEL_RE = re.compile(
+    r"第\s*([0-9]{1,4})\s*页\s*(?:/\s*)?共\s*([0-9]{1,4})\s*页"
+)
+_SLASH_PAGE_LABEL_RE = re.compile(r"(?<![0-9])([0-9]{1,4})\s*/\s*([0-9]{1,4})(?![0-9])")
+
+
+def _expand_pdf_page_labels(raw_labels, page_count):
+    """展开 PDF 的显式 page label 元数据，不从相邻页面推测页码。"""
+    if not isinstance(raw_labels, list) or not raw_labels:
+        return {}
+
+    ranges = []
+    for item in raw_labels:
+        if not isinstance(item, dict):
+            continue
+        try:
+            start_page = int(item.get("startpage", -1))
+        except (TypeError, ValueError):
+            continue
+        if start_page < 0 or start_page >= page_count:
+            continue
+        ranges.append((start_page, item))
+    ranges.sort(key=lambda value: value[0])
+
+    result = {}
+    for index, (start_page, item) in enumerate(ranges):
+        end_page = ranges[index + 1][0] if index + 1 < len(ranges) else page_count
+        prefix = str(item.get("prefix", ""))
+        style = str(item.get("style", "D"))
+        try:
+            first_number = int(item.get("firstpagenum", 1))
+        except (TypeError, ValueError):
+            first_number = 1
+        for physical_page in range(start_page, end_page):
+            number = first_number + physical_page - start_page
+            if style in {"r", "R"}:
+                value = _to_roman(number, upper=style == "R")
+            else:
+                value = str(number)
+            result[physical_page + 1] = f"{prefix}{value}"
+    return result
+
+
+def _to_roman(number, upper=False):
+    if number < 1:
+        return str(number)
+    values = ((1000, "M"), (900, "CM"), (500, "D"), (400, "CD"),
+              (100, "C"), (90, "XC"), (50, "L"), (40, "XL"),
+              (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"))
+    result = []
+    remaining = number
+    for value, symbol in values:
+        count, remaining = divmod(remaining, value)
+        result.append(symbol * count)
+    roman = "".join(result)
+    return roman if upper else roman.lower()
+
+
+def _extract_footer_page_label(page, page_count=None):
+    """仅接受页面底部文本中直接出现的独立页码。"""
+    try:
+        height = float(page.rect.height)
+        page_text = page.get_text()
+        blocks = page.get_text("blocks")
+    except Exception:
+        return None
+    explicit_match = _EXPLICIT_PAGE_LABEL_RE.search(str(page_text))
+    if explicit_match:
+        return explicit_match.group(1)
+    slash_match = _SLASH_PAGE_LABEL_RE.search(str(page_text))
+    if slash_match and page_count is not None and int(slash_match.group(2)) == page_count:
+        return slash_match.group(1)
+
+    candidates = []
+    for block in blocks or []:
+        if not isinstance(block, (tuple, list)) or len(block) < 5:
+            continue
+        try:
+            y0 = float(block[1])
+        except (TypeError, ValueError):
+            continue
+        if y0 < height * 0.85:
+            continue
+        block_lines = [line.strip() for line in str(block[4]).splitlines() if line.strip()]
+        if not block_lines or len(block_lines) > 3:
+            continue
+        for line in block_lines[-1:]:
+            normalized_line = line.strip().strip("-—_ ")
+            match = _PAGE_LABEL_LINE_RE.search(normalized_line)
+            if match:
+                candidates.append(match.group(1))
+    return candidates[-1] if candidates else None
+
+
+def build_pdf_page_labels(pdf_path):
+    """返回物理页序到文档印刷页码的直接证据映射。"""
+    try:
+        import fitz
+        doc = fitz.open(str(pdf_path))
+    except Exception:
+        return {}
+    try:
+        explicit = _expand_pdf_page_labels(doc.get_page_labels(), len(doc))
+        if explicit:
+            return explicit
+        return {
+            page_number: label
+            for page_number in range(1, len(doc) + 1)
+            if (label := _extract_footer_page_label(doc[page_number - 1], len(doc))) is not None
+        }
+    finally:
+        doc.close()
 
 
 def _split_text_by_paragraphs(text):
@@ -248,8 +396,10 @@ def split_markdown_file(md_path, chunk_size=500, chunk_overlap=100,
         return []
 
     line_to_page_fn = None
+    page_labels = {}
     if pdf_path:
-        line_to_page_fn = build_line_page_map(pdf_path)
+        line_to_page_fn = build_line_page_map(pdf_path, md_path=md_path)
+        page_labels = build_pdf_page_labels(pdf_path)
 
     segments = []
     current_text = []
@@ -298,6 +448,7 @@ def split_markdown_file(md_path, chunk_size=500, chunk_overlap=100,
             j = i + 1
 
         chunk_text = "\n\n".join(s["text"] for s in chunk_segs)
+        chunk_text = _PHYSICAL_PAGE_RANGE_RE.sub("", chunk_text).strip()
         chunk_start_line = chunk_segs[0]["start_line"]
         chunk_end_line = chunk_segs[-1]["end_line"]
 
@@ -322,6 +473,11 @@ def split_markdown_file(md_path, chunk_size=500, chunk_overlap=100,
         }
         if pages:
             parent_data["pages"] = pages
+            document_pages = list(dict.fromkeys(
+                page_labels[page] for page in pages if page in page_labels
+            ))
+            if document_pages:
+                parent_data["document_pages"] = document_pages
 
         parent_chunks.append(parent_data)
 

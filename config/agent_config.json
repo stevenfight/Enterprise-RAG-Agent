@@ -52,5 +52,13 @@
         "_comment": "API 鉴权与安全配置",
         "key": "no-key-needed",
         "max_steps_hard_limit": 15
+    },
+    "hot_load": {
+        "_comment": "目录登记默认开启；indexing_enabled 需显式开启后才触发 MinerU 与 Embedding",
+        "directory_sync_enabled": true,
+        "interval_seconds": 15,
+        "indexing_enabled": false,
+        "max_attempts": 3,
+        "parse_timeout_seconds": 600
     }
 }

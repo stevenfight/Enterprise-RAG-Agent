@@ -18,7 +18,7 @@ import {
   message,
 } from 'antd';
 import { InboxOutlined, DeleteOutlined } from '@ant-design/icons';
-import { getDocuments, uploadDocument, deleteDocument }
+import { getDocuments, uploadDocument, deleteDocument, retryDocumentIndex }
     from '@/services/knowledgeService';
 import type { KnowledgeDocument } from '@/types/chat';
 import type { ColumnsType } from 'antd/es/table';
@@ -52,6 +52,25 @@ export default function KnowledgePage() {
   useEffect(() => {
     fetchDocuments();
   }, []);
+
+  const hasActiveIndexTask = documents.some((document) =>
+    document.index_status === 'pending_index' ||
+    document.index_status === 'index_failed',
+  );
+
+  useEffect(() => {
+    if (!hasActiveIndexTask) return undefined;
+
+    const timer = window.setInterval(() => {
+      getDocuments()
+        .then((data) => setDocuments(data.documents))
+        .catch((err) => {
+          console.error('[KnowledgePage] 热加载状态刷新失败:', err);
+        });
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [hasActiveIndexTask]);
 
   const handleUpload = async (file: File) => {
     if (!file.name.toLowerCase().endsWith('.pdf')) {
@@ -94,6 +113,17 @@ export default function KnowledgePage() {
     });
   };
 
+  const handleRetryIndex = async (filename: string) => {
+    try {
+      await retryDocumentIndex(filename);
+      message.success('已重新加入索引队列');
+      fetchDocuments();
+    } catch (err) {
+      console.error('[KnowledgePage] 重新索引失败:', filename, err);
+      message.error('重新索引失败');
+    }
+  };
+
   const columns: ColumnsType<KnowledgeDocument> = [
     {
       title: '文件名', dataIndex: 'filename', key: 'filename',
@@ -122,18 +152,35 @@ export default function KnowledgePage() {
       ],
       onFilter: (value, record: KnowledgeDocument) =>
           record.indexed === Boolean(value),
-      render: (v: boolean) => v
-          ? <Tag color="green">已索引</Tag>
-          : <Tag color="gold">未索引</Tag>,
+      render: (v: boolean, record: KnowledgeDocument) => {
+        const status = record.index_status ?? (v ? 'indexed' : 'not_indexed');
+        if (status === 'indexed') return <Tag color="green">已索引</Tag>;
+        if (status === 'index_failed') {
+          return <Tag color="red" title={record.index_error ?? '索引失败'}>索引失败</Tag>;
+        }
+        if (status === 'pending_index') return <Tag color="processing">处理中</Tag>;
+        return <Tag color="gold">未索引</Tag>;
+      },
     },
     {
       title: '操作', key: 'action', width: 80,
       render: (_: unknown, record: KnowledgeDocument) => (
-        <Button
-          danger icon={<DeleteOutlined />}
-          size="small"
-          onClick={() => handleDelete(record.filename)}
-        />
+        <>
+          {record.index_status === 'index_failed' && (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => handleRetryIndex(record.filename)}
+            >
+              重试
+            </Button>
+          )}
+          <Button
+            danger icon={<DeleteOutlined />}
+            size="small"
+            onClick={() => handleDelete(record.filename)}
+          />
+        </>
       ),
     },
   ];

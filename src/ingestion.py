@@ -31,6 +31,7 @@ import tiktoken
 from src.utils import get_api_key
 
 from .retrieval import preprocess_table_text
+from .index_publication import IndexPublicationManager
 
 ENCODING = tiktoken.get_encoding("cl100k_base")
 MAX_INPUT_TOKENS = 2048
@@ -114,6 +115,7 @@ def collect_chunks_by_company(chunked_dir):
             company_data[company_name]["parent_texts"][global_parent_key] = parent["text"]
 
             pages = parent.get("pages", None)
+            document_pages = parent.get("document_pages", None)
             source_file = parent.get("source_file", jf.stem + ".pdf")
             company_data[company_name]["source_files"].add(source_file)
 
@@ -125,6 +127,7 @@ def collect_chunks_by_company(chunked_dir):
                     "parent_id": parent_id,
                     "source_file": source_file,
                     "pages": pages,
+                    "document_pages": document_pages,
                     "company_name": company_name,
                     "hash": child_hash,
                     "text": child["text"],
@@ -270,6 +273,7 @@ def build_company_index(company_name, child_chunks, parent_texts, output_dir, ap
             "parent_id": c["parent_id"],
             "source_file": c["source_file"],
             "pages": c["pages"],
+            "document_pages": c.get("document_pages"),
             "company_name": c["company_name"],
             "hash": c["hash"],
             "tags": c.get("tags", []),
@@ -298,6 +302,35 @@ def build_company_index(company_name, child_chunks, parent_texts, output_dir, ap
         "vector_dim": EMBEDDING_DIM,
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
+
+
+def build_company_index_to_publication(
+    company_name, child_chunks, parent_texts, output_dir, api_key,
+    source_pdf_path=None, expected_sha256=None,
+):
+    """复用旧索引构建逻辑，但把产物交给 staging 发布层。"""
+    manager = IndexPublicationManager(output_dir)
+    def validate_source_version():
+        if source_pdf_path is None or expected_sha256 is None:
+            return
+        digest = hashlib.sha256()
+        with Path(source_pdf_path).open("rb") as file_handle:
+            for block in iter(lambda: file_handle.read(1024 * 1024), b""):
+                digest.update(block)
+        if digest.hexdigest() != expected_sha256:
+            raise RuntimeError("源 PDF 在索引构建期间发生变化，取消发布")
+
+    return manager.build_and_publish(
+        company_name,
+        lambda staging_company: build_company_index(
+            company_name,
+            child_chunks,
+            parent_texts,
+            staging_company.parent,
+            api_key,
+        ),
+        pre_publish_validator=validate_source_version,
+    )
 
 
 def show_status(registry_path, vector_db_dir):

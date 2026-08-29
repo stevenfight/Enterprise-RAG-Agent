@@ -16,6 +16,9 @@ export interface UploadResult {
   filename: string;
   size: number;
   size_mb: number;
+  sha256?: string | null;
+  index_status?: string;
+  idempotent?: boolean;
 }
 
 /** 获取文档列表 */
@@ -52,5 +55,14 @@ export async function deleteDocument(
 ): Promise<{ success: boolean }> {
   const res = await apiClient.delete(
       `/api/knowledge/documents/${encodeURIComponent(filename)}`);
+  return res.data;
+}
+
+/** 显式重新触发失败 PDF 的索引 */
+export async function retryDocumentIndex(
+    filename: string,
+): Promise<{ success: boolean; index_status: string }> {
+  const res = await apiClient.post(
+      `/api/knowledge/documents/${encodeURIComponent(filename)}/retry-index`);
   return res.data;
 }

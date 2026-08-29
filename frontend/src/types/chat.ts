@@ -39,13 +39,43 @@ export interface QueryResponse {
   comparison?: VerifiedComparison | null;
 }
 
+/** 已核验比较条目的声明级数值明细（后端可选载荷，旧响应不携带）。 */
+export interface VerifiedComparisonFactDetail {
+  raw_value: string;
+  raw_unit: string;
+  normalized_value: string;
+  normalized_unit: string;
+}
+
+/** 比较事实关联的公式计算明细。 */
+export interface VerifiedComparisonCalculation {
+  calculation_id: string;
+  operation: string;
+  formula_version: string;
+  input_fact_ids: string[];
+  details: Record<string, unknown>;
+}
+
+/** 比较事实关联的冲突裁决明细。 */
+export interface VerifiedComparisonConflict {
+  conflict_id: string;
+  status: string;
+  conflict_type: string | null;
+  fact_ids: string[];
+  relative_difference: string;
+  preferred_fact_id: string | null;
+}
+
 export interface VerifiedComparison {
   available: boolean;
   metric_key: string;
   fiscal_year: number;
   unit: string;
   fact_ids: string[];
-  items: Array<{ company_name: string; value: number; source_file: string; pages: number[]; excerpt: string }>;
+  items: Array<{ company_name: string; value: number; source_file: string; pages: number[]; excerpt: string } & Partial<VerifiedComparisonFactDetail>>;
+  /** 声明级证据可选载荷：关联公式与冲突原因，仅 V7 事实链响应携带。 */
+  calculations?: VerifiedComparisonCalculation[];
+  conflicts?: VerifiedComparisonConflict[];
 }
 
 /** 仅检索请求 (对应后端 RetrieveRequest) */
@@ -251,6 +281,11 @@ export interface KnowledgeDocument {
   size_mb: number;
   upload_time: string;
   indexed: boolean;
+  index_status?: string;
+  sha256?: string | null;
+  index_generation?: string | null;
+  index_error?: string | null;
+  index_attempts?: number;
 }
 
 /** 系统状态数据 (对应后端 SystemStatusResponse) */

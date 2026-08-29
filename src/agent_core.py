@@ -923,6 +923,8 @@ class ReActAgent:
                         "source": r.get("source_file", "未知来源"),
                         "content": r.get("text", "")[:200],
                         "pages": r.get("pages", ""),
+                        "physical_pages": r.get("physical_pages", []),
+                        "document_pages": r.get("document_pages", []),
                         "company_name": r.get("company_name", ""),
                     })
                 logger.debug("[ReActAgent] 已收集 %d 条来源 (来自 retrieve)", len(self._sources))
