@@ -305,6 +305,52 @@ class V7MetadataStore:
                 """CREATE INDEX idx_v7_route_decisions_task ON v7_task_route_decisions(task_id, decision_id)""",
             ),
         ),
+        (
+            24,
+            (
+                # D1.4：治理审计事件只追加表，记录 actor/action/resource/result/correlation_id，
+                # 供按任务回放计划、工具、审批、关键输入输出、模型版本与最终结论
+                """
+                CREATE TABLE v7_governance_audit_events (
+                    audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL,
+                    run_id TEXT NOT NULL DEFAULT '',
+                    actor TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    resource TEXT NOT NULL,
+                    result TEXT NOT NULL,
+                    detail_json TEXT NOT NULL DEFAULT '{}',
+                    correlation_id TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+                """CREATE INDEX idx_v7_governance_audit_task ON v7_governance_audit_events(task_id, audit_id)""",
+            ),
+        ),
+        (
+            25,
+            (
+                # D1.2：治理审批记录表，审批与规范化参数哈希及依赖哈希绑定，时效限制且消费后不可复用
+                """
+                CREATE TABLE v7_governance_approvals (
+                    approval_id TEXT PRIMARY KEY,
+                    task_id TEXT NOT NULL,
+                    run_id TEXT NOT NULL DEFAULT '',
+                    subject TEXT NOT NULL CHECK (subject IN ('conflict_resolution', 'report_signoff', 'tool_execution')),
+                    subject_id TEXT NOT NULL,
+                    params_hash TEXT NOT NULL,
+                    binding_json TEXT NOT NULL,
+                    digest TEXT NOT NULL,
+                    approver TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'granted' CHECK (status IN ('granted', 'consumed')),
+                    expires_at TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    consumed_at TEXT
+                )
+                """,
+                """CREATE INDEX idx_v7_governance_approvals_task ON v7_governance_approvals(task_id, subject, subject_id)""",
+            ),
+        ),
     )
 
     def __init__(
