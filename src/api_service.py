@@ -854,6 +854,11 @@ _charts_dir = project_root / "data" / "charts"
 _charts_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/api/charts/images", StaticFiles(directory=str(_charts_dir)), name="charts")
 
+# C2.6 研究任务持久执行 API：状态与事件全部来自 C0 内核，本模块不复制任务状态
+from .research_task_api import router as research_task_router
+
+app.include_router(research_task_router)
+
 
 def _extract_markdown_tables(answer: str, query: str) -> int:
     """从 LLM 回答中提取 markdown 表格，保存为 chart 条目（chart_type=table）

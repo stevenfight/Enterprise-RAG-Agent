@@ -85,32 +85,32 @@
 | S-T04 | 绿色（通过） | 同一 logical document 与相同 hash 幂等返回既有版本 | `python -m pytest -q tests/test_v7_document_repository.py`：RED 3 failed → GREEN 3 passed |
 | S-T05 | 绿色（通过） | 相同 hash 的不同 logical document 不被错误合并 | `python -m pytest -q tests/test_v7_document_repository.py`：RED 3 failed → GREEN 3 passed |
 | S-T06 | 绿色（通过） | 全部当前文档均生成且只生成一种有依据的处理决策 | `python -m pytest -q tests/test_document_reuse_decision.py`：RED 4 failed、原子写入 RED 1 failed → GREEN 5 passed；真实清单 12/12 ENRICH |
-| S-T07 | 🔴 RED | 完整 MinerU 产物选择 REUSE/ENRICH 且不调用解析器 | 复用门禁不存在 |
-| S-T08 | 🔴 RED | 已定位失败页只执行 TARGETED_REEXTRACT 范围 | 定向重处理任务不存在 |
+| S-T07 | 绿色（通过） | 完整 MinerU Markdown 与根目录内本地图片作为 `REUSE_EXISTING_ASSETS` 的实际输入，不调用解析器 | `tests/test_document_reuse_decision.py`：RED 4 failed（模块不存在）→ GREEN 9 passed；复用/清点回归 12 passed |
+| S-T08 | 绿色（通过） | 只接受有明确页码、类别和原因的 `failed_page/complex_table/chart/scanned_page/location_failure` 定向任务；不完整清点不推断扩大范围 | `tests/test_document_reuse_decision.py`：RED 4 failed → GREEN 9 passed |
 | S-T09 | 🔴 RED | 全局不兼容时 FULL_REEXTRACT 留下明确原因 | 全量重提取判定不存在 |
 | SRC-T01 | 绿色（通过） | 源 PDF 冻结清单记录哈希、物理页、加密/可读状态及既有 registry 的逻辑映射；冲突映射不猜测；原子写入保证源文件字节不变 | `python -m pytest -q tests/test_source_inventory.py`：RED 2 failed、追加边界 RED 1 failed → GREEN 3 passed |
-| S-T10 | 🔴 RED | 普通文本页不因首轮迁移调用视觉模型 | 页面路由尚未实现 |
-| S-T11 | 🔴 RED | 首个 v7 generation 覆盖迁移基线全部 active 文档 | 全量代际迁移器不存在 |
-| S-T12 | 🔴 RED | 缺少完整版本证据的旧向量不得导入首个 v7 generation | 向量兼容门禁不存在 |
-| S-T13 | 🔴 RED | 新代际任一完整性校验失败均不改变 active | 不可变发布流程不存在 |
+| S-T10 | 绿色（通过） | 普通文本页不因首轮迁移调用视觉模型 | `tests/test_v7_document_processing_coordinator.py`：RED 1 failed（`AttributeError: route_document_pages`）→ GREEN 4 passed；协调器在校验真实 PDF 后收集页信号、生成 PageRouter 快照，只将 `use_vision=True` 页交给分发器，文本页不分发 |
+| S-T11 | 绿色（通过） | 候选 v7 generation 以全部 active document version 与 blob hash 固定 corpus revision；缺任一 active 文档时拒绝构建 | `tests/test_v7_generation_migration.py`：RED 5 failed（模块不存在）→ GREEN 6 passed；generation/metadata/index 定向回归 22 passed |
+| S-T12 | 绿色（通过） | chunk 缺 parser/splitter/preprocess/embedding/schema 任一版本证据时记录 `reembed_required`，不会标记为旧向量可复用 | `tests/test_v7_generation_migration.py`：RED 5 failed → GREEN 6 passed |
+| S-T13 | 绿色（通过） | 候选制品哈希、大小、metadata 容器类型、维度或抽样检索失败时记录 `validation_failed` 审计且不写 legacy active 指针 | `tests/test_v7_generation_migration.py`：RED 5 failed；追加失败审计 RED 1 failed → GREEN 6 passed |
 | S-T14 | 🔴 RED | 查询在并发激活期间固定同一 generation 快照 | 请求级 Resolver 不存在 |
-| S-T15 | 🔴 RED | 已发布事实、声明、计算和报告关系不存在悬空外键 | ProvenanceRepository 不存在 |
-| S-T16 | 🔴 RED | 来源版本失效会把受影响声明、计算和报告标记 stale | 依赖影响传播不存在 |
-| S-T17 | 🔴 RED | 删除一个逻辑文档不会删除仍被引用的共享 blob | blob 引用计数不存在 |
+| S-T15 | 绿色（通过） | 发布事实、制品、计算、声明、报告的关联表均由 SQLite 外键保护，悬空写入拒绝且不留部分关系 | `tests/test_provenance_repository.py`：RED 3 failed（模块不存在）→ GREEN 3 passed；含 metadata、EvidenceBundle、计算仓储回归 15 passed |
+| S-T16 | 绿色（通过） | 来源 document version 失效会精确将直接/间接依赖的计算、声明和报告标记为 `stale` 并留下失效记录 | `tests/test_provenance_repository.py`：RED 3 failed → GREEN 3 passed |
+| S-T17 | 绿色（通过） | `tests/test_v7_document_repository.py`：零引用且超过保留期前不回收共享 blob；最后引用释放后才允许物理回收 | RED AttributeError（引用计数接口不存在）→ GREEN 文档仓储、上传与协调器回归 9 passed |
 | S-T18 | 🔴 RED | artifact API 拒绝路径、未知/删除/不可见 artifact 且不泄露路径 | 受控制品端点不存在 |
-| S-T19 | 🔴 RED | multimodal 开关关闭时旧上传、删除、查询契约与夹具一致 | 兼容开关未实现 |
+| S-T19 | 绿色（通过） | `multimodal_enabled` 关闭时上传、查询、删除严格匹配冻结 JSON 字段；开启时只追加处理状态和版本标识 | `tests/test_m0_compatibility_contract.py`：RED 2 failed（字段未声明）→ 3 passed；追加 API 装配 RED 1 failed → GREEN 4 passed；兼容回归 22 passed |
 | S-T20 | 🔴 RED | 当前溯源实现不引入图数据库或通用三元组依赖 | 依赖边界尚未实施验证 |
-| S-T21 | 🔴 RED | orphan staging/blob 不能通过查询或 artifact API 访问且可幂等清理 | 孤儿清理与可见性隔离不存在 |
-| S-T22 | 🔴 RED | 哈希键命中但大小/字节不一致时拒绝复用并审计 | 冲突校验不存在 |
+| S-T21 | 绿色（通过） | blob 只能由已登记 `document_version_id` 解析；未登记孤儿 blob 没有按 hash/path 读取接口，过期 staging 文件可幂等清理 | `tests/test_m0_input_and_orphans.py`：RED 2 failed（接口不存在）→ GREEN 3 passed；输入/上传/仓储回归 16 passed |
+| S-T22 | 绿色（通过） | hash 键命中但数据库 size 或磁盘字节不一致均拒绝复用，不创建新 document version | `tests/test_m0_input_and_orphans.py`：数据库大小冲突 GREEN；既有磁盘字节校验由仓储路径覆盖 |
 | S-T23 | 绿色（通过） | 控制字符、路径分隔符和 Windows 保留文件名不进入 v7 文档版本元数据或物理路径 | `python -m pytest -q tests/test_v7_document_repository.py`：追加边界 RED 1 failed → GREEN 4 passed |
-| S-T24 | 🔴 RED | I/O、数据库、解析和索引错误分类稳定且重试有上限 | 错误分类与重试策略不存在 |
-| S-T25 | 🔴 RED | 新上传响应保留 filename/size/size_mb 且处理中不宣称索引完成 | v7 上传兼容适配不存在 |
+| S-T24 | 绿色（通过） | I/O、数据库、解析和索引错误按稳定类别进入有限重试；确定性失败不再自动消费，任一失败均不写 indexed generation | `tests/test_pdf_hot_loader.py`：RED ImportError（不可重试异常/分类接口不存在）→ 热加载、上传、兼容与开关回归 47 passed |
+| S-T25 | 绿色（通过） | 新上传响应保留 `filename/size/size_mb`，并以 `pending_index`/`pending_processing` 表示未完成，V7 字段仅为可选追加 | `tests/test_m0_compatibility_contract.py`：RED 2 failed → GREEN 4 passed |
 | S-T26 | 🔴 RED | 端点级 API key 不被测试或文档误判为文档级多租户 ACL | 权限承诺边界未验证 |
-| S-T27 | 🔴 RED | 单次请求的索引、文档、artifact 和事实固定同一 publication | PublicationResolver 不存在 |
-| S-T28 | 🔴 RED | 两个构建者基于同 revision 发布时只有一个 CAS 成功 | PublicationSet CAS 不存在 |
-| S-T29 | 🔴 RED | 索引文件通过但发布事务失败时全部新数据不可见 | 跨组件发布集合不存在 |
-| S-T30 | 🔴 RED | 回滚整组恢复 index/document/artifact/fact 而非只切索引 | PublicationSet 回滚不存在 |
-| S-T31 | 🔴 RED | 首轮构建期间语料变化不会静默改变覆盖分母 | corpus revision 固定不存在 |
+| S-T27 | 绿色（通过） | PublicationSet 只接受已验证 generation，并以 SQLite 绑定 generation、完整 document version 集、页制品、事实与 corpus revision；请求开始捕获的快照不受后续激活影响 | `tests/test_publication_set.py`：RED 3 failed（模块不存在）→ PublicationSet/generation/metadata/provenance/兼容回归 31 passed |
+| S-T28 | 绿色（通过） | 每个 publication build 持久化 expected active publication/corpus revision；两个构建者同基线提交时仅第一个 CAS 激活，另一个记录 `superseded` 原因 | `tests/test_publication_set.py`：RED 3 failed（expected revision 接口不存在）→ PublicationSet/generation/metadata/provenance 回归 18 passed |
+| S-T29 | 绿色（通过） | publication 只接受带非空已验证索引制品清单的 generation；activation 末尾数据库故障时 active publication 与 build 状态整体回滚，新集合不可见 | `tests/test_publication_set.py`：SQLite trigger 故障注入，PublicationSet/generation/metadata/provenance/兼容回归 29 passed |
+| S-T30 | 绿色（通过） | 回滚创建新的 PublicationSet，完整复用目标 snapshot 的 generation、document versions、页制品和事实，并记录 restored/replaced publication 审计 | `tests/test_publication_set.py`：RED AttributeError（回滚接口不存在）→ 29 passed |
+| S-T31 | 绿色（通过） | candidate 固定 corpus revision，publication 激活必须匹配构建开始时记录的 active publication/revision；语料变化不会静默覆盖新 active 状态 | `tests/test_v7_generation_migration.py`、`tests/test_publication_set.py`：generation 基线与 CAS/superseded 回归 18 passed |
 | S-T32 | 🔴 RED | 删除与同 hash 上传并发时共享 blob 不被误删 | 引用计数事务不存在 |
 | S-T33 | 🔴 RED | 来源软失效保留历史审计并阻止新请求读取受保护 artifact | 软失效和发布过滤未集成 |
 | S-T34 | 🔴 RED | 进程崩溃后的旧 publication 租约可安全过期且不提前回收文件 | publication 租约不存在 |
@@ -177,51 +177,87 @@
 | PAGEART-T01 | 绿色（通过） | 页图制品登记必须绑定 matching manifest/document version/物理页，拒绝跨文档、越界和第 0 页 | `python -m pytest -q tests/test_page_artifact_repository.py`：RED 2 failed、页 0 边界 RED 1 failed → GREEN 2 passed |
 | REGION-T01 | 绿色（通过） | VisualRegion 只能绑定已完成页图制品，回查 manifest/物理页；仅接受有序的 0–1 非零面积规范化坐标 | `python -m pytest -q tests/test_visual_region_repository.py`：RED 2 failed → GREEN 2 passed；真实 PDF 第 1 物理页临时登记通过 |
 | BATCH-T01 | 绿色（通过） | 解析批次以不可重叠的 PDF 物理页段持久化，汇总明确区分缺失、失败和未完成页 | `python -m pytest -q tests/test_parse_batch_repository.py`：RED 2 failed → GREEN 2 passed；真实 5 页 PDF 的 `1–5` 物理页范围验收通过 |
+| ARTIFACT-T01 | 绿色（通过） | 六类制品均有 schema 版本；Manifest、Region、ParseBatch、表格、图表和视觉证据状态受限且同事务审计，页图仅凭完整文件创建为 immutable complete | `tests/test_visual_artifact_repository.py`：状态接口 RED 1 failed、schema 列 RED 1 failed → GREEN；`tests/test_parse_batch_repository.py`、manifest/region/page/metadata 关联回归 22 passed |
 | COORD-T01 | 绿色（通过） | V7 协调器只能用 document version/blob SHA/物理页数启动，按 manifest 全页渲染并以页图与解析批次双门禁完成 | `python -m pytest -q tests/test_v7_document_processing_coordinator.py`：RED 2 failed → GREEN 2 passed；真实 5 页 blob 临时链路通过 |
 | ASSET-T01 | 绿色（通过） | 既有 PDF/Markdown 诊断清单按同名配对统计图片、HTML/Markdown 表格与公式；缺失或越界本地制品标记 incomplete，报告原子写入 | `python -m pytest -q tests/test_document_asset_inventory.py`：RED 2 failed、追加写入 RED 1 failed → GREEN 3 passed |
-| M-T01 | 🔴 RED | 制品清单发现既有 Markdown 图片、HTML/Markdown 表格和公式 | DocumentAssetManifest 不存在 |
-| M-T02 | 🔴 RED | 缺失图片或无法关联页码的制品标记 missing/unresolved | 完整性校验不存在 |
-| M-T03 | 🔴 RED | MinerU 失败页批次使文档保持 incomplete | 批次状态未记录 |
-| M-T04 | 🔴 RED | 相同文档、页码和渲染版本复用页图 artifact ID | PageRenderer 不存在 |
-| M-T05 | 🔴 RED | 旋转页 bbox 与前端高亮使用同一规范化坐标 | 坐标模型不存在 |
-| M-T06 | 🔴 RED | 有文本层的普通页面不调用视觉模型 | PageRouter 不存在 |
-| M-T07 | 🔴 RED | 视觉模型未配置时明确 unavailable 且不静默文本回退 | VisionProvider 不存在 |
-| M-T08 | 🔴 RED | BaseLLMProvider.chat 保持纯文本契约 | 多模态尚未实现兼容边界 |
-| M-T09 | 🔴 RED | MinerU HTML 表格保留多级表头和 row/colspan | 表格结构适配器不存在 |
-| M-T10 | 🔴 RED | 表格事实不从 preprocess_table_text 扁平结果反推 | 结构化真值链不存在 |
-| M-T11 | 🔴 RED | 跨页续表只在标题、表头、列结构和相邻页均兼容时合并 | 续表规则不存在 |
-| M-T12 | 🔴 RED | 条件不足的跨页表格保持分离并标记候选关系 | 保守合并门禁不存在 |
-| M-T13 | 🔴 RED | 图表提取标题、图例、轴、单位、期间、系列和区域 | 图表理解器不存在 |
-| M-T14 | 🔴 RED | 只能判断趋势时不伪造精确数据点 | 置信与输出等级不存在 |
-| M-T15 | 🔴 RED | 扫描页低置信数字不能进入 verified 事实 | 视觉事实审核状态未集成 |
-| M-T16 | 🔴 RED | 视觉数字复用统一单位、期间和币种归一器 | 视觉链尚未接入 B 内核 |
-| M-T17 | 🔴 RED | 正文与图表同口径冲突进入统一冲突引擎 | 跨模态冲突链不存在 |
-| M-T18 | 🔴 RED | 视觉提示词注入不能改变工具权限和审批 | 视觉安全边界不存在 |
-| M-T19 | 🔴 RED | SourceInfo 可选视觉字段不改变旧 API JSON | 后端兼容扩展未实现 |
-| M-T20 | 🔴 RED | EvidencePanel 显示页图、区域高亮和 incomplete 警告 | 前端视觉证据未实现 |
-| M-T21 | 🔴 RED | 删除 PDF 同步清理清单、页图、视觉事实和索引 | 生命周期清理未实现 |
+| M-T01 | 绿色（通过） | 制品清单发现既有 Markdown 图片、HTML/Markdown 表格和公式 | `tests/test_document_asset_inventory.py`（Markdown 图片/HTML 表格/公式资产发现）3 用例通过；历史 RED 原始输出缺失（实现随 document_asset_inventory.py 先行落地），以现状通过为证如实登记 |
+| M-T02 | 绿色（通过） | 缺失图片或无法关联页码的制品标记 missing/unresolved | `tests/test_document_asset_inventory.py`（缺失资产标 missing）与 `tests/test_document_asset_manifest_repository.py`（complete 需解析批次覆盖、unresolved 禁止 complete）覆盖，合并 9 passed（短 basetemp）；历史 RED 原始输出缺失，以现状通过为证如实登记 |
+| M-T03 | 绿色（通过） | MinerU 失败页批次使文档保持 incomplete | RED 4 failed（`ImportError: cannot import name 'MinerUParseBatchBypass' from 'src.pdf_mineru'`）；GREEN `tests/test_pdf_mineru_parse_batch_bypass.py` 4 passed（成功批次写入/失败页使 coverage.complete=False 且 manifest.asset_status 保持 incomplete/旁路记录失败不影响原解析/单批异常路径记 failed），关联回归 `tests/test_parse_batch_repository.py` + `tests/test_pdf_hot_loader.py` 30 passed（短 basetemp） |
+| M-T04 | 绿色（通过） | 相同文档、页码和渲染版本复用页图 artifact ID | `tests/test_page_image_renderer.py`（同页渲染命中内容哈希缓存返回相同 artifact）与 `tests/test_page_artifact_repository.py`（注册链接 manifest 页身份）覆盖，22 passed（短 basetemp）；历史 RED 原始输出缺失，以现状通过为证如实登记 |
+| M-T05 | 绿色（通过） | 旋转页 bbox 与前端高亮使用同一规范化坐标 | `tests/test_multimodal_candidate_inventory.py`：RED 1 failed（90° 页直接按旋转后尺寸归一化得到错误坐标）→ GREEN 5 passed；检测器未旋转 bbox 先经 `page.rotation_matrix` 转换到页图空间后再归一化，未旋转页契约保持通过 |
+| M-T06 | 绿色（通过） | 有文本层的普通页面不调用视觉模型 | RED 1 collection error（`ModuleNotFoundError: No module named 'src.page_router'`，4 用例）；GREEN `tests/test_page_router.py` 4 passed（五类型区分/纯文本页 use_vision=False 且理由可审计/scan·chart·mixed 请求视觉而 table 按复杂度门禁另行决策/低字符文本页不误判 scan），全新独立模块无既有调用方，回归范围即本套件（短 basetemp） |
+| M-T07 | 绿色（通过） | 视觉模型未配置时明确 unavailable 且不静默文本回退 | `tests/test_vision_provider.py`：RED 2 failed（`ModuleNotFoundError: src.vision_provider`）→ GREEN 3 passed；未启用、缺 API key/model 或能力未声明均返回 `unavailable`，不会调用文本 Provider |
+| M-T08 | 绿色（通过） | BaseLLMProvider.chat 保持纯文本契约 | 同套件调用既有 `BaseLLMProvider.chat([{role, content}])` 仍抛出原有 `NotImplementedError`；视觉模块独立、未导入或包装 `BaseLLMProvider`，与多 Agent/路由/M2.1～M2.3 关联回归 78 passed |
+| M-T09 | 绿色（通过） | MinerU HTML 表格保留多级表头和 row/colspan | RED 1 collection error（`ModuleNotFoundError: No module named 'src.table_structure'`，4 用例）；GREEN `tests/test_table_structure.py` 4 passed（HTML colspan 表头网格展开且原始值/题注保留、rowspan 多级表头跨行关系与被覆盖格保留、Markdown 表格保留空单元格/单位/期间/原始文本、模块命名空间零导入 src.retrieval 且排版符号原样保留），关联回归 `tests/test_source_excerpt.py` + `tests/test_page_router.py` 10 passed |
+| M-T10 | 绿色（通过） | 表格事实不从 preprocess_table_text 扁平结果反推 | `src/table_structure.py` 结构化真值链直接解析 MinerU HTML/Markdown 原文（标准库 HTMLParser，无第三方依赖），经测试证明模块命名空间无任何来自 src.retrieval 的符号导入，且含排版符号与空值的原始单元格值原样保留（同上 4 passed） |
+| M-T11 | 绿色（通过） | 跨页续表只在标题、表头、列结构和相邻页均兼容时合并 | `tests/test_cross_page_table_continuation.py`：RED 1 collection error（`ImportError: cannot import name 'TablePage'`）→ GREEN 3 passed；相邻页、题注、表头、列结构全部兼容才返回 `confirmed`，不修改原表格真值 |
+| M-T12 | 绿色（通过） | 条件不足的跨页表格保持分离并标记候选关系 | 同一套件验证题注、表头或列结构冲突与非相邻页均返回 `candidate`、`requires_review=True`，不自动合并；与 M2.1/M2.2 关联回归 17 passed |
+| M-T55 | 绿色（通过） | 复杂表格视觉结果携带结构化表格、置信度、模型、用量和区域；高低置信均只进入 candidate，不可用或缺审计字段为 incomplete | `tests/test_complex_table_vision.py`：RED 2 failed（`ModuleNotFoundError: src.complex_table_vision`）→ GREEN 2 passed；视觉/表格/制品/事实关联回归 17 passed，未写入 verified 事实 |
+| M-T13 | 绿色（通过） | 图表提取标题、图例、轴、单位、期间、系列和区域 | `tests/test_chart_understanding.py`：RED 1 collection error（`ModuleNotFoundError: src.chart_understanding`）→ GREEN 3 passed；候选结果保留 manifest/视觉区域、标题、图例、轴、单位、期间与系列，且不写入 verified 事实 |
+| M-T14 | 绿色（通过） | 只能判断趋势时不伪造精确数据点 | 同一套件验证数值置信度 0.42 时清空 data_points、仅保留趋势候选；置信度阈值默认 0.85，全部成功输出保持 candidate/review_required |
+| M-T15 | 绿色（通过） | 扫描页低置信数字不能进入 verified 事实 | `tests/test_visual_fact_candidate_repository.py`：RED 2 failed（`ModuleNotFoundError: src.visual_fact_candidate_repository`）→ GREEN 2 passed；扫描候选外键绑定 manifest/页制品、默认 pending_review，低置信拒绝准入，高置信仍须显式 verified 后才能保存并关联事实 |
+| M-T56 | 绿色（通过） | 视觉候选事实的准入服务同时要求置信度达标与人工审核通过 | `tests/test_visual_fact_admission.py`：RED 1 collection error（`ModuleNotFoundError: src.visual_fact_admission`）→ GREEN 2 passed；低置信即使标记 verified 仍不调用事实仓储，candidate 同样拒绝，高置信 verified 才保存 |
+| M-T16 | 绿色（通过） | 视觉数字复用统一单位、期间和币种归一器 | `tests/test_visual_fact_normalizer.py`：RED 4 failed（`ModuleNotFoundError: src.visual_fact_normalizer`）→ GREEN 4 passed；候选仓储注册强制调用既有金额归一器和 FinancialFact 契约，保存归一值/单位/换算轨迹，拒绝未知单位、非法币种和非法期间 |
+| M-T17 | 绿色（通过） | 正文与图表同口径冲突进入统一冲突引擎 | `tests/test_visual_fact_conflict_bridge.py`：RED 1 failed（`ModuleNotFoundError: src.visual_fact_conflict_bridge`）→ GREEN 1 passed；已审核且已关联事实的视觉候选调用既有 FinancialFactConflictService，超阈值 VALUE_CONFLICT 写入既有冲突仓储 |
+| M-T18 | 绿色（通过） | 图片/OCR 等不可信视觉内容被隔离进只读上下文，不能改变系统指令、工具权限、审批、能力或预算 | `tests/test_vision_security_boundaries.py`：RED 3 failed（`src.vision_security` 不存在）→ GREEN；`VisionSafetyGuard` HTML 转义并封装不可信内容，`BaseVisionProvider` 仅向具体 Provider 传递已冻结请求 |
+| M-T19 | 绿色（通过） | `SourceInfo` 可选视觉字段不改变旧 API JSON；仅 complete 制品可带 manifest/page/region/bbox 定位 | `tests/test_source_info_visual_locator.py`：RED 1 failed（定位字段丢弃）→ 后端兼容定向回归 8 passed；前端 241 passed、生产构建通过 |
+| M-T20 | 绿色（通过） | EvidencePanel 显示页图、区域高亮和 incomplete 警告 | `tests/test_source_info_visual_locator.py` RED 1 failed（缺失状态字段）→ 后端来源定向回归 4 passed；`SourceCard.test.tsx` RED 1 failed（提示未显示）→ GREEN 5 passed，确认 incomplete 不请求页图 |
+| M-T21 | 绿色（通过） | 删除 PDF 同步清理清单、页图、视觉事实和索引 | 完整链路已闭环：未发布版本清理服务（M-T36）；已索引版本经删除协调器推进——`delete_pdf(filename, deletion_coordinator=...)` 为同名全部未删除版本幂等创建删除请求（M3.6.a），排除重建与 PublicationSet CAS 发布（M-T44/M3.10.b）、`cleanup_request` 事实失效/stale 传播/blob 回收（M-T41/M3.11）、旧代际回收（M1.10）；页图 `.deleting` 受限清理（M-T28/M-T37/M-T38）。`tests/test_v7_delete_pdf_integration.py`：RED 3 failed（`deletion_coordinator` 参数与 `request_deletion_by_original_filename` 不存在）→ GREEN 4 passed，关联回归 46 passed（7 套件）；不注入协调器时 V7 表零触碰，与现状完全一致 |
 | M-T22 | 🔴 RED | 多模态索引不降低批准的纯文本检索与问答基线 | 尚未运行集成回归 |
 | M-T23 | 🔴 RED | 同一视觉区域命中缓存时不重复调用模型 | 视觉缓存和调用账本不存在 |
-| M-T24 | 🔴 RED | 异常像素、页数或成本超限时停止并留下审计错误 | 资源预算门禁不存在 |
+| M-T24 | 绿色（通过） | 伪造 PNG/JPEG、异常像素、文件大小、调用次数或预估 Token 超限时在具体 Provider 调用前停止，并返回 explicit incomplete | `tests/test_vision_security_boundaries.py`：首轮 3 failed（模块不存在），追加 Provider 调用隔离 RED 1 failed（安全异常直接冒泡）→ GREEN 4 passed；M3 视觉服务关联回归 16 passed |
 | M-T25 | 🔴 RED | manifest 原子写入失败时不得推进 complete | 制品状态存储不存在 |
 | M-T26 | 🔴 RED | 视觉 embedding 失败不写零向量且标记 incomplete | 索引 strict 模式不存在 |
-| M-T27 | 🔴 RED | 页图端点只接受合法 artifact ID 并拒绝路径遍历/跨文档访问 | 受控制品 API 不存在 |
-| M-T28 | 🔴 RED | 删除中断后保持 deleting 并可幂等续清理 | 删除状态机不存在 |
-| M-T29 | 🔴 RED | 同源页面或裁剪变体不能跨开发集和冻结留出集 | 多模态数据泄漏校验不存在 |
+| M-T27 | 绿色（通过） | 页图端点仅解析同 manifest 下合法且 complete 的已登记 artifact ID，拒绝路径遍历、未知 ID、跨 manifest 和默认关闭路径 | `tests/test_page_artifact_access.py`：RED 2 failed（访问服务不存在）、端点 RED 1 failed（接口不存在）→ 关联回归 16 passed；应用级 API key 不构成文档级 ACL |
+| M-T28 | 🟡 部分通过 | 删除中断后保持 deleting 并可幂等续清理 | 页图根目录的 `.deleting` 文件可受限幂等清理，并已收敛到 V7 处理协调器实际输出目录（M-T37/M-T38）；尚未接入应用启动或后台调度 |
+| M-T29 | 绿色（通过） | 同源页面或裁剪变体不能跨开发集和冻结留出集 | 区域级样本强制提供 PDF SHA-256 和物理页；`tests/test_multimodal_evaluation_coverage.py` RED 1 failed（只报样本数量不足）→ 覆盖/候选关联回归 7 passed，跨不同 document ID 的同 hash 页被拒绝 |
 | M-T30 | 🔴 RED | 高风险视觉数字误入 verified 时无视平均分直接失败 | 高风险硬门禁不存在 |
 | M-T31 | 🔴 RED | 多模态报告包含路由、缓存、调用、失败和 P95 | 成本观测字段不存在 |
 | M-T32 | 🔴 RED | 页图高亮可键盘操作且表格/图表有文本等价说明 | 前端可访问性尚未实现 |
 | M-T33 | 🔴 RED | staging 索引构建失败不改变 active publication | 索引代际管理器不存在 |
 | M-T34 | 🔴 RED | 新代际校验后与文档/制品/事实整组发布且可回滚 | PublicationSet 不存在 |
-| M-T35 | 🔴 RED | 单次请求始终读取同一 publication | 请求级发布快照固定不存在 |
-| M-T36 | 🔴 RED | 激活后 RAGGenerator、RetrieveTool、CompareTool 新请求均刷新 publication | 统一 Resolver 不存在 |
-| M-T37 | 🔴 RED | Windows 打开旧索引时不会被回收或替换 | 代际引用与回收策略不存在 |
-| M-T38 | 🔴 RED | multimodal_enabled 关闭时旧上传、索引和来源响应完全不变 | 多模态开关不存在 |
-| M-T39 | 🔴 RED | 相同内容哈希重复上传幂等返回同一文档版本 | 文档版本模型不存在 |
-| M-T40 | 🔴 RED | 同名不同内容创建新版本且完整前不替换 active | 版本激活门禁不存在 |
-| M-T41 | 🔴 RED | deleting 线性化点后新查询不再包含该文档版本 | 查询快照过滤不存在 |
-| M-T42 | 🔴 RED | 删除完成后 artifact API 和新索引均不可访问派生数据 | 跨存储删除闭环未实现 |
+| M-T35 | 绿色（通过） | complete `visual_locator` 经统一 Bearer 请求读取 Blob 页图，并按 bbox 显示高亮；请求 URL 不包含密钥 | `SourceCard.test.tsx` RED 1 failed（未显示页图）→ 来源卡与服务层定向回归 8 passed；全量前端 242 passed、生产构建通过 |
+| M-T36 | 绿色（通过） | 未发布且未进入索引代际的 V7 文档删除会同步清理 manifest、解析批次、页图文件、视觉区域、表图制品和视觉证据；索引代际引用明确拒绝 | `tests/test_v7_document_deletion.py` RED 2 failed（模块不存在）→ GREEN 2 passed；与页图、制品仓储、manifest 关联回归 14 passed |
+| M-T37 | 绿色（通过） | 删除中断遗留的页图 `.deleting` 文件只可在调用方明确指定的制品根目录内幂等清理 | `tests/test_v7_document_deletion.py` RED 1 failed（恢复接口不存在）→ GREEN 3 passed，目录外同名文件保持不变 |
+| M-T38 | 绿色（通过） | V7 处理协调器恢复页图删除时仅使用其 PageImageRenderer 配置的输出根目录 | `tests/test_v7_document_processing_coordinator.py` RED 1 failed（协调器接口不存在）→ 与删除服务回归 6 passed |
+| M-T39 | 绿色（通过） | 区域级源页身份字段在 JSON Schema 与运行时模型中同名、同约束，避免 `additionalProperties=false` 拒绝有效样本 | `tests/test_multimodal_evaluation_coverage.py` RED 1 failed（Schema 缺字段）→ 与评测质量门禁回归 24 passed |
+| M-T44 | 绿色（通过） | 已索引文档只能通过排除后的候选 generation 退出未来发布集；构建候选不会原地改变当前 active 文档或 active publication，并记录排除审计 | `tests/test_v7_generation_migration.py`：RED 1 failed（接口不存在）→ generation、PublicationSet、删除关联回归 16 passed |
+| M-T45 | 绿色（通过） | staging generation 制品验证成功后，PublicationSet 只进入 prepared 并带构建开始时的 CAS 基线；不会自动切换 active publication | `tests/test_v7_generation_publication_coordinator.py`：RED 1 failed（协调器模块不存在）→ generation、PublicationSet、legacy staging 关联回归 25 passed |
+| M-T51 | 绿色（通过） | 实际 `IndexPublicationManager` 发布出的 staging generation 制品被注册为 V7 candidate 的不可变 hash/size manifest 绑定；绑定失败不创建 PublicationSet 且 active publication 不变；manifest 与发布结果不一致先于验证被拒绝 | `tests/test_v7_index_generation_binding.py`：RED 3 failed（绑定模块不存在）→ 绑定、协调器、回收定向回归 9 passed，generation/publication/legacy 关联回归 33 passed |
+| M-T52 | 绿色（通过） | 协调器提供受控显式 CAS 激活入口：基线匹配时切换 active 并置 published；基线过期得到 superseded 且 active 保持不变，绝不读取 legacy JSON active 指针 | `tests/test_v7_generation_publication_coordinator.py`：RED 2 failed（激活入口不存在）→ 三套件定向回归 9 passed，关联回归 33 passed |
+| M-T53 | 绿色（通过） | 旧 generation 回收只记录资格审计（无 active publication 引用、无在途请求引用、保留期已过、Windows 制品未被打开锁定），绝不物理删除；历史 publication 引用仅记入明细不阻塞；锁定文件释放后资格恢复 True | `tests/test_v7_generation_retirement.py`：RED 3 failed（回收模块不存在）→ 三套件定向回归 9 passed，关联回归 33 passed；锁定探测原用重命名到自身无法感知 CPython 共享打开，改为 Windows 独占打开探测后 GREEN |
+| M-T54 | 绿色（通过） | 端到端编排收口：排除文档候选 → 实际构建发布 → 绑定 → CAS 准备 → 显式激活 → 旧代际回收资格；激活后旧代际合格、整组回滚后重新失格；并发基线覆盖时后激活者 superseded、回滚恢复旧代际且候选与制品不被物理删除；V7 激活不读/不改 legacy JSON 指针 | `tests/test_v7_generation_publication_e2e.py`：集成验证组合既有分段能力（M-T44～M-T53），无新增生产代码故无 RED 缺口，不作伪造 → 2 passed，七套件关联回归 35 passed |
+| M-T46 | 绿色（通过） | 单次请求始终读取同一 publication：请求内激活新 publication 不影响本请求，end_request/request_scope 后释放，无 active 时返回 None | `tests/test_publication_set.py`：RED 1 failed（`AttributeError: 'PublicationResolver' object has no attribute 'begin_request'`）→ 新增 2 用例 GREEN；resolver 用 ContextVar 保存请求快照实现请求级固定 |
+| M-T47 | 绿色（通过） | 激活后 RAGGenerator、RetrieveTool、CompareTool 新请求均刷新 publication，结果携带 publication_id，请求结束后快照释放；未注入 resolver 时三工具行为与现状完全一致 | `tests/test_v7_publication_resolver_wiring.py`：RED 4 failed（HybridRetriever/RetrieveTool/CompareTool/RAGGenerator 各 1 个 `TypeError: unexpected keyword argument`）→ HybridRetriever 快照代际优先 + 三工具接线后 4 用例 GREEN；关联回归 14 passed（generation/publication E2E、retrieve/compare quick、agent tools） |
+| M-T48 | 绿色（通过） | Windows 打开旧索引时不会被回收或替换 | `tests/test_v7_generation_retirement_execution.py`：RED 3 failed（`ImportError: cannot import name 'V7GenerationRetirementExecutor'`）→ 执行器 GREEN：合格代际制品物理删除+候选置 retired+retirement_executed 审计；不合格（active 引用/在途/保留期/锁定任一）绝不删除并记 retirement_skipped；锁定句柄期间回收跳过、释放后重新执行成功；active publication 全程不变。资格评估原 3 用例 + 关联回归 20 passed（migration/coordinator/e2e/publication_set） |
+| M-T49 | 🔴 RED | multimodal_enabled 关闭时旧上传、索引和来源响应完全不变 | 多模态开关不存在 |
+| M-T50 | 🔴 RED | 相同内容哈希重复上传幂等返回同一文档版本 | 文档版本模型不存在 |
+| M-T40 | 绿色（通过） | 同名不同内容创建新版本且完整前不替换 active | `tests/test_v7_document_version_promotion.py`：RED 3 failed（`AttributeError`：promote_document_version_to_active / get_active_document_version 不存在）→ 仓储新增两方法后 GREEN：同 key 不同 hash 登记新版本为 pending_index 且 active 不变，唯一激活入口 promote 原子降级旧 active 为 superseded 并激活目标；GREEN 验证 12 passed（promotion 3 + m0 兼容 4 + repository 5），关联回归 23 passed |
+| M-T57 | 绿色（通过） | 索引回调明确成功并返回 generation 身份后才调用文档版本提升 | `tests/test_v7_document_index_promotion_coordinator.py`：RED 2 failed（`ModuleNotFoundError`）→ GREEN 2 passed；索引失败/缺 generation 保持旧 active，成功后才显式 promote |
+| M-T58 | 绿色（通过） | 旧 generation 批处理只选择 `validated` 状态，遵守稳定顺序和单轮 batch 上限；在途 generation 由既有执行器保留制品、状态并留下跳过审计 | `tests/test_v7_generation_retirement_scheduler.py`：RED 2 failed（`ModuleNotFoundError`）→ 批处理与资格/执行器关联 GREEN 8 passed |
+| M-T41 | 绿色（通过） | 文档级 deleting 线性化点后新查询不再取得该版本，旧查询快照保持固定；blob ID 解析拒绝 deleting 版本；active publication 包含 deleting 文档时，新 V7 请求 fail-closed，不回退 legacy generation；活动请求租约在 begin/end 间持久化，删除请求明确返回等待 lease 或重建 generation 状态；`rebuild_required` 删除请求可构建排除 deleting 版本的候选代际，经制品绑定与 PublicationSet CAS 发布使替代 publication 生效，重建不触碰 deleting 版本本体；过期租约不再阻塞删除进度，`advance_request()` 按租约与替代 publication 状态推进到 `cleanup_ready` 稳定终态（schema v22），`cleanup_request()` 完成事实可见性失效、stale 传播软失效审计与共享 blob 引用分层回收 | `tests/test_v7_document_deletion_visibility.py`、`tests/test_v7_document_deletion_coordinator.py`：RED 分别为 2 failed、1 failed（模块不存在）→ 删除协调、可见性、PublicationResolver、metadata 关联 GREEN；`tests/test_v7_deletion_rebuild_publication.py`：RED 1 failed（`GenerationMigrationError: 待移除文档版本不是 active 状态`）→ `build_candidate_excluding_document` 接受 `deleting` 线性化状态后 GREEN；租约等待/过期治理与 `advance_request()` 首轮 GREEN 前命中旧 CHECK 约束（status 不含 `cleanup_ready`）→ schema v22 重建表放宽约束后 coordinator 专测 9 passed；`cleanup_request()` 首轮 `FOREIGN KEY constraint failed`（deleting 版本行外键仍引用 blob 登记行）→ 引用计数排除 `deleting`、仅全部版本行物理移除才删登记行的分层设计后 GREEN；软失效审计按 `reason='document_cleanup'` 精确断言（主键为 (document_version_id, reason)，删除请求与清理动作各有记录）；并发引用插入经 `BEGIN IMMEDIATE` 写锁串行化后回收基于最新引用判定；十文件定向回归 47 passed（deletion coordinator/repository、provenance、deletion、rebuild publication、deletion visibility、metadata store、publication set、generation migration、generation publication e2e） |
+| M-T42 | 绿色（通过） | 删除完成后 artifact API 和新索引均不可访问派生数据 | 索引层：重建候选排除 deleting 版本（M-T44/M-T41 链，`tests/test_v7_deletion_rebuild_publication.py`）；artifact 层：页图端点对 deleting 版本 fail-closed 拒绝读取（M-T60，`tests/test_artifact_endpoint_auth.py`）；页图文件物理清理调度接线仍属 M-T28 范围 |
 | M-T43 | 🔴 RED | 旧在途请求与新代际激活遵守明确快照语义 | 文档版本与 generation 固定未集成 |
+| M-T59 | 绿色（通过） | delete_pdf 经注入协调器为同名全部未删除版本幂等创建删除请求且先于文件删除，不注入时 V7 表零触碰；索引 metadata 链条件透传 artifact_refs，未携带不新增字段 | `tests/test_v7_delete_pdf_integration.py`：RED 3 failed（`deletion_coordinator` 参数与 `request_deletion_by_original_filename` 不存在）→ GREEN 4 passed；`tests/test_ingestion_strict_and_artifact_refs.py`：RED 3 failed（strict 与 `EmbeddingIncompleteError` 不存在）→ GREEN 4 passed（M-T26 strict 语义共用此证据）；7 套件关联回归 46 passed |
+| M-T60 | 绿色（通过） | 页图端点受端点级 API key 保护（路径不在免认证白名单，缺头/错 key 返回 401 且下游不被调用）；制品目录不公开静态挂载、页图路由为受控 APIRoute；关联 document version 为 deleting 或缺失时页图读取 fail-closed 拒绝；仅承诺单用户/单租户端点级认证，不构成文档级多租户 ACL（M3.9/M3.9.1/S-T26 边界） | `tests/test_artifact_endpoint_auth.py`：RED 1 failed（`resolve_image` 不校验版本可见性，DID NOT RAISE）→ JOIN `v7_document_versions.index_status` 校验后 GREEN 3 passed（认证与挂载两条为钉住既有行为的回归）；9 套件关联回归 52 passed |
+| M-T61 | 绿色（通过） | M3.1–M3.5 与 M3.10–M3.12 的已实现本地链路可共同回归，短临时目录不受 Windows 中文长路径影响 | `$env:TEMP` 下短 `--basetemp` 执行 24 个 M3 相关套件：85 passed；仅 4 条既有第三方弃用警告。 |
+| M-T62 | 绿色（通过） | 可选 `visual_chart` 不破坏旧 `SourceInfo`；证据分组与链节点能区分回答、检索、视觉证据，并对缺少完整页图定位的视觉制品标记 incomplete | 前端 RED：4 个定向文件失败（`VisualChartEvidence` 不存在、bundle/chain/panel 无视觉语义）；GREEN：5 文件 20 tests passed；全量前端 46 文件 248 tests passed。 |
+| M-T63 | 绿色（通过） | 证据面板和证据链图将视觉类别与不完整状态以可访问文本明确呈现；既有页图 Blob 预览、bbox 高亮与键盘触发语义保持复用 | `EvidenceContent.test.tsx`、`EvidenceChainGraph.test.tsx`、`SourceCard.test.tsx` 定向 GREEN；全量前端 46 文件 248 tests passed。 |
+| M-T64 | 绿色（通过） | 识别图表仅在数值置信度不少于 0.85 且拥有 complete 页图定位时复用 `ChartContainer` 展示；否则拒绝绘制数值图，仅显示不完整警告和趋势候选 | `VisualChartEvidence.test.tsx` RED（模块不存在）→ GREEN（高置信+定位可绘制，低置信/无定位不绘制）; 全量前端 46 文件 248 tests passed，lint/build 通过。 |
+| M-T65 | 绿色（通过） | M4.4 准入报告在证据缺失时 fail-closed；只接受已 verified 的区域样本、与当前 holdout 完全一致的冻结运行记录、合法视觉运行账本、零高风险误入 verified 及完整成本批准记录 | `tests/test_m4_multimodal_readiness.py`：RED 4 failed（模块不存在）→ GREEN 4 passed；与既有多模态覆盖和评测质量门禁回归共 28 passed。当前 385 条 pending_review 候选实跑报告为 No-Go，不作为发布证据。 |
+| M-T66 | 绿色（通过） | 人工复核候选抽样按整份文档/公司隔离 development 与 holdout，同源页只保留一条，轮转文档抽样，候选状态强制为 pending_review；公司跨分区、源页不足或输出非 pending_review 均拒绝 | `tests/test_multimodal_candidate_inventory.py`：RED 3 failed（抽样/写包函数不存在）→ GREEN；与区域级评测覆盖回归共 12 passed。真实包 `multimodal_review_packet_tables_20260830.jsonl` 为 30 development + 10 holdout，0 重复源页、0 hash/页/bbox 校验失败。 |
+| C1-T01 | 绿色（通过） | ResearchTask 的 task_id 映射稳定 C0 run_id，DAG 节点直接映射 C0 step_id/lease；任务状态与 revision 仅来自 C0，且不新增任务状态表、不替换 AgentMemory | `tests/test_research_task_adapter.py`：RED 3 failed（适配模块不存在）→ GREEN；与 `tests/test_durable_execution.py` 共 16 passed。 |
+| C1-T02 | 绿色（通过） | 等待审批、暂停、恢复和取消命令均复用 C0 transition/revision/CAS；重复 command_id 幂等，过期 revision 被拒绝 | `tests/test_research_task_adapter.py`：RED 1 failed（命令方法不存在）→ GREEN；与 C0 回归共 17 passed。 |
+| C1-T03 | 绿色（通过） | 研究检查点具 schema_version，仅含 task/run、DAG、依赖版本、制品/事实稳定 ID，拒绝不可 JSON 序列化对象 | `tests/test_research_task_adapter.py`：RED 1 failed（构造器不存在）→ GREEN；与 C0 回归共 18 passed。 |
+| C1-T04 | 绿色（通过） | 研究步骤提交将版本化 checkpoint 与 invocation 委托 C0 `commit_step` 的同一事务；保留 C0 租约、revision/CAS 与晚到结果门禁，不新增任务表 | `tests/test_research_task_adapter.py`：RED 1 failed（提交方法不存在）→ GREEN；与 C0 回归共 19 passed。 |
+| C1-T05 | 绿色（通过） | 研究任务仅以 `task_id` 在运行时关联既有 `AgentMemory` 实例，复用其原上下文生成，不改写工作记忆、会话持久化或数据库 | `tests/test_research_task_adapter.py`：RED 1 failed（关联方法不存在）→ GREEN；与 C0 和 AgentMemory 回归共 27 passed。 |
+| C1-T06 | 绿色（通过） | 恢复只复用检查点依赖版本完全一致、且当前步骤幂等键对应成功调用的步骤；版本变化必须明确拒绝复用 | `tests/test_research_task_adapter.py`：RED 1 failed（恢复决策方法不存在）→ GREEN；与 C0 回归共 21 passed。 |
+| C1-T07 | 绿色（通过） | 临时错误只在有限次数内允许重试；批准类错误等待审批，未知或输入错误失败；超时只标记尝试，仍由 C0 拒绝晚到结果 | `tests/test_research_task_adapter.py`：RED 1 failed（失败决策方法不存在）→ GREEN；与 C0 回归共 22 passed。 |
+| C1-T08 | 绿色（通过） | 研究任务在 Planner 产出、编排启动、DAG 领取/提交和超时边界均委托 C0；超时不把运行或底层调用写为已停止 | `tests/test_research_task_adapter.py`：RED 1 failed（编排模块不存在）→ GREEN；与 C0 和 Planner 回归共 23 passed。 |
+| C1-T09 | 绿色（通过） | 任务事件使用 C0 持久自增 ID，按保留期裁剪；显式数值游标早于最旧保留事件时返回重同步，不静默漏事件 | `tests/test_research_task_adapter.py`：RED 1 failed（事件流模块不存在）→ GREEN；与 C0 回归共 24 passed。 |
+| C1-T10 | 绿色（通过） | 新研究任务事件流使用 fetch 和 `Authorization` 头；密钥不进入 URL，端点不进入 APIAuthMiddleware 免鉴权白名单 | 前端 `researchTaskStream.test.ts`：RED（模块不存在）→ GREEN 1 passed；后端鉴权回归 4 passed；前端生产构建通过。 |
+
+> 编号勘误（2026-08-29）：本段原 M-T35～M-T39 五条 RED 与上方已完成条目编号重复，现重编为 M-T46～M-T50；已完成条目 M-T35～M-T39 含义不变。新增测试 ID 自 M-T51 起分配。
 
 ## C1. 可恢复研究任务产品化
 
@@ -244,9 +280,12 @@
 | C-T15 | 🔴 RED | 旧即时问答 API 响应保持兼容 | 新集成尚未实现 |
 | C-T16 | 🔴 RED | 持久任务流必须鉴权且不接受 URL 长期 API Key | 新流式端点不存在 |
 | C-T17 | 🔴 RED | 事件游标早于保留窗口时要求快照重同步 | 事件保留策略不存在 |
-| C-T18 | 🔴 RED | 前端按 revision 忽略旧状态事件 | 前端任务状态合并不存在 |
+| C-T18 | 绿色（通过） | 前端按 revision 忽略旧状态事件：乱序/重放旧 revision 或相同 revision 事件不回退状态且返回原引用；run_created 初始化 pending；resumed 标记仅在 paused→running 迁移为 true；window_end 与未知事件类型不参与状态合并；多任务状态隔离且 resetTask 可移除；状态标签覆盖七类状态中文展示与恢复提示 | `frontend/src/services/__tests__/researchTaskState.test.ts`、`frontend/src/stores/__tests__/researchTaskStore.test.ts`、`frontend/src/components/chat/__tests__/ResearchTaskStatusTag.test.tsx`：RED 3 个文件收集失败（`@/services/researchTaskState` 等模块不存在）→ GREEN 14 passed；`node node_modules/typescript/bin/tsc -b` 类型检查通过。实现记录见文末 2026-08-30 C2.8 段。 |
 | C-T19 | 🔴 RED | 现有线程 timeout 不被误判为底层调用已取消 | 晚到结果隔离尚未接入编排器 |
 | C-T20 | 🔴 RED | waiting_approval 依赖变化后不能沿用旧审批 | 审批版本绑定未集成 |
+| C-T21 | 绿色（通过） | 六端点 API（创建/查询/事件流/暂停/恢复/取消）：控制命令携带 command_id/expected_revision，重复命令幂等回放，过期 revision 返回 409 与当前 revision，缺失任务 404，请求体校验 422；事件流输出 SSE 帧与 window_end 游标帧，游标早于保留窗口时返回 resync_required 帧而非静默跳过 | `tests/test_research_task_api.py`：RED 14 failed（`src.research_task_api` 不存在）→ GREEN 14 passed；定向回归（adapter/stream_auth/durable/api）39 passed。实现记录见文末 2026-08-30 C2.6 段。 |
+| C-T22 | 绿色（通过） | 路由决策持久化与重试守卫：选定路径只追加且同路径幂等，异路径改道抛 RoutePathConflictError，未知路径 ValueError；失败记录保存 category/action/retry_count/max_retries 且选定路径不变；重试新建 `{task_id}-retry-N` 全新 run（原 run 保持 failed），新任务继承选定路径并写入 retry 决策（detail 含 new_task_id）；未记录路径或未 failed 拒绝重试 | `tests/test_research_task_route_persistence.py`：RED 7 failed（adapter 缺少 record_route_selection 等方法与 RoutePathConflictError）→ GREEN 7 passed；定向回归（adapter/metadata_store/durable/api/stream_auth/route_persistence）51 passed。实现记录见文末 2026-08-30 C2.7 段。 |
+| C-T23 | 绿色（通过） | 五类故障演练：Worker 异常（重试型失败保持运行且失败只追加记录，重试耗尽迁移 failed、选定路径不变、晚到结果被丢弃、显式重试新建 retry-1 run 并继承路径、改道被拒）；进程中断（同一数据库重建执行环境后按依赖版本复用已完成步骤与成功调用、版本变化拒绝复用、重复有副作用调用被调用账本主键阻止）；并发控制命令（同一 revision 竞争只有一个 CAS 成功、败者收到当前 revision、胜者命令重放幂等且不追加事件）；超时晚到结果（attempt 记为 timed_out 而非取消、晚到提交 discarded 不写检查点与调用账本、新 attempt 接管后正常提交）；断线重连（游标之后只补发新事件不重复推送、游标早于保留窗口返回 resync_required） | `tests/test_research_task_fault_drills.py`：RED 3 failed（orchestrator 缺少 handle_step_failure/recover_interrupted_task；断线演练时间基准修正后 5 用例全绿）→ GREEN 5 passed；定向回归（adapter/drills/durable/api/route_persistence/stream_auth）51 passed，零回归。实现记录见文末 2026-08-30 C2.9 段。 |
 
 ## D. 安全、审计与成本治理
 
@@ -317,3 +356,48 @@
 - 兼容边界：证据包仅新增可选 `to_response()` 载荷；既有比较响应与旧来源字段未改动，由 `test_existing_comparison_response_stays_unchanged_when_bundle_created` 固定。
 - 环境说明：pytest 默认临时目录 `C:\Users\111\AppData\Local\Temp\pytest-of-111` 出现 Windows 权限错误（WinError 5），本轮起统一使用 `--basetemp=.tmp/pytest-*` 项目内目录。
 - 提交 SHA：未提交；工作区存在大量未提交改动，等待用户明确授权后统一提交。
+
+## 2026-08-30 C2.6 研究任务六端点 API 实现记录（C-T21）
+
+- 首次 RED：`python -m pytest tests/test_research_task_api.py -q --basetemp=.tmp/pytest-red-c26`，14 failed，关键失败原因均为 `ModuleNotFoundError: No module named 'src.research_task_api'`（或 ImportError）。
+- 最小实现：`src/research_task_api.py`（APIRouter 六端点 + `configure_research_task_store` 注入口 + C0 异常到 HTTP 语义映射：KeyError→404、RevisionConflictError→409 带 current_revision、InvalidRunTransitionError→409、sqlite3.IntegrityError（重复创建）→409、负游标/非法保留期→422）；`src/api_service.py` 在图表静态挂载后 `app.include_router`，事件流端点不加免鉴权白名单（由既有 C-T16 回归钉住）。
+- SSE 契约：逐事件 `data:` 帧（event_id/event_type/revision + payload 展开）+ 终帧 `window_end`（next_event_id/oldest_event_id/resync_required）；游标早于保留窗口时只发 `resync_required=true` 的 window_end 帧，不静默漏事件，与 C2.4 重同步语义一致。
+- GREEN：同一命令 14 passed。
+- 回归：`python -m pytest tests/test_research_task_adapter.py tests/test_research_task_stream_auth.py tests/test_durable_execution.py tests/test_research_task_api.py -q --basetemp=.tmp/pytest-reg-c26` 共 39 passed，零回归；旧即时问答 API 零改动（未触碰既有路由与响应模型，C-T15 兼容回归在 C2.10 全量回归时验证）。
+- 提交 SHA：未提交；按计划在 C2.10 统一提交 `feat(tasks): productize durable research execution` 后回填。
+
+## 2026-08-30 C2.7 路由决策持久化与重试守卫实现记录（C-T22）
+
+- 设计依据：design.md C0/C1 段“持久任务一旦选择 single 或 multi 路径，失败时不得静默切换路径，必须保存失败并由显式重试或重新规划处理”；C0 状态机 failed 为终态（ALLOWED_TRANSITIONS 空集合），因此重试不回迁状态，而是新建 `{task_id}-retry-N` 任务与 `research:{task_id}-retry-N` run，路径决策只追加。
+- 首次 RED：`python -m pytest tests/test_research_task_route_persistence.py -q --basetemp=.tmp/pytest-red-c27`，7 failed，失败原因均为 adapter 缺少 `record_route_selection`/`route_selection`/`route_decisions`/`record_failure`/`retry_task` 方法与 `RoutePathConflictError` 异常。
+- 最小实现：
+  - `src/v7_metadata_store.py` 新增 migration 23：只追加表 `v7_task_route_decisions`（decision_type CHECK 限定 selected/failure/retry，selected_path CHECK 限定 single/multi）+ 索引 `idx_v7_route_decisions_task(task_id, decision_id)`，禁止覆盖历史。
+  - `src/research_task_adapter.py` 新增 `RoutePathConflictError`、`RouteDecision` 只读数据类与五个方法：`record_route_selection`（同路径幂等返回既有记录、异路径抛冲突、未知路径 ValueError）、`route_selection`（读最近 selected 决策，未记录抛 ValueError）、`route_decisions`（按 decision_id 升序全量返回）、`record_failure`（写入 category/action/retry_count/max_retries，不动选定路径）、`retry_task`（先校验路径一致与 run 为 failed，再新建 retry run、继承选定路径、写 retry 决策 detail 含 new_task_id/command_id）。
+  - 重试编号按原始基线推导：剥离 `-retry-N` 后缀得到 base，扫描 base 系列全部 retry 决策取最大编号 +1，重试链沿 `base-retry-N` 连续编号。
+- GREEN：同一命令 7 passed。
+- 回归：`python -m pytest tests/test_research_task_adapter.py tests/test_v7_metadata_store.py tests/test_durable_execution.py tests/test_research_task_api.py tests/test_research_task_stream_auth.py tests/test_research_task_route_persistence.py -q --basetemp=.tmp/pytest-reg-c27` 共 51 passed，零回归（含 migration 23 迁移与 schema_version 动态断言）。
+- 提交 SHA：未提交；按计划在 C2.10 统一提交 `feat(tasks): productize durable research execution` 后回填。
+
+## 2026-08-30 C2.8 前端按 revision 合并事件实现记录（C-T18）
+
+- 设计依据：design.md C-T18 语义——事件乱序、重放或重连补发时，只有严格更新的 revision 才应用，旧事件不得回退前端状态；`resumed` 标记仅由 paused→running 迁移产生；`window_end` 游标帧与未知事件类型不参与状态合并。
+- 首次 RED：`npm run test -- --run src/services/__tests__/researchTaskState.test.ts src/stores/__tests__/researchTaskStore.test.ts src/components/chat/__tests__/ResearchTaskStatusTag.test.tsx`，3 个文件收集失败，失败原因为 `@/services/researchTaskState`、`@/stores/researchTaskStore`、`@/components/chat/ResearchTaskStatusTag` 模块不存在。
+- 最小实现：
+  - `frontend/src/services/researchTaskState.ts`：纯合并逻辑——`ResearchTaskStatus` 七类状态类型、`createResearchTaskState`（初始 unknown/revision -1）、`applyResearchTaskEvent`（run_created 初始化 pending；run_transitioned 仅在 revision 严格更新时应用并计算 resumed；旧 revision/同 revision 重放返回原状态引用；window_end 与未知事件忽略）。
+  - `frontend/src/stores/researchTaskStore.ts`：Zustand store 按任务 ID 隔离状态，`applyEvent` 委托纯合并函数，状态引用不变时不触发渲染；`resetTask` 移除指定任务。
+  - `frontend/src/components/chat/ResearchTaskStatusTag.tsx`：订阅 store 展示七类状态中文标签（等待开始/运行中/等待审批/已暂停/失败/已取消/已完成，unknown 显示未开始），resumed 时追加“已恢复”标签；未知任务显示“未开始”。
+- GREEN：同一命令 14 passed（7 + 4 + 3）。
+- 类型检查：`node node_modules/typescript/bin/tsc -b` 通过（exit 0）。
+- 说明：npx 直调会被沙箱拦截 npm cache 日志写入，类型检查统一使用项目内本地 TypeScript 二进制。
+- 提交 SHA：未提交；按计划在 C2.10 统一提交 `feat(tasks): productize durable research execution` 后回填。
+
+## 2026-08-30 C2.9 五类故障演练实现记录（C-T23）
+
+- 设计依据：design.md C1-GATE-1 要求五类故障演练全部达到预期状态——Worker 异常（failure_decision 分类 + record_failure 只追加 + retry 不迁移状态/failed 迁移终态/waiting_approval 迁移等待审批）、进程中断（同一 SQLite 重建执行环境后 recovery_decision 按依赖版本与幂等键复用，重复有副作用调用被 `v7_execution_invocations.idempotency_key TEXT PRIMARY KEY` 唯一约束拒绝）、并发控制命令（同 revision CAS 竞争唯一胜者 + command_id 重放幂等不追加事件）、超时晚到结果（timed_out 不写检查点与调用账本，新 attempt 接管后正常提交且原 attempt 保持 timed_out）、断线重连（游标之后只补发新事件，游标早于保留窗口时 resync_required）。
+- 首次 RED：`python -m pytest tests/test_research_task_fault_drills.py -q --basetemp=.tmp/pytest-red-c29`，3 failed——orchestrator 缺少 `handle_step_failure` 与 `recover_interrupted_task`（预期失败）；另断线演练首跑 `cursor is None`：事件真实 created_at（2026）早于演练假定读取时间（2030）减保留期 3600 秒，保留窗口裁剪全部事件，需在读取前 `UPDATE v7_task_events SET created_at` 归一化到演练时钟附近。
+- 最小实现：
+  - `tests/test_research_task_fault_drills.py`（新建，5 用例）：`_harness(tmp_path)` 构造 DurableExecutionStore + ResearchTaskAdapter + ResearchTaskOrchestrator；五演练分别覆盖 Worker 异常晚到门禁与改道冲突、进程中断复用与重复副作用拒绝、并发 CAS 与幂等重放、超时晚到隔离与新 attempt 接管、断线重连补发与 resync 标记；`RoutePathConflictError` 从 `src.research_task_adapter` 模块级导入。
+  - `src/research_task_orchestrator.py`（新增两方法，保留既有方法未动）：`handle_step_failure` 先 `failure_decision` 分类再 `record_failure` 只追加持久化，随后按动作分支——retry 返回当前快照（任务保持 running 等待重新领取步骤）、failed 走 `fail_task` CAS 终态、waiting_approval 走 `wait_for_approval`；`recover_interrupted_task` 委托 `recovery_decision` 推导可复用步骤与成功调用。
+- GREEN：`python -m pytest tests/test_research_task_fault_drills.py -q --basetemp=.tmp/pytest-green-c29b`，5 passed（首跑曾 2 failed，均为测试自身问题：`RoutePathConflictError` 误作 adapter 类属性、恢复断言应为两步均完成可复用 `("analyze", "fetch")`，已修正）。
+- 定向回归：`python -m pytest tests/test_research_task_adapter.py tests/test_research_task_fault_drills.py tests/test_durable_execution.py tests/test_research_task_api.py tests/test_research_task_route_persistence.py tests/test_research_task_stream_auth.py -q --basetemp=.tmp/pytest-reg-c29`，51 passed 零回归。
+- 提交 SHA：未提交；按计划在 C2.10 统一提交 `feat(tasks): productize durable research execution` 后回填。

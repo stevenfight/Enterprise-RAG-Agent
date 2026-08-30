@@ -106,7 +106,7 @@
 - [x] C0.6 已实现 cancellation/attempt token；超时或取消后的晚到结果记录 discarded，禁止提交事实、索引或 completed。
 - [x] C0.7 已明确外部线程/模型调用超时不等于真实取消，并在步骤边界停止后续工作。
 - [x] C0.8 已用模拟 PDF 入库步骤完成进程中断、租约接管、重复命令和晚到结果故障演练。
-- [ ] C0.9 运行 C0 回归和代码审查，提交 `feat(execution): add durable run foundation`。
+- [x] C0.9 已运行 C0 回归和代码审查，提交 `feat(execution): add durable run foundation`。
 
 ### C0 包退出条件
 
@@ -121,70 +121,102 @@
 
 - [x] M0.1 冻结当前全部源 PDF 的路径、SHA-256、页数、加密/可读状态和 logical document 映射；迁移过程只读。
 - [x] M0.2 在 `multimodal_enabled` 路径内适配 `upload_pdf()`：同文件系统 staging 写入、关闭后校验与哈希、数据库登记成功后发布不可变 document version；开关关闭时旧契约不变。
-- [ ] M0.3 实现 logical_document_id、document_version_id 与内容寻址 blob；同逻辑同 hash 幂等，相同 blob 的不同逻辑文档不合并，物理回收遵守引用计数和保留期。
+- [x] M0.3 已实现 logical_document_id、document_version_id 与内容寻址 blob；同逻辑同 hash 幂等，相同 blob 的不同逻辑文档不合并，物理回收遵守引用计数和保留期。
 - [x] M0.4 为当前每个文档生成 `REUSE/ENRICH/TARGETED_REEXTRACT/FULL_REEXTRACT` 决策、依据和错误状态；禁止任意比例阈值和无证据全量重跑。
-- [ ] M0.5 对 REUSE/ENRICH 复用现有 MinerU Markdown、图片和表格；只为明确失败页、复杂表格/图表、扫描页或定位失败区域建立定向任务。
-- [ ] M0.6 在 V7MetadataStore 建立 document version、artifact、fact、claim、calculation、report 及关联表、外键、版本和失效状态；不引入图数据库。
-- [ ] M0.7 侧向构建首个 v7 generation，覆盖迁移基线全部 active 文档；复用合格 chunk，但重算缺少 parser/splitter/preprocess/embedding/schema 版本证据的旧向量。
-- [ ] M0.8 校验新 generation 的文档覆盖、chunk 数量、向量维度、文件哈希、BM25/FAISS metadata 对齐和抽样检索；任何失败不改变旧 active publication。
-- [ ] M0.9 记录迁移前后源 PDF 哈希、处理决策、索引发布/回滚和溯源外键完整性证据。
-- [ ] M0.10 冻结旧上传/删除/查询 JSON 夹具，定义新上传异步状态的可选字段和功能开关开/关回归。
-- [ ] M0.11 补齐 PDF magic、空文件、加密、页数、截断、Windows 显示文件名和哈希键冲突校验；staging/孤儿 blob 不得被任何读取端点访问。
-- [ ] M0.12 定义稳定错误分类、有限重试和不可重试边界；磁盘、数据库、解析或索引失败不得产生 complete 状态。
+- [x] M0.5 对 REUSE/ENRICH 复用现有 MinerU Markdown、图片和表格；只为明确失败页、复杂表格/图表、扫描页或定位失败区域建立定向任务。
+- [x] M0.6 在 V7MetadataStore 建立 document version、artifact、fact、claim、calculation、report 及关联表、外键、版本和失效状态；不引入图数据库。
+- [x] M0.7 侧向构建首个 v7 generation，覆盖迁移基线全部 active 文档；复用合格 chunk，但重算缺少 parser/splitter/preprocess/embedding/schema 版本证据的旧向量。
+- [x] M0.8 校验新 generation 的文档覆盖、chunk 数量、向量维度、文件哈希、BM25/FAISS metadata 对齐和抽样检索；任何失败不改变旧 active publication。
+- [x] M0.9 记录迁移前后源 PDF 哈希、处理决策、索引发布/回滚和溯源外键完整性证据。
+- [x] M0.10 冻结旧上传/删除/查询 JSON 夹具，定义新上传异步状态的可选字段和功能开关开/关回归。
+- [x] M0.11 补齐 PDF magic、空文件、加密、页数、截断、Windows 显示文件名和哈希键冲突校验；staging/孤儿 blob 不得被任何读取端点访问。
+- [x] M0.12 定义稳定错误分类、有限重试和不可重试边界；磁盘、数据库、解析或索引失败不得产生 complete 状态。
 - [x] M0.12.a 将 MinerU 单文档解析超时接入 `hot_load.parse_timeout_seconds`，默认 600 秒，校验正数并覆盖配置读取、适配器传参和失败状态测试。
 - [x] M0.12.b 热加载普通 PDF 复用 `extract_batch` 异步轮询，大 PDF 按 150 页物理页分批并输出物理页进度。
 - [x] M0.12.c 合并大 PDF Markdown 时写入物理页批次标记，任一批次失败则阻断本次解析结果。
 - [x] M0.12.d 修复热加载临时 Markdown 未参与页映射的问题，并过滤批次标记，避免污染检索文本。
-- [ ] M0.13 实现 PublicationSet：绑定 index generation、可见 document versions、artifact/fact 版本边界和 corpus revision；active publication 以 SQLite 为唯一真值。
-- [ ] M0.14 首轮基线固定 corpus revision；并发上传/删除进入下一 publication，发布使用 expected revision/CAS，过期构建标记 superseded。
-- [ ] M0.15 以短事务发布已校验的不可变文件；实现跨索引、文档、制品和事实的整组回滚，不允许只回滚索引指针。
+- [x] M0.13 实现 PublicationSet：绑定 index generation、可见 document versions、artifact/fact 版本边界和 corpus revision；active publication 以 SQLite 为唯一真值。
+- [x] M0.14 首轮基线固定 corpus revision；并发上传/删除进入下一 publication，发布使用 expected revision/CAS，过期构建标记 superseded。
+- [x] M0.15 以短事务发布已校验的不可变文件；实现跨索引、文档、制品和事实的整组回滚，不允许只回滚索引指针。
 
 ### M1. 评测、清单与页图
 
 - [ ] M1.1 在 A 的数据框架中建立不少于 40 个区域级多模态案例和独立指标分母，按文档/公司拆分开发集与至少 25% 的冻结留出集。
+- [x] M1.1.a 扩展评测 schema 和独立多模态覆盖报告，拒绝文档/公司跨 development 与 holdout 泄漏；现有真实可复核样本不足 40 条，M1.1 主任务保持未关闭。
+- [x] M1.1.b 基于真实 PDF 页和归一化 bbox 建立 pending_review 区域候选扫描器；候选与 verified 评测样本严格分离，批量人工复核后才可进入主任务分母。
+- [x] M1.1.c 生成并校验 385 条候选记录（8 个文档）；源 SHA256、物理页和 bbox 漂移检查为 0，候选集仍保持 pending_review。
+- [x] M1.1.d 生成首批普通表格人工复核包：30 条 development 与 10 条 holdout 按公司/文档隔离，逐条复验源 SHA256、物理页和 bbox；全部保持 pending_review，不计入 M1.1 主任务分母。
 - [x] M1.2 清点 12 份现有 PDF/Markdown 的图片引用、HTML/Markdown 表格、公式与缺失文件，不重新生成可复用制品。
-- [ ] M1.3 定义带 schema 版本和状态迁移的 DocumentAssetManifest、PageArtifact、VisualRegion、TableArtifact、ChartArtifact 和 VisualEvidence，并通过 V7MetadataStore 事务持久化；JSON 仅作诊断导出。
-- [ ] M1.4 为 MinerU `_extract_single/_process_large_pdf` 增加旁路状态记录，保留原解析结果和逻辑。
-- [ ] M1.5 使用现有 PyMuPDF 实现幂等页图、缩略图、规范化坐标和内容哈希缓存。
-- [ ] M1.6 实现制品清单完整性校验；缺页批次、缺失图片和 unresolved 定位均禁止 complete 状态。
+- [x] M1.3 定义带 schema 版本和状态迁移的 DocumentAssetManifest、PageArtifact、VisualRegion、TableArtifact、ChartArtifact 和 VisualEvidence，并通过 V7MetadataStore 事务持久化；JSON 仅作诊断导出。
+- [x] M1.3.a 为 TableArtifact、ChartArtifact、VisualEvidence 增加 V7MetadataStore 事务仓储，并拒绝跨 manifest 的页图、区域、表格和图表关联；统一状态迁移和端到端试点仍待完成。
+- [x] M1.3.b 为 TableArtifact、ChartArtifact、VisualEvidence 增加受限状态迁移和同事务审计事件。
+- [x] M1.3.c 为 Manifest 的完整性导出状态、VisualRegion 与 ParseBatch 增加受限迁移/同事务审计；migration 18 为 PageArtifact、VisualRegion、TableArtifact、ChartArtifact、VisualEvidence 补齐 `schema_version`，PageArtifact 保持“只以完整文件创建为 immutable complete”的既有语义。
+- [x] M1.4 为 MinerU _extract_single/_process_large_pdf 增加旁路状态记录，保留原解析结果和逻辑。
+- [x] M1.5 使用现有 PyMuPDF 实现幂等页图、缩略图、规范化坐标和内容哈希缓存。
+- [x] M1.6 实现制品清单完整性校验；缺页批次、缺失图片和 unresolved 定位均禁止 complete 状态。
 - [ ] M1.7 先用一份 PDF、一个普通表格和一个复杂视觉区域完成“清单→事实→SourceInfo→前端定位”纵向试点，默认开关关闭；试点通过后再批量扩展。
-- [ ] M1.8 实现不可变索引 generation、staging 构建和完整校验；由 PublicationSet 原子发布并整组回滚，不以文件指针为真值。
-- [ ] M1.9 建立统一 PublicationResolver，请求开始固定 publication ID，并让索引、文档、artifact、事实查询及 RAGGenerator、RetrieveTool、CompareTool 缓存使用同一快照。
-- [ ] M1.10 旧 generation 仅在无活动引用并通过保留期后回收；Windows 下不得删除正在打开的 FAISS/BM25 文件。
-- [ ] M1.11 区分 logical_document_id 与 document_version_id：同 hash 上传幂等，不同 hash 的同名文件创建新版本，完整索引前不替换 active 版本。
+- [x] M1.7.a 为 `SourceInfo` 增加可选 `visual_locator`：仅透传 complete 制品的 manifest/page/region/bbox，旧来源 JSON 不增加空字段；前端来源卡只显示只读坐标说明，不伪造页图预览。
+- [x] M1.7.b 增加默认关闭的受控 PageArtifact PNG 端点：只接受 manifest 与已登记页制品 ID，从 SQLite 解析完整文件；拒绝路径、未知 ID 和跨 manifest 请求，不引入文档级 ACL 承诺。
+- [x] M1.7.c 前端通过统一 Bearer 鉴权读取 complete 页图 Blob，并按规范化 bbox 叠加只读高亮；不得在 URL 传递密钥或为 incomplete 制品伪造预览。
+- [x] M1.7.d 为 incomplete 视觉制品增加不含路径和坐标的可访问提示；保持 complete 页图读取路径不变且不触发无效请求。
+- [x] M1.7.e 为未发布且未进入索引代际的 V7 文档增加制品清理服务：事务清理 manifest、页图、区域、表图制品、视觉证据和解析批次，已发布/已索引/已关联事实的文档显式拒绝。
+- [x] M1.7.f 为页图根目录增加 `.deleting` 遗留文件的受限幂等恢复清理，避免目录外文件被误删。
+- [x] M1.1.b 区域级评测样本强制记录 PDF SHA-256 与物理页，并拒绝同一源页或裁剪变体跨 development/holdout 分区。
+- [x] M1.7.g 将页图 `.deleting` 恢复入口收敛到 V7 处理协调器的实际 PageImageRenderer 输出根目录。
+- [x] M1.1.c 同步区域级源页身份到 JSON Schema，避免运行时与对外数据契约不一致。
+- [x] M1.7.h 为已索引文档提供“排除后候选代际”构建入口：冻结排除后的文档基线并审计，但不原地改写 active 文档或 active publication。
+- [x] M1.8.a 将候选 generation 的 staging 制品验证与 PublicationSet 的 prepared/CAS 基线连接；该步骤只准备、不激活。
+- [x] M1.8.b 将实际 `IndexPublicationManager` 的 staging generation 制品注册为 V7 candidate 的不可变制品目录/manifest 绑定（持久化路径无关的 hash/size manifest）；绑定失败时不得创建 PublicationSet，active publication 保持不变。
+- [x] M1.8.c 在 `V7GenerationPublicationCoordinator` 上提供受控显式 CAS activation 入口：并发/过期基线得到 `superseded`，绝不通过 legacy JSON active 指针激活 V7 publication。
+- [x] M1.8.d 为旧 generation 回收建立前置条件资格记录（无 active publication 引用、无活动请求引用、已过保留期、Windows 文件未打开）；只记录资格，不物理删除。
+- [x] M1.8.e 端到端编排收口：排除文档构建候选 → 实际索引构建发布 → 制品绑定 → CAS 准备 → 显式激活 → 旧代际回收资格评估，并验证激活 superseded 与整组回滚（回滚后旧代际重新被 active 引用即失格）。
+- [x] M1.8 实现不可变索引 generation、staging 构建和完整校验；由 PublicationSet 原子发布并整组回滚，不以文件指针为真值。
+- [x] M1.9 建立统一 PublicationResolver，请求开始固定 publication ID，并让索引、文档、artifact、事实查询及 RAGGenerator、RetrieveTool、CompareTool 缓存使用同一快照。
+  - [x] M1.9.a PublicationResolver 请求级快照固定：begin_request 在请求开始捕获 active 快照并在请求期间保持不变（期间激活新 publication 不影响本请求），current_snapshot/end_request/request_scope 提供完整请求作用域语义；无 active publication 时返回 None。
+  - [x] M1.9.b HybridRetriever 快照代际注入：支持 generation_resolver 优先于 legacy JSON active 指针解析检索目录（generations/<generation_id>/<company>），未注入或解析为空时保持 legacy 指针与旧目录契约不变；检索器缓存按代际变化自动重载。
+  - [x] M1.9.c 三工具接线同一快照：RetrieveTool/CompareTool/RAGGenerator 接受可选 publication_resolver，请求开始固定快照、finally 释放，检索使用快照代际，返回结果携带 publication_id；未注入时行为与现状完全一致。
+- [x] M1.10 旧 generation 仅在无活动引用并通过保留期后回收；Windows 下不得删除正在打开的 FAISS/BM25 文件。
+  - [x] M1.10.a 提供显式启停的受控批量回收入口：仅扫描 `validated` generation，按稳定顺序和 batch 上限逐项调用既有执行器；在途引用、保留期、active publication 和文件锁仍由执行器逐项审计并拦截。
+- [x] M1.11 区分 logical_document_id 与 document_version_id：同 hash 上传幂等，不同 hash 的同名文件创建新版本，完整索引前不替换 active 版本。
 
 ### M2. 路由与结构提取
 
-- [ ] M2.1 实现可解释 PageRouter，区分 text/table/chart/scan/mixed，并证明纯文本页不调用视觉模型。
-- [ ] M2.2 实现 MinerU HTML/Markdown 表格结构适配器，保留多级表头、row/colspan、脚注、单位、期间和原始值。
-- [ ] M2.3 实现保守的跨页续表关系；条件不充分时保持分离和待确认。
-- [ ] M2.4 新增类型化 BaseVisionProvider、VisionRequest、VisionResponse 和显式 capability/config 检查，保持 BaseLLMProvider.chat 不变。
-- [ ] M2.5 对复杂表格难例调用视觉能力并输出结构化结果、置信度、模型、用量和区域。
-- [ ] M2.6 实现图表标题、图例、轴、单位、期间、系列、数据点和趋势提取；不能可靠读数时只输出趋势候选。
-- [ ] M2.7 只在无可用文本层或既有解析失败时处理扫描页；能力不可用时返回 incomplete，不静默猜测。
+- [x] M2.1 实现可解释 PageRouter，区分 text/table/chart/scan/mixed，并证明纯文本页不调用视觉模型。
+- [x] M2.2 实现 MinerU HTML/Markdown 表格结构适配器，保留多级表头、row/colspan、脚注、单位、期间和原始值。
+- [x] M2.3 实现保守的跨页续表关系；条件不充分时保持分离和待确认。
+- [x] M2.4 新增类型化 BaseVisionProvider、VisionRequest、VisionResponse 和显式 capability/config 检查，保持 BaseLLMProvider.chat 不变。
+- [x] M2.5 对复杂表格难例调用视觉能力并输出结构化结果、置信度、模型、用量和区域。
+- [x] M2.6 实现图表标题、图例、轴、单位、期间、系列、数据点和趋势提取；不能可靠读数时只输出趋势候选。
+- [x] M2.7 只在无可用文本层或既有解析失败时处理扫描页；能力不可用时返回 incomplete，不静默猜测。
 
 ### M3. 金融事实、证据与安全
 
-- [ ] M3.1 把视觉数值接入 B 阶段统一归一器和 FinancialFactService，禁止视觉专用换算表或事实库。
-- [ ] M3.2 实现正文—表格—图表交叉核验，并把真实差异送入统一冲突引擎。
-- [ ] M3.3 扩展 SourceInfo 与 `_build_agent_answer_sources()` 的可选视觉字段，缺省响应保持兼容。
-- [ ] M3.4 给视觉内容增加提示词注入、越权指令、异常像素/文件和预算安全边界。
-- [ ] M3.5 低置信或定位未解析结果只保存 candidate/pending_review，不进入 verified 事实和确定性计算。
-- [ ] M3.6 扩展 `delete_pdf()` 和重建索引流程，清理或失效所有视觉制品、事实和索引，验证无孤儿数据。
+- [x] M3.1 把视觉数值接入 B 阶段统一归一器和 FinancialFactService，禁止视觉专用换算表或事实库。`VisualFactCandidateRepository` 强制调用共享归一器，`VisualFactAdmissionService` 只经既有 FinancialFactRepository 写入；接口层回归通过，真实 Provider 端到端验收另列 M-GATE。
+- [x] M3.2 实现正文—表格—图表交叉核验，并把真实差异送入统一冲突引擎。已审核且关联事实的视觉候选经 `VisualFactConflictBridge` 复用既有冲突仓储，定向回归通过。
+- [x] M3.3 扩展 SourceInfo 与 `_build_agent_answer_sources()` 的可选视觉字段，缺省响应保持兼容。来源兼容与视觉定位定向回归通过。
+- [x] M3.4 给视觉内容增加提示词注入、越权指令、异常像素/文件和预算安全边界。`VisionSafetyGuard` 在实际 Provider 调用前隔离不可信内容、校验 PNG/JPEG 尺寸与文件大小，并限制调用次数和预估 Token；拒绝结果显式为 incomplete。
+- [x] M3.5 低置信或定位未解析结果只保存 candidate/pending_review，不进入 verified 事实和确定性计算。候选审核、低置信拒绝和已审核准入回归通过。
+- [x] M3.6 扩展 `delete_pdf()` 和重建索引流程，清理或失效所有视觉制品、事实和索引，验证无孤儿数据。
+  - [x] M3.6.a `delete_pdf(filename, deletion_coordinator=...)` 集成 V7 删除协调器：多模态开关开启时端点注入协调器，为同名全部未删除版本幂等创建删除请求（已 deleting 版本跳过），V7 请求先于文件删除创建；不注入时行为与现状完全一致。后续推进复用 M3.10.c/M3.11 链（advance → cleanup_ready → 事实失效/stale 传播/blob 回收）与 M3.10.b 重建发布链、M1.10 旧代际回收。
 - [ ] M3.7 复用 `build_company_index()` 与原 FAISS/BM25 metadata 生成链写入 artifact 引用；禁止建立第二套视觉向量库。
+  - [x] M3.7.a metadata 链 artifact 引用承接：`build_company_index()` 在既有 metadata 生成链上为携带 `artifact_refs` 的子块写入引用，未携带的子块不新增字段（旧 9 字段契约不变）；FAISS/BM25 仍由同一构建链产出，无第二套向量库。视觉子块上游生产随 M3.1-M3.5 视觉链路。
 - [ ] M3.8 给视觉索引启用兼容的 strict 模式，embedding 失败时标记 incomplete，禁止零向量制品进入可用索引。
-- [ ] M3.9 新增受认证的 artifact ID 图像读取端点；不挂载公开制品目录，不接受客户端文件路径。
-- [ ] M3.9.1 明确首版仅为现有 API key 下的单用户/单租户端点认证，不实现或宣称文档级多租户 ACL。
-- [ ] M3.10 定义查询、重建、版本激活和删除的线性化点：新查询排除 deleting 版本；删除返回完成前等待活动引用释放或明确返回异步状态。
-- [ ] M3.11 删除 logical document/version 时先失效其事实和索引可见性，标记受影响声明、计算与报告为 stale；共享 blob 仅在零引用和保留期后物理回收。
-- [ ] M3.12 使用外键 RESTRICT 与软失效保留历史审计；共享 blob 引用变更和删除资格在同一事务串行化，覆盖并发上传/回收。
+  - [x] M3.8.a strict 模式索引构建语义：`build_faiss_index(..., strict=True)` 任一 embedding 批次失败即抛出 `EmbeddingIncompleteError` 中止构建，不补零向量、不写 index.faiss 制品；默认 strict=False 保持 legacy 补零行为不变。视觉编排层捕获异常后标记 incomplete 的接线随视觉链路启用。
+- [x] M3.9 新增受认证的 artifact ID 图像读取端点；不挂载公开制品目录，不接受客户端文件路径。
+- [x] M3.9.1 明确首版仅为现有 API key 下的单用户/单租户端点认证，不实现或宣称文档级多租户 ACL。
+- [x] M3.10 定义查询、重建、版本激活和删除的线性化点：新查询排除 deleting 版本；删除返回完成前等待活动引用释放或明确返回异步状态。
+  - [x] M3.10.a 建立文档版本删除线性化与文档级查询可见性：短事务把版本置为 `deleting` 并记录失效；已固定快照保持原 ID，新查询仅选择 `active` 版本，原始 blob 解析拒绝 deleting 版本。
+  - [x] M3.10.b 将删除可见性接入 PublicationResolver、generation 检索与活动请求租约；已完成 PublicationResolver 的 fail-closed 过滤、活动请求租约计数、`waiting_for_active_requests/rebuild_required` 删除请求状态，以及 generation 级排除：`deleting` 线性化版本可被排除构建候选代际，经制品绑定与 PublicationSet CAS 发布使替代 publication 生效；租约等待/过期治理、异步删除执行和物理清理由 M3.10.c 与 M3.11/M3.12 完成。
+  - [x] M3.10.c 租约等待/过期治理与异步删除执行：过期租约自动不再阻塞删除进度；`advance_request()` 在存在未过期租约时返回 `waiting_for_active_requests`，租约归零但 active publication 仍含被删版本时保持 `rebuild_required`，替代 publication 生效后进入 `cleanup_ready` 稳定终态（schema v22 放宽 CHECK 约束），全程不触碰版本本体。
+- [x] M3.11 `cleanup_request()` 物理清理执行器：失效事实可见性（删除版本的事实关联行）、经 ProvenanceRepository 传播受影响计算/声明/报告为 stale 并写入软失效审计；共享 blob 在排除 `deleting` 引用后零引用且超过保留期时物理回收文件，deleting 版本行经外键继续保护 blob 登记行。
+- [x] M3.12 外键 RESTRICT 全库启用并验证 `PRAGMA foreign_key_check` 一致；软失效审计（`v7_document_version_invalidations`）保留删除请求与清理动作历史；共享 blob 引用变更（上传登记）与删除资格判定（回收）均在 `BEGIN IMMEDIATE` 事务内串行化，并发引用插入经写锁等待后基于最新引用判定。
 
 ### M4. 前端与验收
 
-- [ ] M4.1 扩展前端 SourceInfo、buildEvidenceBundles 和 buildEvidenceChain，保持旧来源兼容。
-- [ ] M4.2 在 EvidencePanel、SourceCard 和 EvidenceChainGraph 增加页图预览、区域高亮、证据类型与完整性警告。
-- [ ] M4.3 复用现有图表组件展示识别后的系列及原始图表证据，不重写 Charts 模块。
-- [ ] M4.4 跑多模态专集、文本回归、上传/删除生命周期、安全与成本报告。
+- [x] M4.1 扩展前端 SourceInfo、buildEvidenceBundles 和 buildEvidenceChain，保持旧来源兼容。
+- [x] M4.2 在 EvidencePanel、SourceCard 和 EvidenceChainGraph 增加页图预览、区域高亮、证据类型与完整性警告。
+- [x] M4.3 复用现有图表组件展示识别后的系列及原始图表证据，不重写 Charts 模块。
+- [ ] M4.4 跑多模态专集、文本回归、上传/删除生命周期、安全与成本报告；本地 fail-closed 准入报告已完成，真实 Provider、人工复核与运行账本未齐，主项保持未关闭。
 - [ ] M4.4.1 单列冻结留出集结果、高风险误入库数、视觉路由比例、缓存命中、调用量、失败率与 P95；M 基线后留痕批准成本门禁。
 - [ ] M4.4.2 检查页图预览与区域高亮的键盘操作、替代文本和结构化表格/图表说明。
 - [ ] M4.4.3 准备一例成功视觉定位与一例显式拒绝结论的失败演示，禁止只挑最佳样本。
@@ -203,23 +235,23 @@
 
 ### C1.1 研究任务模型与持久化
 
-- [ ] C1.1 将 ResearchTask、TaskStep 和 DAG 节点映射到 C0 ExecutionRun/StepAttempt，不创建第二套状态表。
-- [ ] C1.2 扩展研究任务合法迁移和 waiting_approval 语义，继续使用 C0 revision/CAS。
-- [ ] C1.3 复用 V7MetadataStore、事务、租约、事件和调用账本；不得创建第二个任务数据库。
-- [ ] C1.4 保持 `AgentMemory` 会话记忆逻辑不变，通过 task_id 关联而非替换。
-- [ ] C1.5 定义研究检查点 JSON schema，只保存稳定 ID、generation、制品/事实版本和可序列化数据。
+- [x] C1.1 将 ResearchTask、TaskStep 和 DAG 节点映射到 C0 ExecutionRun/StepAttempt，不创建第二套状态表。
+- [x] C1.2 扩展研究任务合法迁移和 waiting_approval 语义，继续使用 C0 revision/CAS。
+- [x] C1.3 复用 V7MetadataStore、事务、租约、事件和调用账本；不得创建第二个任务数据库。
+- [x] C1.4 保持 `AgentMemory` 会话记忆逻辑不变，通过 task_id 关联而非替换。
+- [x] C1.5 定义研究检查点 JSON schema，只保存稳定 ID、generation、制品/事实版本和可序列化数据。
 
 ### C1.2 恢复、编排与事件
 
-- [ ] C2.1 恢复时复用依赖版本一致的已完成步骤和成功工具/模型调用；版本变化时拒绝错误复用。
-- [ ] C2.2 实现错误分类、有限重试、暂停、恢复和取消，并继承 C0 晚到结果隔离。
-- [ ] C2.3 在 Planner/Orchestrator/DAG 步骤边界写入 C0 状态；现有线程超时不得直接视为调用已停止。
-- [ ] C2.4 为任务事件流增加持久 ID、保留期限和“游标早于最旧事件”的明确重同步响应。
-- [ ] C2.5 新任务流采用带 Authorization 的 fetch streaming；禁止加入 APIAuthMiddleware 免鉴权前缀或在 URL 放长期 API Key。
-- [ ] C2.6 新增任务创建、查询、事件流、暂停、恢复、取消 API，命令携带 command_id/revision，保持原即时问答 API 不变。
-- [ ] C2.7 持久任务失败时保存选定路径，不静默回退或切换 single/multi。
-- [ ] C2.8 前端按 revision 合并事件，展示运行、暂停、等待审批、失败、取消和恢复状态。
-- [ ] C2.9 执行 Worker 异常、进程中断、并发控制命令、超时晚到结果和断线重连故障演练。
+- [x] C2.1 恢复时复用依赖版本一致的已完成步骤和成功工具/模型调用；版本变化时拒绝错误复用。
+- [x] C2.2 实现错误分类、有限重试、暂停、恢复和取消，并继承 C0 晚到结果隔离。
+- [x] C2.3 在 Planner/Orchestrator/DAG 步骤边界写入 C0 状态；现有线程超时不得直接视为调用已停止。
+- [x] C2.4 为任务事件流增加持久 ID、保留期限和“游标早于最旧事件”的明确重同步响应。
+- [x] C2.5 新任务流采用带 Authorization 的 fetch streaming；禁止加入 APIAuthMiddleware 免鉴权前缀或在 URL 放长期 API Key。
+- [x] C2.6 新增任务创建、查询、事件流、暂停、恢复、取消 API，命令携带 command_id/revision，保持原即时问答 API 不变。实现见 `src/research_task_api.py`（挂载于 api_service），TDD 记录 C-T21。
+- [x] C2.7 持久任务失败时保存选定路径，不静默回退或切换 single/multi。实现见 `src/research_task_adapter.py`（路由决策只追加表 migration 23），TDD 记录 C-T22。
+- [x] C2.8 前端按 revision 合并事件，展示运行、暂停、等待审批、失败、取消和恢复状态。实现见 `frontend/src/services/researchTaskState.ts`、`frontend/src/stores/researchTaskStore.ts` 与 `frontend/src/components/chat/ResearchTaskStatusTag.tsx`，TDD 记录 C-T18。
+- [x] C2.9 执行 Worker 异常、进程中断、并发控制命令、超时晚到结果和断线重连故障演练。实现见 `tests/test_research_task_fault_drills.py` 与 `src/research_task_orchestrator.py`（新增 handle_step_failure/recover_interrupted_task），TDD 记录 C-T23。
 - [ ] C2.10 运行 C1 包全回归和代码审查，提交 `feat(tasks): productize durable research execution`。
 
 ### C1 包退出条件

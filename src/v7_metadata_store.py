@@ -286,6 +286,25 @@ class V7MetadataStore:
                 """CREATE TABLE v7_execution_commands (command_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, target_status TEXT NOT NULL, expected_revision INTEGER NOT NULL, result_revision INTEGER NOT NULL, result_status TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(run_id) REFERENCES v7_execution_runs(run_id) ON DELETE RESTRICT)""",
             ),
         ),
+        (
+            23,
+            (
+                # C2.7：研究任务路由决策只追加表，记录选定 single/multi 路径、失败分类与显式重试链，禁止覆盖历史
+                """
+                CREATE TABLE v7_task_route_decisions (
+                    decision_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL,
+                    run_id TEXT NOT NULL,
+                    decision_type TEXT NOT NULL CHECK (decision_type IN ('selected', 'failure', 'retry')),
+                    selected_path TEXT CHECK (selected_path IS NULL OR selected_path IN ('single', 'multi')),
+                    detail_json TEXT NOT NULL DEFAULT '{}',
+                    actor TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+                """CREATE INDEX idx_v7_route_decisions_task ON v7_task_route_decisions(task_id, decision_id)""",
+            ),
+        ),
     )
 
     def __init__(

@@ -62,6 +62,16 @@ class EventRecord:
 
 
 @dataclass(frozen=True)
+class EventWindow:
+    """按持久事件 ID 读取的窗口，以及客户端是否需要重同步。"""
+
+    events: tuple[EventRecord, ...]
+    oldest_event_id: int | None
+    next_event_id: int | None
+    resync_required: bool
+
+
+@dataclass(frozen=True)
 class CheckpointRecord:
     step_id: str
     payload: dict[str, Any]
@@ -316,6 +326,55 @@ class DurableExecutionStore:
         with self.metadata_store.connect() as connection:
             rows = connection.execute("SELECT event_id, event_type, revision, payload_json FROM v7_task_events WHERE run_id=? ORDER BY event_id", (run_id,)).fetchall()
         return [EventRecord(row[0], row[1], row[2], json.loads(row[3])) for row in rows]
+
+    def event_window(
+        self,
+        run_id: str,
+        after_event_id: int | None,
+        *,
+        now: str,
+        retention_seconds: int,
+    ) -> EventWindow:
+        """裁剪过期事件并读取窗口；过旧游标明确要求客户端重同步。"""
+        if retention_seconds <= 0:
+            raise ValueError("事件保留期限必须为正数")
+        if after_event_id is not None and after_event_id < 0:
+            raise ValueError("事件游标不能为负数")
+        with self.metadata_store.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                connection.execute(
+                    "DELETE FROM v7_task_events WHERE run_id=? AND julianday(created_at) < julianday(?) - ? / 86400.0",
+                    (run_id, now, retention_seconds),
+                )
+                oldest_row = connection.execute(
+                    "SELECT MIN(event_id) FROM v7_task_events WHERE run_id=?", (run_id,)
+                ).fetchone()
+                oldest_event_id = oldest_row[0] if oldest_row is not None else None
+                resync_required = (
+                    after_event_id is not None
+                    and oldest_event_id is not None
+                    and after_event_id < oldest_event_id - 1
+                )
+                if resync_required:
+                    rows = []
+                elif after_event_id is None:
+                    rows = connection.execute(
+                        "SELECT event_id, event_type, revision, payload_json FROM v7_task_events WHERE run_id=? ORDER BY event_id",
+                        (run_id,),
+                    ).fetchall()
+                else:
+                    rows = connection.execute(
+                        "SELECT event_id, event_type, revision, payload_json FROM v7_task_events WHERE run_id=? AND event_id>? ORDER BY event_id",
+                        (run_id, after_event_id),
+                    ).fetchall()
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        events = tuple(EventRecord(row[0], row[1], row[2], json.loads(row[3])) for row in rows)
+        next_event_id = events[-1].event_id if events else after_event_id
+        return EventWindow(events, oldest_event_id, next_event_id, resync_required)
 
     def checkpoints(self, run_id: str) -> list[CheckpointRecord]:
         with self.metadata_store.connect() as connection:
