@@ -142,7 +142,7 @@ class VerifyTool(BaseTool):
 
         # ---- 提取数值 ----
         claim_numbers = self._extract_numbers(claim)
-        source_numbers = self._extract_numbers(source_text)
+        source_numbers = self._extract_source_numbers(source_text)
 
         logger.info("[VerifyTool] claim 提取到 %d 个数值: %s",
                      len(claim_numbers),
@@ -315,7 +315,66 @@ class VerifyTool(BaseTool):
     # 数值提取
     # ============================================================
 
-    def _extract_numbers(self, text: str) -> List[Dict[str, Any]]:
+    def _extract_source_numbers(self, text: str) -> List[Dict[str, Any]]:
+        """提取来源数字，并在 HTML 表格内应用邻近的金额单位声明。
+
+        年报常把“金额单位为人民币百万元”写在表格外，单元格只保留裸数字。
+        单位只对当前表格生效，避免把表格单位错误扩散到后续正文。
+        """
+        table_pattern = re.compile(r"<table\b[^>]*>.*?</table>", re.IGNORECASE | re.DOTALL)
+        tables = list(table_pattern.finditer(text))
+        if not tables:
+            return self._extract_numbers(text)
+
+        outside_parts: List[str] = []
+        cursor = 0
+        table_numbers: List[Dict[str, Any]] = []
+        for table in tables:
+            outside_parts.append(text[cursor:table.start()])
+            outside_parts.append(" ")
+            implicit_unit, implicit_currency = self._extract_table_amount_context(
+                text[max(0, table.start() - 500):table.start()]
+            )
+            table_numbers.extend(
+                self._extract_numbers(
+                    table.group(0),
+                    implicit_unit=implicit_unit,
+                    implicit_currency=implicit_currency,
+                )
+            )
+            cursor = table.end()
+        outside_parts.append(text[cursor:])
+        return self._extract_numbers("".join(outside_parts)) + table_numbers
+
+    def _extract_table_amount_context(self, prefix: str) -> Tuple[Optional[str], str]:
+        """读取当前表格前的金额单位声明并转换为 VerifyTool 单位别名。"""
+        context_pattern = re.compile(
+            r"(?:金额)?单位\s*(?:为|是|：|:)\s*"
+            r"(?P<currency>人民币|美元|港元|欧元|日元)?\s*"
+            r"(?P<unit>万亿元|千亿元|十亿元|百万元|万元|亿元|万亿|千亿|十亿|百万|万|千|元)",
+        )
+        matches = list(context_pattern.finditer(prefix))
+        if not matches:
+            return None, ""
+
+        unit_aliases = {
+            "万亿元": "万亿",
+            "千亿元": "千亿",
+            "十亿元": "十亿",
+            "百万元": "百万",
+            "万元": "万",
+            "亿元": "亿",
+            "元": "个",
+        }
+        match = matches[-1]
+        return unit_aliases.get(match.group("unit"), match.group("unit")), match.group("currency") or ""
+
+    def _extract_numbers(
+        self,
+        text: str,
+        implicit_unit: Optional[str] = None,
+        implicit_currency: str = "",
+    ) -> List[Dict[str, Any]]:
         """从文本中提取所有数值及其单位
 
         支持的格式:
@@ -348,8 +407,22 @@ class VerifyTool(BaseTool):
         for m in matches:
             raw = m.group(0).strip()
             num_str = m.group(1).replace(",", "").replace("，", "")
-            magnitude_unit = m.group(2) if m.group(2) else "个"
-            currency = m.group(3) if m.group(3) else ""
+            has_explicit_magnitude = bool(m.group(2))
+            has_explicit_currency = bool(m.group(3))
+            magnitude_unit = (
+                m.group(2)
+                if has_explicit_magnitude
+                else (implicit_unit or "个")
+            )
+            currency = (
+                m.group(3)
+                if has_explicit_currency
+                else (
+                    implicit_currency
+                    if magnitude_unit not in NON_AMOUNT_UNITS
+                    else ""
+                )
+            )
 
             # 跳过孤立的小数点或明显非数值
             if num_str in (".", ",", "，", ""):
@@ -361,7 +434,7 @@ class VerifyTool(BaseTool):
                 continue
 
             # 跳过四年份 (1900-2099) 且无量级单位
-            if magnitude_unit == "个" and 1900 <= value <= 2099 and value == int(value):
+            if not has_explicit_magnitude and 1900 <= value <= 2099 and value == int(value):
                 continue
 
             # 跳过过于小或过于大的异常值（可能是页码或股票代码）
