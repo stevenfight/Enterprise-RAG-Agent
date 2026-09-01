@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "scenarios": [
+    {"scenario_id": "main-flow", "title": "计划到声明级报告", "inputs": {"scope": ["收入", "利润"]}, "expected_outcome": "展示计划版本、声明依据和 Markdown/HTML 导出"},
+    {"scenario_id": "conflict-review", "title": "关键事实冲突裁决", "inputs": {"conflict_id": "demo-conflict-1", "fact_ids": ["demo-fact-a", "demo-fact-b"]}, "expected_outcome": "展示双方事实、保持未决与经审批批准的只追加历史"},
+    {"scenario_id": "recovery", "title": "中断后的检查点恢复", "inputs": {"task_id": "demo-recovery-1", "step_id": "compare"}, "expected_outcome": "展示匹配依赖版本和幂等键时仅复用成功步骤"},
+    {"scenario_id": "budget-pause", "title": "硬预算安全暂停", "inputs": {"task_id": "demo-budget-1", "hard_cost": "10.00"}, "expected_outcome": "D-T09 接入后展示 BudgetExceededError、检查点和 paused 状态；当前为待实现演示目标"}
+  ]
+}

@@ -256,45 +256,88 @@
 
 ### C1 包退出条件
 
-- [ ] C1-GATE-1 五类故障与并发演练全部达到预期状态。
-- [ ] C1-GATE-2 依赖版本一致的已完成步骤及成功调用重复执行为 0；有副作用调用自动重复执行为 0。
-- [ ] C1-GATE-3 非法/过期 revision 状态迁移全部阻止，晚到结果无法复活任务。
-- [ ] C1-GATE-4 新任务流需要有效鉴权，旧聊天和会话记忆无回归。
+- [x] C1-GATE-1 五类故障与并发演练全部达到预期状态。（tests/test_research_task_fault_drills.py 5 passed）
+- [x] C1-GATE-2 依赖版本一致的已完成步骤及成功调用重复执行为 0；有副作用调用自动重复执行为 0。（故障演练进程中断复用断言）
+- [x] C1-GATE-3 非法/过期 revision 状态迁移全部阻止，晚到结果无法复活任务。（C2.6 API 409 语义与 C2.9 晚到 discarded 断言）
+- [x] C1-GATE-4 新任务流需要有效鉴权，旧聊天和会话记忆无回归。（test_research_task_stream_auth.py 与 m0 兼容回归）
 
 ## D. 安全、审计与成本治理
 
-- [ ] D1.1 定义工具风险等级、权限策略和默认拒绝边界。
-- [ ] D1.2 实现参数绑定、时效限制的审批记录。
-- [ ] D1.2.1 审批哈希同时绑定 task revision、plan、事实/制品版本和 index generation；任一依赖变化使旧审批失效。
-- [ ] D1.3 为关键冲突裁决和正式报告签发加入审批门禁；仅在存在真实高风险工具时扩展到工具执行。
-- [ ] D1.4 建立只追加审计事件和任务回放查询。
-- [ ] D1.4.1 关键状态迁移、审批消费和审计事件在 V7MetadataStore 同一事务提交，避免“已执行但无审计”或“已审计但未执行”。
-- [ ] D1.5 在日志、追踪和报告持久化前实施敏感字段脱敏。
-- [ ] D1.6 扩展安全集：文档注入、工具参数注入、跨 Agent 污染和越权调用。
-- [ ] D1.7 统计任务 Token、调用次数、延迟和成本估算。
-- [ ] D1.8 实现软预算预警和硬预算暂停。
-- [ ] D1.9 比较现有 single/multi 路由质量—成本曲线并保存理由。
-- [ ] D1.10 运行 D 包回归和代码审查，提交 `feat(governance): add agent policy audit and budgets`。
+- [x] D1.1 定义工具风险等级、权限策略和默认拒绝边界。（src/governance/tool_policy.py 五级风险 + tests/test_governance_tool_policy.py 4 passed）
+- [x] D1.2 实现参数绑定、时效限制的审批记录。（src/governance/approval.py grant/check_gate/consume + tests/test_governance_approval.py 14 passed 含参数化）
+- [x] D1.2.1 审批哈希同时绑定 task revision、plan、事实/制品版本和 index generation；任一依赖变化使旧审批失效。（ApprovalBinding digest + check_gate dependencies_changed）
+- [x] D1.3 为关键冲突裁决和正式报告签发加入审批门禁；仅在存在真实高风险工具时扩展到工具执行。（SUBJECT_CONFLICT_RESOLUTION/SUBJECT_REPORT_SIGNOFF/SUBJECT_TOOL_EXECUTION）
+- [x] D1.4 建立只追加审计事件和任务回放查询。（src/governance/audit.py + 迁移 24 + tests/test_governance_audit.py 4 passed）
+- [x] D1.4.1 关键状态迁移、审批消费和审计事件在 V7MetadataStore 同一事务提交，避免“已执行但无审计”或“已审计但未执行”。（consume_in_transaction BEGIN IMMEDIATE 原子性）
+- [x] D1.5 在日志、追踪和报告持久化前实施敏感字段脱敏。（src/governance/redaction.py + 审计 _insert 边界脱敏 + tests/test_governance_redaction.py 4 passed）
+- [x] D1.6 扩展安全集：文档注入、工具参数注入、跨 Agent 污染和越权调用。（src/governance/security.py + tests/test_governance_security.py 7 passed）
+- [x] D1.7 统计任务 Token、调用次数、延迟和成本估算。（src/governance/metrics.py + tests/test_governance_metrics.py 3 passed）
+- [x] D1.8 实现软预算预警和硬预算暂停。（src/governance/budget.py + tests/test_governance_budget.py 4 passed）
+- [x] D1.9 比较现有 single/multi 路由质量—成本曲线并保存理由。（src/governance/routing_rationale.py + tests/test_governance_routing_rationale.py 3 passed）
+- [x] D1.10 运行 D 包回归和代码审查，提交 `feat(governance): add agent policy audit and budgets`。（1428ef6，治理定向 43 passed，全量 641 passed + 1 skipped）
 
 ### D 包退出条件
 
-- [ ] D-GATE-1 未审批高风险调用执行为 0。
-- [ ] D-GATE-2 审计日志能重建一次完整任务关键路径。
-- [ ] D-GATE-3 安全攻击集达到批准结果。
-- [ ] D-GATE-4 超预算任务安全暂停且可恢复。
+- [x] D-GATE-1 未审批高风险调用执行为 0。（test_governance_tool_policy.py 越权工具 DENIED 断言）
+- [x] D-GATE-2 审计日志能重建一次完整任务关键路径。（test_governance_audit.py 与 test_governance_routing_rationale.py 审计事件回放断言）
+- [x] D-GATE-3 安全攻击集达到批准结果。（test_governance_security.py 文档注入/参数注入/跨 Agent 污染/越权调用全部拒绝）
+- [x] D-GATE-4 超预算任务安全暂停且可恢复。（test_governance_budget.py 超硬预算抛 BudgetExceededError 携带成本快照）
 
 ## E. 研究工作流与可审计报告
 
-- [ ] E1.1 定义 ResearchPlan、Claim、ResearchReport 与审核状态模型。
-- [ ] E1.2 新增研究任务列表和详情 API。
-- [ ] E1.3 新增研究任务页面并复用现有布局、DAG、证据、图表组件。
-- [ ] E1.4 支持执行前调整范围和预算重新计算。
-- [ ] E1.5 支持关键冲突批准、驳回和保持未决。
-- [ ] E1.6 生成声明级可追溯 Markdown/HTML 报告。
-- [ ] E1.7 实现事实修订后的局部失效与报告版本比较。
-- [ ] E1.8 记录 PDF、Word、Excel 三个后续独立 OpenSpec 子变更；它们不阻塞 v7.0 首发，需要新包时先核查并申请。
-- [ ] E1.9 准备 5 分钟主流程、冲突、恢复和安全演示数据。
-- [ ] E1.10 运行 E 包回归、可访问性检查和代码审查，提交 `feat(research): deliver auditable research workflow`。
+- [x] E1.1 定义 ResearchPlan、Claim、ResearchReport 与审核状态模型。（E-T10 RED→GREEN：稳定 ID、预算快照、声明依据与审核状态模型，4 passed）
+- [x] E1.2 新增研究任务列表和详情 API。（复用 C2.6 详情 API；新增只读列表 API，E-T11 RED→GREEN，研究任务定向回归 30 passed）
+- [x] E1.3 新增研究任务页面并复用现有布局、DAG、证据、图表组件。（E-T12 RED→GREEN：任务页、路由和无结果降级，前端定向 14 passed、build/lint 通过）
+- [x] E1.4 支持执行前调整范围和预算重新计算。（E-T02 RED→GREEN：范围直接影响与下游闭包、无关步骤成本保持、pending 门禁、DAG/预算一致性拒绝；研究任务定向回归 34 passed）
+- [x] E1.5 支持关键冲突批准、驳回和保持未决。（E-T04 RED→GREEN：原冲突不覆盖、裁决历史只追加、批准/驳回同事务消费匹配审批；18 passed）
+- [x] E1.6 生成声明级可追溯 Markdown/HTML 报告。（E-T07 RED→GREEN：报告/计划/数据版本、声明与证据 ID 完整输出，HTML 转义；6 passed）
+- [x] E1.7 实现事实修订后的局部失效与报告版本比较。（E-T06 RED→GREEN：事实→声明反向定位、旧报告不变、新版本可比较；7 passed）
+- [x] E1.8 记录 PDF、Word、Excel 三个后续独立 OpenSpec 子变更；它们不阻塞 v7.0 首发，需要新包时先核查并申请。（已建立三份独立 proposal）
+- [x] E1.9 准备 5 分钟主流程、冲突、恢复和安全演示数据。（E-T13 RED→GREEN：四个离线场景清单，1 passed；预算暂停明确为 D-T09 待实现目标）
+- [ ] E1.10 运行 E 包回归、可访问性检查和代码审查，提交 `feat(research): deliver auditable research workflow`。（当前主工作区的后端 724 passed、1 skipped、前端 53 个文件/293 项、lint/build、compileall、范围化安全审查和自动化 a11y 已完成；本轮在独立副本 `codex/research-e110-isolated-20260901` 形成 60 文件可审计提交，最终提交 SHA 见交接文档；当前仓库因 `.git/FETCH_HEAD` 与 ref lock 无写权限无法导入该引用；真实屏幕阅读器验收仍待完成，因此本任务保持未勾选）
+
+- [x] E-T01 创建研究任务时持久化计划与预算快照。（迁移 27、`ResearchPlanRepository`；创建响应/详情可读，25 passed）
+- [x] E-T14 在研究任务详情读取最新持久化报告，并在报告缺失时展示明确空态。（测试先行；当前 worktree 初次 RED 因无 `node_modules` 无法执行，复用原项目已安装依赖后 GREEN：前端定向 9 passed、build 通过）
+- [x] E-T15 从持久化计划和声明输入创建不可变报告版本。（RED：POST 报告路由返回 405；GREEN：定向 3 passed、关联回归 28 passed）
+- [x] E-T16 建立服务端任务—冲突依赖上下文并由当前任务/计划生成审批绑定。（RED：模块缺失 3 failed、过期有效期未拒绝 1 failed；GREEN：4 passed）
+- [x] E-T17 配置独立审批密钥和部署审批主体，开放只授予审批的受保护 API；缺配置或密钥不匹配必须拒绝，客户端不得提交审批主体或绑定字段。（RED：端点缺失 3 failed；GREEN：3 passed，关联治理/任务回归完成）
+- [x] E-T18 以可信任务—冲突上下文提供冲突列表/历史和受审批保护的裁决 API；批准/驳回必须服务端重建绑定并同事务消费审批，保持未决不消费审批。（RED 3 failed：端点缺失；GREEN 3 passed，关联回归 26 passed）
+- [x] E-T19 在研究任务页展示任务范围内的冲突及其裁决历史，并在无冲突时明确空态；浏览器不得持有部署审批密钥或直接调用裁决端点。（RED 1 failed：面板缺失；GREEN 5 passed；生产构建受共享依赖缓存权限阻断）
+- [x] E-T20 建立用户、角色与 HttpOnly 会话身份；审批端点仅接受具有 approver 角色的当前会话，首个管理员只能由部署配置初始化。（RED 2 failed：登录端点缺失；GREEN 与关联回归 14 passed）
+- [x] E-T21 全局 API 门禁接受有效研究会话，同时保留既有 Bearer API Key 客户端兼容；审批角色检查不放宽。（独立 RED：`1428ef6` 只读基线副本中旧 `api_service` 缺少 `_research_session_is_valid`，1 failed；当前实现 GREEN：定向 6 passed）
+- [x] E-T22 在既有页头提供登录、登出和当前会话身份状态；仅调用研究身份 API，不在浏览器保存密码、会话令牌或审批凭据。（独立 RED→GREEN：前端定向 13 passed，关联回归 23 passed）
+- [x] E-T23 在研究任务冲突卡提供 approver 裁决交互；普通用户只读，前端先请求服务端生成的审批再提交裁决，不接触绑定字段或审批密钥。（独立 RED→GREEN：任务页 7 passed，前端关联回归 25 passed）
+- [x] E-T23.1 驳回冲突时不提交事实选择，先取得 `selected_fact_id=null` 的服务端审批再提交裁决，避免被后端治理规则拒绝。（RED→GREEN：研究任务页 12 passed）
+- [x] E-T24 正式报告签发必须经过 approver 一次性审批，且存在未裁决关键冲突时服务端拒绝；签发记录只追加保存。（独立 RED→GREEN：2 passed，关联回归 49 passed）
+- [x] E-T25 在任务页为 approver 接入报告签发与持久化签发状态；普通用户只读，刷新后仍从服务端记录展示状态。（独立 RED→GREEN：后端 2 passed、任务页 9 passed；关联后端 47 passed、前端 27 passed）
+- [x] E-T26 为研究登录、冲突裁决和报告签发完成键盘操作与失败提示 a11y 验收；失败信息必须被辅助技术明确通知。（独立 RED→GREEN：登录错误提示 12 passed；页面键盘签发/错误提示与页头 22 passed，前端关联回归 29 passed）
+- [x] E-T27 对 E-T20 至 E-T26 完成范围化代码审查，核对会话、角色、审批绑定、签发事务和浏览器边界。（无阻塞问题；身份/审批/签发定向回归 47 passed）
+- [x] E-T28 重启前后端后在真实浏览器核验登录与研究任务页的键盘焦点、语义和空态。（登录与刷新按钮均获得可见 `:focus-visible` 轮廓；未登录任务页保持明确空态）
+- [x] E-T28.1 登录或登出后同步研究任务页的当前会话身份，审批人无需手动刷新即可看到签发入口。（RED：任务页已登录但缺签发入口；GREEN：认证事件触发页面重读身份，任务页与页头 23 passed）
+- [x] E-T28.2 记录发布范围决策：真实屏幕阅读器验收暂缓为后续无障碍验收项，不作为 E1.10 当前发布阻塞；保留 E-T26 自动化和真实键盘验收，且不伪造读屏通过。
+- [x] E-T29 证据链定位来源时自动展开对应来源卡片及评分详情，保留后端原始 `hybrid`、`rerank`、`vector`、`bm25` 与状态字段。
+- [x] E-T30 知识库索引完成率优先使用热加载清单的 `index_status`，仅无清单记录时兼容旧向量目录推断，避免已索引文件被错误计为待索引。
+- [x] E-T31 研究员只能在有效会话下创建研究任务；创建后先形成只追加的“已提交”记录，审批人可批准并启动执行或驳回，任务快照公开当前提交状态与操作人。（RED→GREEN：提交审批 API 2 passed；研究任务/冲突/签发关联回归 28 passed）
+- [x] E-T32 研究任务页提供最小“提交研究任务”入口和提交状态展示；仅研究员可提交、仅审批人可决定执行或驳回，浏览器不提交审批人身份。（RED→GREEN：`ResearchTasksPage.test.tsx` 13 passed；生产构建和 lint 通过）
+- [x] E-T33 批准后的最小执行器按计划步骤顺序领取并提交 C0 检查点；仅在检索获得来源证据时写入待审核报告，全部步骤成功后完成任务。（RED→GREEN：`test_research_task_execution.py` 2 passed）
+- [x] E-T34 API 装配真实查询执行器；批准仅调度执行，执行异常应明确标记 failed，不能留下无产物的 running 状态。（RED→GREEN：提交审批 API 2 passed；端到端新任务 completed 且报告含 source）
+- [x] E-T35 任务详情公开只读执行进度：已完成步骤、当前步骤、终态完成时间与经脱敏的失败原因；页面据此展示 DAG 节点状态。（RED→GREEN：后端摘要 1 passed；研究页 14 passed）
+- [x] E-T36 审批人可处置无有效租约、检查点或调用记录的遗留 `running` 任务：仅允许以 CAS 标记 failed 并只追加原因，禁止删除/重置/伪造报告。（RED 端点 404 → GREEN `test_research_task_legacy_disposition_api.py` 2 passed）
+- [x] E-T37 最终报告、最终步骤 checkpoint/调用记录和任务 completed 状态在同一 SQLite 事务内提交；失败必须整体回滚。（RED 模拟报告写入失败后仍 completed → GREEN 回滚断言通过）
+- [x] E-T38 审批人可基于已失败历史任务的持久化计划创建新的 `-retry-N` pending 任务；保留原任务审计，新任务重新 submitted，不得自动执行或回迁原运行。（RED retry 端点 404 → GREEN 4 passed）
+- [x] E-T39 研究计划步骤显式绑定 `AgentRegistry` 中的 Agent 与允许工具；执行时校验绑定并将每步 Agent、工具调用和脱敏结果摘要持久化到 C0 调用账本，任务摘要与研究任务页只读展示轨迹。（RED `agent_registry` 参数缺失 → GREEN `test_research_task_trace.py` 8 passed，含受控 HTTP 提交→审批→执行→摘要链路；研究任务 API/执行/遗留处置/重规划回归 48 passed；页面 15 passed；前端全量 52 文件/285 项通过；lint/build 通过。正式服务只读 HTTP 已确认旧无绑定任务与完成报告可读；正式库没有已执行的绑定任务，不能将此项误写为真实绑定执行证据。）
+- [x] E-T40 对绑定 `retrieve` 步骤接入现有 `ToolRegistry` 实际调用；调用账本仅记录工具名称、状态与脱敏来源数量，工具未装配/失败/无来源时失败，旧无绑定计划保持通用查询兼容。（RED 构造参数错误 → GREEN 13 passed；关联研究任务回归 48 passed；后端全量 700 passed、1 skipped；前端全量 52 文件/285 项、lint/build 通过）
+- [x] E-T41.1 对绑定 `DataAgent + retrieve` 的步骤接入实际 `DataAgent` ReAct 运行；仅在服务已装配 `LLMProvider` 时启用，复用受控 `RetrieveTool`，记录脱敏 Worker 摘要并保留 E-T40 的非 Worker 工具执行路径。此项不代表 VerifyAgent、报告或其他 Worker 已实际执行。（RED 构造参数错误 → GREEN 14 passed；关联与全量后端核查见交接文档）
+- [x] E-T41.2 对绑定 `VerifyAgent + verify` 的 `review` 步骤接入实际 VerifyAgent ReAct 运行。审核输入必须来自当次检索的声明和来源正文，工具策略仅允许 `verify`；审核不通过、无结论或未实际调用 verify 时任务失败，账本仅记录脱敏结论和 Worker 统计。此项不代表报告 Worker 或其他 Agent 已实际执行。（RED 未调用 verify → GREEN 15 passed；关联与全量后端核查见交接文档）
+- [x] E-T41.3a 为 CalcAgent 增加审批时持久化的结构化计算输入（操作类型及相应数值字段），拒绝从目标或来源正文推断数值；计划创建阶段拒绝未知操作、缺失/额外字段与非有限数值，CalcAgent 仅注册 calculator，实际 action_input 必须与批准快照完全一致，C0 仅回放 operation、结果存在性和 Worker 步数。（RED 安全轨迹/字段契约缺口 → GREEN；后端全量 707 passed、1 skipped）
+- [x] E-T41.3b 为 CompareAgent 增加审批时持久化的结构化对比输入（公司、指标、年份及 top_n），拒绝从目标或来源正文推断公司/指标；字段白名单、仅含 compare 的实际 Worker 和完整任务 C0 invocation 脱敏回放均已验证。（RED 4 failed → GREEN；后端全量 713 passed、1 skipped）
+- [x] E-T41.3c 为 ChartAgent 增加审批时持久化的图表 data/chart_type/title 输入；计划创建阶段拒绝空数据、空标签、布尔/非有限数值、未知图表类型及额外字段，实际 Worker 仅注册 chart 且 action_input 必须与审批快照完全一致；完整任务 C0 回放只保留 chart_type、结果存在性及 Worker 步数，不保存图表数据。（定向与关联 61 passed；后端全量 718 passed、1 skipped）
+- [x] E-T41.4 对绑定 `PlanAgent + []` 的 `plan` 步接入实际无工具 Worker。Worker 只读取已审批且已持久化的计划快照，模型输出不得修改步骤、范围、预算或绑定；C0 仅回放计划版本、范围/步骤计数、确认状态和 Worker 步数，不保存目标、风险、提示词或模型原文。旧未绑定或历史 `DataAgent` plan 绑定保持直接提交兼容。（RED 2 failed → GREEN；关联 63 passed，后端全量 720 passed、1 skipped）
+- [x] E-T41.5 对绑定 `ReportAgent + []` 的 `report` 步接入实际无工具 Worker。报告必须先由已审核检索结果构造为不可变草稿，Worker 只确认草稿，模型输出不得新增或改写声明；C0 仅回放报告版本、声明计数、审核状态、确认状态和 Worker 步数。（RED 1 failed → GREEN；关联 64 passed，后端全量 721 passed、1 skipped）
+- [x] E-T42 为失败研究任务提供 approver 可见的安全重放入口；只调用既有 retry API 创建新的 submitted 任务，原任务保持失败且不可自动执行。（页面测试 16 passed，前端 build 通过）
+- [x] E-T43 为 approver 提供遗留 running 任务的审计处置入口；必须填写原因并调用既有 legacy-disposition API，不删除、重启或直接改写原记录。（页面测试 17 passed，前端 build 通过）
+- [x] E-T44 修复绑定 DataAgent 丢失审批范围的问题；Worker 查询上下文必须同时包含 objective 与已审批 scope，旧未绑定查询路径保持不变。（RED：scope 仅持久化但未传入 Worker，1 failed；GREEN：scope 上下文契约及 DataAgent Worker 回归通过，研究执行/轨迹 24 passed）
+- [x] E-T45 修复绑定 VerifyAgent 使用截断来源或模型自带来源的问题；回答级摘要保持兼容，审核 Worker 使用本次检索的完整进程内正文，执行器固定 canonical 声明/来源并忽略 action_input 的替换，C0 仍只保存脱敏审核摘要。（RED：200 字符摘要导致审核输入丢失，1 failed；GREEN：完整正文传递、输入固定及既有审核回归 3 passed）
 
 ### E 包退出条件
 

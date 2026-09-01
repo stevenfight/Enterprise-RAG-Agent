@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from src.v7_metadata_store import V7MetadataStore
 
@@ -153,6 +154,18 @@ class DurableExecutionStore:
             raise KeyError(run_id)
         return RunSnapshot(*row)
 
+    def runs_with_prefix(self, prefix: str) -> tuple[RunSnapshot, ...]:
+        """按运行 ID 前缀读取快照，供业务适配层隔离各自的 C0 运行视图。"""
+        if not isinstance(prefix, str) or not prefix:
+            raise ValueError("prefix 不能为空")
+        with self.metadata_store.connect() as connection:
+            rows = connection.execute(
+                "SELECT run_id, status, revision, cancellation_token FROM v7_execution_runs "
+                "WHERE run_id LIKE ? ORDER BY run_id ASC",
+                (f"{prefix}%",),
+            ).fetchall()
+        return tuple(RunSnapshot(*row) for row in rows)
+
     def transition(self, run_id: str, target_status: str, expected_revision: int, command_id: str, *, actor: str) -> RunSnapshot:
         with self.metadata_store.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -195,6 +208,35 @@ class DurableExecutionStore:
                 connection.rollback()
                 raise
         return RunSnapshot(run_id, target_status, next_revision, next_cancellation_token)
+
+    def pause_with_checkpoint(self, run_id: str, step_id: str, attempt_token: str, owner_token: str, expected_revision: int, command_id: str, *, checkpoint: Mapping[str, Any], actor: str, now: float) -> RunSnapshot:
+        """在同一事务保存检查点、释放租约并将运行暂停。"""
+        payload = self._json_object(checkpoint)
+        with self.metadata_store.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                run = connection.execute("SELECT status, revision, cancellation_token FROM v7_execution_runs WHERE run_id=?", (run_id,)).fetchone()
+                attempt = connection.execute("SELECT attempt_id FROM v7_step_attempts WHERE attempt_token=? AND run_id=? AND step_id=? AND owner_token=?", (attempt_token, run_id, step_id, owner_token)).fetchone()
+                lease = connection.execute("SELECT attempt_id, expires_at FROM v7_leases WHERE run_id=? AND step_id=? AND owner_token=?", (run_id, step_id, owner_token)).fetchone()
+                if run is None:
+                    raise KeyError(run_id)
+                if run[1] != expected_revision:
+                    raise RevisionConflictError(run[1])
+                if run[0] != "running" or attempt is None or lease is None or lease[0] != attempt[0] or lease[1] <= now:
+                    raise InvalidRunTransitionError("仅有效运行中步骤可以因预算暂停")
+                next_revision = expected_revision + 1
+                connection.execute("INSERT INTO v7_execution_checkpoints(checkpoint_id, run_id, step_id, attempt_id, schema_version, payload_json) VALUES (?, ?, ?, ?, ?, ?)", (uuid.uuid4().hex, run_id, step_id, attempt[0], int(payload.get("schema_version", 1)), json.dumps(payload, sort_keys=True)))
+                connection.execute("UPDATE v7_step_attempts SET status='paused' WHERE attempt_id=?", (attempt[0],))
+                connection.execute("DELETE FROM v7_leases WHERE run_id=? AND step_id=?", (run_id, step_id))
+                connection.execute("UPDATE v7_execution_runs SET status='paused', revision=?, updated_at=CURRENT_TIMESTAMP WHERE run_id=? AND revision=?", (next_revision, run_id, expected_revision))
+                connection.execute("INSERT INTO v7_execution_commands(command_id, run_id, target_status, expected_revision, result_revision, result_status, actor) VALUES (?, ?, 'paused', ?, ?, 'paused', ?)", (command_id, run_id, expected_revision, next_revision, actor))
+                self._append_event(connection, run_id, next_revision, "budget_exceeded", {"actor": actor, "step_id": step_id})
+                self._append_event(connection, run_id, next_revision, "run_transitioned", {"actor": actor, "status": "paused"})
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return RunSnapshot(run_id, "paused", next_revision, run[2])
 
     def acquire_lease(self, run_id: str, step_id: str, owner_token: str, *, now: float | None = None, ttl_seconds: float = 30) -> AttemptClaim:
         now = time.time() if now is None else now
@@ -287,7 +329,21 @@ class DurableExecutionStore:
                 connection.rollback()
                 raise
 
-    def commit_step(self, run_id: str, step_id: str, attempt_token: str, owner_token: str, expected_revision: int, *, checkpoint: Mapping[str, Any], invocation: Mapping[str, Any], now: float | None = None) -> CommitResult:
+    def commit_step(
+        self,
+        run_id: str,
+        step_id: str,
+        attempt_token: str,
+        owner_token: str,
+        expected_revision: int,
+        *,
+        checkpoint: Mapping[str, Any],
+        invocation: Mapping[str, Any],
+        on_commit: Callable[[sqlite3.Connection], None] | None = None,
+        completion_command_id: str | None = None,
+        completion_actor: str | None = None,
+        now: float | None = None,
+    ) -> CommitResult:
         now = time.time() if now is None else now
         payload = self._json_object(checkpoint)
         invocation_payload = self._json_object(invocation)
@@ -313,9 +369,26 @@ class DurableExecutionStore:
                     "INSERT INTO v7_execution_checkpoints(checkpoint_id, run_id, step_id, attempt_id, schema_version, payload_json) VALUES (?, ?, ?, ?, ?, ?)",
                     (uuid.uuid4().hex, run_id, step_id, attempt[0], int(payload.get("schema_version", 1)), json.dumps(payload, sort_keys=True)),
                 )
+                if on_commit is not None:
+                    on_commit(connection)
                 connection.execute("UPDATE v7_step_attempts SET status='completed', completed_at=CURRENT_TIMESTAMP WHERE attempt_id=?", (attempt[0],))
                 connection.execute("DELETE FROM v7_leases WHERE run_id=? AND step_id=?", (run_id, step_id))
                 self._append_event(connection, run_id, expected_revision, "step_completed", {"step_id": step_id, "idempotency_key": key})
+                if completion_command_id is not None:
+                    if not isinstance(completion_actor, str) or not completion_actor.strip():
+                        raise ValueError("完成任务必须提供执行者")
+                    next_revision = expected_revision + 1
+                    update_cursor = connection.execute(
+                        "UPDATE v7_execution_runs SET status='completed', revision=?, updated_at=CURRENT_TIMESTAMP WHERE run_id=? AND revision=?",
+                        (next_revision, run_id, expected_revision),
+                    )
+                    if update_cursor.rowcount != 1:
+                        raise RevisionConflictError(expected_revision)
+                    connection.execute(
+                        "INSERT INTO v7_execution_commands(command_id, run_id, target_status, expected_revision, result_revision, result_status, actor) VALUES (?, ?, 'completed', ?, ?, 'completed', ?)",
+                        (completion_command_id, run_id, expected_revision, next_revision, completion_actor),
+                    )
+                    self._append_event(connection, run_id, next_revision, "run_transitioned", {"actor": completion_actor, "status": "completed"})
                 connection.commit()
             except Exception:
                 connection.rollback()

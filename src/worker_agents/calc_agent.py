@@ -25,8 +25,9 @@ class CalcAgent(ReActAgent):
     def __init__(
         self,
         calculator_tool: Any,
-        retrieval_tool: Any,
+        retrieval_tool: Any | None = None,
         llm_provider: Optional[Any] = None,
+        allow_retrieve: bool = True,
     ):
         """初始化 CalcAgent
 
@@ -37,7 +38,10 @@ class CalcAgent(ReActAgent):
         """
         registry = ToolRegistry()
         registry.register(calculator_tool)
-        registry.register(retrieval_tool)
+        if allow_retrieve:
+            if retrieval_tool is None:
+                raise ValueError("允许检索的 CalcAgent 必须提供 retrieve 工具")
+            registry.register(retrieval_tool)
 
         super().__init__(
             tool_registry=registry,

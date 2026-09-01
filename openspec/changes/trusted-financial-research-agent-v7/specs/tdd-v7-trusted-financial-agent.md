@@ -291,30 +291,74 @@
 
 | ID | 状态 | 测试目标 | 预期 RED 原因 |
 |---|---|---|---|
-| D-T01 | 🔴 RED | 只读与计算工具按策略自动执行 | 工具策略不存在 |
-| D-T02 | 🔴 RED | 关键冲突裁决或正式报告签发无审批时阻止 | 审批门禁不存在 |
-| D-T03 | 🔴 RED | 审批参数变化后失效 | 参数绑定不存在 |
-| D-T04 | 🔴 RED | 检索文档中的指令不能触发工具越权 | 新攻击链测试未实现 |
-| D-T05 | 🔴 RED | 上游 Agent 指令不能污染下游 | 结构化边界不存在 |
-| D-T06 | 🔴 RED | 敏感字段在持久化前脱敏 | 脱敏层不存在 |
-| D-T07 | 🔴 RED | 审计事件可重建任务关键路径 | 审计账本不存在 |
-| D-T08 | 🔴 RED | 软预算产生预警 | 预算器不存在 |
-| D-T09 | 🔴 RED | 硬预算暂停并保存检查点 | 预算与状态机未集成 |
-| D-T10 | 🔴 RED | 路由记录质量、风险与成本理由 | 路由解释不存在 |
-| D-T11 | 🔴 RED | task revision、事实/制品或索引代际变化使审批失效 | 审批依赖哈希不完整 |
-| D-T12 | 🔴 RED | 状态迁移、审批消费和审计事件同事务提交 | 审计与业务事务未集成 |
+| D-T01 | 绿色（通过） | 只读与计算工具按策略自动执行 | `python -m pytest -q tests/test_governance_tool_policy.py`：GREEN 4 passed（无副作用自动放行、外部写/特权需审批、未注册默认拒绝、重复注册拒绝） |
+| D-T02 | 绿色（通过） | 关键冲突裁决或正式报告签发无审批时阻止 | `python -m pytest -q tests/test_governance_approval.py`：RED 2 failed（AuditRecord 缺便捷属性）→ GREEN 14 passed 含参数化（missing 门禁） |
+| D-T03 | 绿色（通过） | 审批参数变化后失效 | 同 approval 测试（params_changed 门禁语义） |
+| D-T04 | 绿色（通过） | 检索文档中的指令不能触发工具越权 | `python -m pytest -q tests/test_governance_security.py`：GREEN 7 passed（结束标记转义、参数注入拒绝、保留控制键拒绝、干净参数放行） |
+| D-T05 | 绿色（通过） | 上游 Agent 指令不能污染下游 | 同 security 测试（跨 Agent 纯文本载荷拒绝） |
+| D-T06 | 绿色（通过） | 敏感字段在持久化前脱敏 | `python -m pytest -q tests/test_governance_redaction.py`：GREEN 4 passed（嵌套/列表脱敏、原结构不变、审计持久化边界脱敏） |
+| D-T07 | 绿色（通过） | 审计事件可重建任务关键路径 | `python -m pytest -q tests/test_governance_audit.py`：GREEN 4 passed（回放重建、只追加、任务隔离、空 action 拒绝） |
+| D-T08 | 绿色（通过） | 软预算产生预警 | `python -m pytest -q tests/test_governance_budget.py`：GREEN 4 passed（soft_warning 状态与成本快照） |
+| D-T09 | 绿色（通过） | 硬预算暂停并保存检查点 | `python -m pytest tests/test_research_budget_pause.py tests/test_research_task_adapter.py tests/test_governance_budget.py -q --basetemp=C:/Users/111/AppData/Local/Temp/dt09green`：RED 模块不存在→GREEN 16 passed；C0 同一事务写检查点、释放租约、暂停运行并记录命令。 |
+| D-T10 | 绿色（通过） | 路由记录质量、风险与成本理由 | `python -m pytest -q tests/test_governance_routing_rationale.py`：GREEN 3 passed（质量成本比、高复杂度/高风险质量优先、理由经审计持久化） |
+| D-T11 | 绿色（通过） | task revision、事实/制品或索引代际变化使审批失效 | 同 approval 测试（dependencies_changed 门禁语义，参数化覆盖依赖变化） |
+| D-T12 | 绿色（通过） | 状态迁移、审批消费和审计事件同事务提交 | 同 approval 测试（BEGIN IMMEDIATE 原子提交与业务失败全回滚断言） |
 
 ## E. 研究交付
 
 | ID | 状态 | 测试目标 | 预期 RED 原因 |
 |---|---|---|---|
-| E-T01 | 🔴 RED | 创建研究任务生成计划和预算 | 新 API 不存在 |
-| E-T02 | 🔴 RED | 修改范围只重算受影响步骤 | 依赖失效逻辑不存在 |
-| E-T03 | 🔴 RED | 未裁决关键冲突阻止正式报告 | 报告门禁不存在 |
-| E-T04 | 🔴 RED | 用户可批准、驳回或保持冲突未决 | 审核流程不存在 |
+| E-T01 | 绿色（通过） | 显式计划字段创建研究任务时生成并持久化计划和预算快照，创建响应与详情均可读取 | `python -m pytest tests/test_research_task_api.py tests/test_research_delivery_models.py tests/test_v7_metadata_store.py -q --basetemp=C:/Users/111/AppData/Local/Temp/et01green`：RED 1 failed（响应缺少 `plan`）→ GREEN 25 passed；迁移 27 的 `v7_research_plans` 只追加保存计划版本与 Decimal 预算文本。旧调用不提供完整计划字段时保持 C2.6 兼容。 |
+| E-T10 | 绿色（通过） | ResearchPlan、Claim、ResearchReport 以稳定 ID、预算快照、声明依据与明确审核状态表达研究交付模型 | `python -m pytest tests/test_research_delivery_models.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e11green2`：RED 收集失败（模块不存在）→ GREEN 4 passed；编译通过 |
+| E-T11 | 绿色（通过） | 研究任务列表仅返回 `research:` 前缀的 C0 运行，并以稳定任务 ID 排序 | `python -m pytest tests/test_research_task_api.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e12green`：RED 1 failed（GET `/api/research/tasks` 返回 405）→ GREEN 15 passed；与模型/适配层回归共 30 passed |
+| E-T12 | 绿色（通过） | 研究任务页复用 PageShell、DAG、证据和图表组件；无持久 DAG/报告数据时明确展示空态 | `npm run test -- --run src/pages/__tests__/ResearchTasksPage.test.tsx src/pages/__tests__/DagBoardPage.test.tsx src/components/layout/__tests__/HeaderBar.test.tsx`：RED 0 test（页面不存在）→ GREEN 14 passed；`npm run build`、`npm run lint` 通过 |
+| E-T14 | 绿色（通过） | 前端报告服务请求任务最新报告；任务详情展示报告版本和声明依据，报告缺失时保持明确空态 | 测试先行；当前 worktree 初次 RED 因无 `node_modules` 仅报 `vitest: command not found`，不伪造业务失败。临时复用原项目已安装依赖后，`npm run test -- --config vitest.worktree.config.mjs --configLoader native --run src/services/__tests__/apiClient.test.ts src/pages/__tests__/ResearchTasksPage.test.tsx`：GREEN 9 passed；`npm run build -- --configLoader native` 通过。 |
+| E-T15 | 绿色（通过） | 创建报告必须绑定任务当前持久化计划，服务端生成连续版本、待审核状态和稳定报告 ID；缺任务或缺计划明确拒绝，输入无依据声明不得落库 | `python -m pytest tests/test_research_task_api.py::test_create_report_uses_persisted_plan_and_generates_immutable_versions tests/test_research_task_api.py::test_create_report_rejects_unknown_task_or_task_without_persisted_plan tests/test_research_task_api.py::test_create_report_rejects_claim_without_auditable_support -q --basetemp=C:/Users/111/AppData/Local/Temp/e15red`：RED 3 failed（POST 返回 405）→ `--basetemp=C:/Users/111/AppData/Local/Temp/e15green`：GREEN 3 passed；关联回归 28 passed。 |
+| E-T16 | 绿色（通过） | 仅后端登记任务—冲突的事实、制品和索引版本上下文；审批服务从当前 run revision、当前计划哈希和该上下文生成绑定，缺上下文明确拒绝 | `python -m pytest tests/test_research_conflict_governance.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e16red`：RED 3 failed（模块不存在）；补充过期审批 RED 为 1 failed（未拒绝）→ `--basetemp=C:/Users/111/AppData/Local/Temp/e16final`：GREEN 4 passed。 |
+| E-T17 | 绿色（通过） | 仅在部署方配置独立审批密钥与审批主体后可授予冲突审批；身份、过期时间和版本绑定由服务端生成，伪造的 `approver` 或绑定字段必须被请求 schema 拒绝 | `python -m pytest tests/test_research_conflict_approval_api.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e17red`：RED 3 failed（端点返回 404）→ `--basetemp=C:/Users/111/AppData/Local/Temp/e17final`：GREEN 3 passed；关联冲突治理/裁决/审批/任务 API 回归完成，`compileall`、限定差异和 UTF-8 U+FFFD 扫描通过。 |
+| E-T18 | 绿色（通过） | 任务仅能读取可信上下文关联的冲突和历史；批准/驳回在服务端重建当前绑定并消费匹配审批，保持未决不消费审批 | `tests/test_research_conflict_review_api.py`：RED 3 failed（端点 404）→ `--basetemp=C:/Users/111/AppData/Local/Temp/e18green`：GREEN 3 passed；关联回归 26 passed。 |
+| E-T19 | 绿色（通过） | 研究任务页展示可信冲突与裁决历史，无冲突明确空态；浏览器不持有部署审批密钥 | 前端 RED 1 failed（冲突面板缺失）→ 工作区临时依赖配置下 GREEN `ResearchTasksPage` 5 passed；生产构建被共享依赖的 TypeScript 增量缓存写权限阻断，未伪称通过。 |
+| E-T20 | 绿色（通过） | 首次部署按配置初始化管理员；合法凭据产生 HttpOnly 会话，当前身份仅返回角色与用户名，审批端点拒绝非 approver | `python -m pytest tests/test_research_identity_api.py tests/test_research_conflict_approval_api.py tests/test_research_conflict_review_api.py tests/test_research_conflict_governance.py tests/test_research_conflict_review.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e20final`：GREEN 14 passed；初始 RED 2 failed（登录端点不存在）。 |
+| E-T21 | 🟢 GREEN | 有效研究会话可通过全局 API 门禁，旧 Bearer API Key 继续兼容，无凭据仍拒绝，审批角色检查不放宽 | 独立 RED：从 `1428ef6` 只读基线副本运行 E-T21 测试探针，旧 `api_service` 缺少 `_research_session_is_valid`，得到 **1 failed**；当前实现 GREEN：`python -m pytest tests/test_research_session_auth.py tests/test_research_identity_api.py tests/test_artifact_endpoint_auth.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e21-green-20260901` 得到 **6 passed**。此前“测试与实现同次加入、RED 遗漏”的记录已补正，不将当前 GREEN 倒推为 RED。 |
+| E-T22 | 绿色（通过） | 页头仅通过 HttpOnly 会话调用登录、当前身份与登出 API；未登录有明确登录入口，登录后显示用户名和角色，登出后回到未登录态 | `frontend/src/services/__tests__/researchAuthService.test.ts` 与 `HeaderBar.test.tsx`：独立 RED 为认证服务模块不存在、页头缺登录入口（2 files failed，既有 9 passed）→ GREEN 13 passed；关联服务/任务页回归 23 passed。 |
+| E-T23 | 绿色（通过） | 仅当前会话有 approver 角色时展示批准、驳回和保持未决按钮；批准/驳回必须先由服务端授予审批再提交裁决，普通用户无裁决入口 | `ResearchTasksPage.test.tsx`：独立 RED 2 failed（裁决服务与角色受控按钮不存在，既有 5 passed）→ GREEN 7 passed；与认证服务、页头和 apiClient 关联回归 25 passed。 |
+| E-T23.1 | 🟢 GREEN | 驳回冲突不得选择事实；前端应以 `selected_fact_id=null` 请求并提交服务端审批 | RED：驳回沿用首个事实 ID，服务端返回 422，页面显示通用失败提示；GREEN：按动作区分参数，`ResearchTasksPage.test.tsx` 12 passed。 |
+| E-T24 | 绿色（通过） | 正式报告签发先取得与当前报告、计划、任务版本绑定的 approver 审批；未裁决关键冲突必须被服务端拒绝，签发仅追加记录 | `python -m pytest tests/test_research_report_signoff_api.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e24red`：RED 2 failed（签发审批端点不存在）→ `--basetemp=C:/Users/111/AppData/Local/Temp/e24green`：GREEN 2 passed；关联回归 49 passed。 |
+| E-T25 | 🟢 GREEN | 任务页仅向 approver 展示报告签发入口；先申请签发审批再签发，刷新从服务端只读签发记录显示状态，普通用户无入口 | RED：后端读取签发状态为 405、前端找不到“正式签发报告”；GREEN：后端 `tests/test_research_report_signoff_api.py` 2 passed，任务页 9 passed；关联后端 47 passed、前端 27 passed。 |
+| E-T26 | 🟢 GREEN | 登录可由键盘提交，登录、冲突裁决与报告签发失败均有辅助技术可宣布的错误提示 | RED：键盘提交登录后无法找到 `role="alert"`；GREEN：登录失败改为 Ant `Alert`，页头 12 passed；报告签发原生按钮可由 Enter 触发且失败 `Alert` 可读取，任务页与页头 22 passed；前端关联回归 29 passed。冲突裁决既有失败路径已使用同一 Ant `Alert` 组件。 |
+| E-T28.1 | 🟢 GREEN | 在研究任务页完成登录或登出后，页面无需刷新即可重新读取当前会话，正确显示或隐藏 approver 签发入口 | RED：`ResearchTasksPage` 新增用例派发登录完成事件后仍找不到“正式签发报告”；GREEN：认证服务导出统一事件名，页头登录/登出后派发事件，任务页监听后重读 `auth/me`，`npm run test -- --run src/pages/__tests__/ResearchTasksPage.test.tsx src/components/layout/__tests__/HeaderBar.test.tsx`：23 passed。 |
+| E-T28.2 | 🟡 后续无障碍验收 | 真实屏幕阅读器应验证登录、冲突裁决和报告签发的朗读与错误宣布 | 用户于 2026-08-31 确认其不再阻塞当前发布。保留 E-T26 的自动化 `role="alert"`/键盘覆盖和已完成的真实 Tab/Enter 证据；当前环境未检测到可用读屏工具，不能标记为通过。 |
+| E-T29 | 🟢 GREEN | 从回答级证据链定位来源时，来源卡片直接展开摘要、视觉定位和评分详情，避免评分字段仅存在于二次点击后的隐藏区域 | RED：`highlighted` 来源未展示“评分详情”及 `hybrid/rerank` 明细；GREEN：`SourceCard` 由定位状态初始化并自动展开，`SourceCard.test.tsx` 6 passed。 |
+| E-T30 | 🟢 GREEN | 知识库文档的 `indexed` 布尔值与清单 `index_status` 一致；无清单时保持旧向量目录兼容 | RED：清单状态为 `indexed` 但文档 `indexed` 为 `False`；GREEN：清单状态优先、旧目录作为无清单回退，`test_pdf_hot_loading.py` 13 passed。 |
+| E-T31 | 🟢 GREEN | 有效 researcher 会话创建任务后产生 submitted 记录；仅 approver 可批准并启动或驳回，重复/过期决策必须拒绝 | RED：匿名创建返回 200、审批端点为 404；GREEN：`test_research_task_submission_api.py` 2 passed，研究任务/冲突/签发关联回归共 28 passed。 |
+| E-T32 | 🟢 GREEN | 研究任务页向研究员提供最小提交入口并显示 submitted/approved/rejected；审批人可批准执行或驳回 | RED：页面和服务不存在；GREEN：研究员提交范围/预算，审批人批准并执行的页面测试通过，`ResearchTasksPage.test.tsx` 13 passed；`npm run build`、`npm run lint` 通过。 |
+| E-T33 | 🟢 GREEN | 批准后的最小执行器依次完成 `plan → retrieve → review → report`；仅有来源证据时写入待审核报告，并在全部检查点成功后迁移为 completed | RED：`ResearchTaskExecutor` 模块不存在，2 failed；GREEN：成功路径生成一条 `source` 依据声明并 completed，无来源路径 failed 且无报告，`test_research_task_execution.py` 2 passed。 |
+| E-T34 | 🟢 GREEN | API 启动时装配真实查询函数，批准后调度执行；查询或报告生成异常必须被审计并将任务转为 failed，禁止无产物长期停留 running | RED：测试装配调用 `configure_research_task_query` 时属性不存在；GREEN：审批路由以后台任务执行，测试读取 completed 与报告；正式 HTTP 创建 `manual-execution-e2e-20260901` 后 20 秒为 completed，报告 1 条且支持类型为 source。 |
+| E-T35 | 🟢 GREEN | 任务详情公开只读执行进度：已完成步骤、当前步骤、终态完成时间与经脱敏的失败原因；页面据此展示 DAG 节点状态 | RED：执行摘要路由返回 404，页面没有“执行进度”；GREEN：`GET /execution` 从 C0 检查点、终态更新时间和失败决策构造只读摘要，页面按摘要渲染 DAG；后端摘要/执行回归 3 passed，页面 14 passed、lint/build 通过。 |
+| E-T36 | 🟢 GREEN | 仅 approver 能以 CAS 处置无活动执行证据的遗留 `running` 任务；处置仅追加失败原因并迁移为 failed，存在 lease、checkpoint 或调用记录时拒绝 | `tests/test_research_task_legacy_disposition_api.py`：RED 2 failed（处置端点 404）→ GREEN 2 passed；处置在同一 `BEGIN IMMEDIATE` 事务检查执行证据、写入 C0 failed 命令/事件和只追加 failure 决策。 |
+| E-T37 | 🟢 GREEN | 最终报告、最终步骤 checkpoint/调用记录、租约释放和 `completed` 迁移必须同一事务提交；报告写入失败时不得留下任一最终状态制品 | `tests/test_research_task_execution.py`：RED 模拟 `append_in_transaction` 失败时任务仍为 completed → GREEN 断言报告与 report checkpoint 均不存在、任务为 failed；研究任务/执行/C0 关联回归 53 passed。 |
+| E-T38 | 🟢 GREEN | approver 只能以 CAS 从 failed 且有计划的历史任务创建 `-retry-N` pending 任务；原任务保持 failed，新任务复制计划并重新 submitted，重复 command_id 幂等 | `tests/test_research_task_legacy_disposition_api.py`：RED 1 failed（retry 端点 404）→ GREEN 4 passed；覆盖计划复制、原任务保持 failed、新任务 pending/submitted、重复 command_id 返回同一任务、过期 revision 和缺计划拒绝。 |
+| E-T39 | 🟢 GREEN | 每个研究步骤绑定已注册 Agent 及允许工具；执行校验绑定，C0 调用账本保存 Agent、工具、状态和脱敏结果摘要，执行摘要/任务页可只读查看 | RED：`ResearchTaskExecutor` 不接受 `agent_registry`，3 项执行轨迹/绑定测试失败；GREEN：新增 `ResearchStepBinding`、schema 33 计划快照字段、执行器注册表校验和安全轨迹，`tests/test_research_task_trace.py` 8 passed（含受控 HTTP 提交→审批→执行→摘要链路）；研究任务 API/执行/遗留处置/重规划回归 48 passed；页面测试 15 passed，前端全量 52 文件/285 项通过，lint/build 通过。正式服务只读 HTTP 已读取旧无绑定任务与完成报告；正式库无已执行绑定任务，故正式绑定执行仍仅有受控 HTTP 证据。 |
+| E-T40 | 🟢 GREEN | 绑定 `retrieve` 的研究步骤必须通过注入 `ToolRegistry` 实际调用，并在 C0 调用账本保存安全的工具调用摘要；旧无绑定计划继续使用通用查询函数 | RED：`ResearchTaskExecutor` 不接受 `tool_registry`，新测试构造失败；GREEN：绑定检索调用实际 `ToolRegistry.execute("retrieve")`，不回退通用查询，调用账本只保存工具名、状态及来源数量/回答存在性，正文和参数均不持久化；未装配工具注册表时任务失败且无报告。`test_research_task_trace.py` 与执行器回归 13 passed，关联研究任务回归 48 passed，后端全量 700 passed、1 skipped，前端全量 52 文件/285 项、lint/build 通过。 |
+| E-T41.1 | 🟢 GREEN | 绑定 `DataAgent + retrieve` 且已注入 `LLMProvider` 的研究步骤必须实际运行 `DataAgent`，由其调用受控 `RetrieveTool`；C0 调用账本仅保存 Agent 名称、状态、步数、来源数量和回答存在性，不保存提示词、查询参数、来源正文或模型原始输出 | RED：执行器尚不接受 `llm_provider`，新测试构造失败；GREEN：以脚本化 Provider 驱动 DataAgent 的 `retrieve → Final Answer` 两步 ReAct，确认复用注入工具、通用查询函数未被调用，账本只保存脱敏 `worker_call` 和工具摘要。定向 `test_research_task_trace.py` 与执行器回归 14 passed。 |
+| E-T41.2 | 🟢 GREEN | 绑定 `VerifyAgent + verify` 且已注入 `LLMProvider` 的 `review` 步骤必须实际运行 VerifyAgent；它仅可见 `verify` 工具，使用本次检索的声明和来源正文，且必须产生 `valid=True` 的结构化审核结论。C0 仅保存有效性、置信度、统计和 Worker 步数，不保存声明、来源正文、提示词或模型原始输出 | RED：任务 completed 但测试的 verify 工具调用为 0；GREEN：VerifyAgent 可按绑定仅注册 verify，执行器从真实 verify 工具观察结果解析并校验结构化结论，未调用/无结论/非 `valid=True` 时失败。脚本化 Provider 验证 DataAgent 两步 + VerifyAgent 两步、实际 verify 输入、脱敏账本，轨迹与执行器定向 15 passed。 |
+| E-T41.3a | 🟢 GREEN | CalcAgent 必须只接受计划快照中经审批持久化的 calculator 结构化参数；缺失、未知字段或从 objective/来源正文推断参数均被拒绝，实际 Worker 只可调用 calculator | RED 1：实际 calculator 已调用但 calculate 步 C0 轨迹仅有通用 `planned_step_count`。RED 2：未知操作、缺失/额外字段、布尔数值均可进入计划。GREEN：步骤输入经 schema 34/Repository/API 保存，计划创建时按 operation 校验精确字段/有限数值，CalcAgent 只注册 calculator，执行器校验实际 `action_input` 与审批快照完全相等，C0 只保存 operation、结果存在性和步数。后端全量 707 passed、1 skipped。 |
+| E-T41.3b | 🟢 GREEN | CompareAgent 必须只接受计划快照中经审批持久化的 compare 结构化参数；缺失、未知字段或从 objective/来源正文推断公司/指标均被拒绝，实际 Worker 只可调用 compare | RED：非法公司数、年份、top_n 和额外字段均可进入计划。GREEN：计划创建时校验精确 companies/metric/year/top_n，CompareAgent 仅注册 compare，实际 `action_input` 必须与快照相等；完整 `retrieve → compare → review → report` 任务确认 compare C0 仅保留 metric/结果存在性/步数，不保留公司或年份。关联 56 passed、后端全量 713 passed、1 skipped。 |
+| E-T41.3c | 🟢 GREEN | ChartAgent 必须只接受计划快照中经审批持久化的 chart 结构化参数；缺失、未知字段或从 objective/来源正文推断图表数据均被拒绝，实际 Worker 只可调用 chart | RED：空数据、非法类型、非有限数值及额外字段均可进入计划。GREEN：计划创建时校验 data、`bar/line/pie/hbar` 和可选文本字段；ChartAgent 仅注册 chart，实际 `action_input` 必须与快照相等；完整 `retrieve → chart → review → report` 任务确认 chart C0 仅保留 chart_type/结果存在性/步数，不保留图表数据。关联 61 passed、后端全量 718 passed、1 skipped。 |
+| E-T41.4 | 🟢 GREEN | 绑定 `PlanAgent + []` 的 `plan` 步必须实际运行无工具 Worker，仅确认已审批计划快照；模型不得生成、修改或替换计划，C0 不得保存目标、风险、提示词或模型原文 | RED：执行器无 `_plan`，PlanAgent 绑定任务失败（2 failed）。GREEN：新增无工具 PlanAgent，Worker 读取计划快照但其最终答案不参与计划变更；C0 仅保存 plan_version、scope_count、step_count、acknowledged 与总步数。完整 `plan → retrieve → review → report` 任务确认无目标/风险泄露；旧未绑定及历史 DataAgent plan 绑定保留直接提交兼容。关联 63 passed、后端全量 720 passed、1 skipped。 |
+| E-T41.5 | 🟢 GREEN | 绑定 `ReportAgent + []` 的 `report` 步必须实际运行无工具 Worker，仅确认已审核、不可变报告草稿；模型不得新增或改写声明，C0 不得保存声明正文、来源、提示词或模型原文 | RED：report C0 仍含 report_id，缺少 Worker 确认摘要（1 failed）。GREEN：新增无工具 ReportAgent，先复用原有来源链构造报告，再仅向 Worker 提供草稿确认；模型输出不参与声明写入。完整任务确认 C0 只保存 report_version、claim_count、review_status、acknowledged 和总步数。关联 64 passed、后端全量 721 passed、1 skipped。 |
+| E-T42 | 🟢 GREEN | 失败任务页只向 approver 展示“创建重试任务”入口；操作必须携带当前 revision 与新 command_id，并只创建新的 submitted 任务，不在浏览器伪造状态或改写原失败任务 | GREEN：页面调用既有 retry API，成功后仅选中新 pending 任务；测试确认 approver 请求携带原 revision，页面展示新 run。页面 16 passed，前端 build 通过。 |
+| E-T43 | 🟢 GREEN | 遗留 `running` 任务页只向 approver 展示审计处置入口；必须提交原因、当前 revision 与新 command_id，并调用既有 legacy-disposition API，禁止浏览器直接删除、重启或改写记录 | GREEN：页面仅在 approver 查看 running 任务时显示原因输入与“标记为失败并保留审计”操作；测试确认调用服务端处置 API 并刷新任务摘要。页面 17 passed，前端 build 通过。此项为补充页面回归，未补造 RED 证据。 |
+| E-T44 | 🟢 GREEN | 绑定 DataAgent 的 Worker 查询必须携带审批快照中的 objective 与完整 scope，避免研究范围仅持久化而未参与检索；旧未绑定路径保持兼容 | RED：新增 scope 契约断言发现 DataAgent 输入只有 objective（1 failed）。GREEN：新增 `_data_agent_query()`，将 objective 与规范化 scope 组合后传给 Worker；实际绑定 Worker 回归验证 scope 进入首条用户上下文，研究执行与轨迹相关测试 **24 passed**。 |
+| E-T45 | 🟢 GREEN | 绑定 VerifyAgent 必须使用本次检索的完整进程内来源正文和执行器声明；回答级摘要保持兼容，Worker action input 不得替换审核输入，C0 只保留脱敏审核摘要；年报 HTML 表格的裸数字必须读取邻近金额单位上下文 | RED：来源只保留 200 字符且 Worker 可提交自带 `source_text`，完整来源契约测试 **1 failed**。GREEN：检索来源保留短摘要并附进程内 `verification_text`，执行器用受控工具适配器固定 canonical 声明/来源；新增 `test_verify_tool_table_context.py` 首次 **1 failed**，修复后通过；真实中国移动 2024 年报片段中“人民币百万元”与 `1,040,759` 可正确匹配 `10,408 亿元`。完整来源/单位/工具/研究执行关联回归 **43 passed**，后端全量 **724 passed、1 skipped、112 warnings**，未改变 C0 字段。隔离分支提交 `d0498b1`，仅包含本轮源码与测试。 |
+| E1.10-A11Y | 🟢 GREEN | 研究任务工作台必须暴露带名称的主地标、研究工作台区域和所有异步动作的稳定可读操作名；空态仍可被辅助技术读取 | RED：`ResearchTasksPage` 无带名称的 `main`，修复后加载态刷新按钮名称暴露为 `loading 刷新`；追加 RED：提交任务加载态名称暴露为 `loading 提交研究任务`；再追加 RED：审批、重试、遗留处置和报告签发加载态分别暴露为 `loading 批准并执行`、`loading 创建重试任务`、`loading 标记为失败并保留审计`、`loading 正式签发报告`。GREEN：为上述四个异步按钮增加稳定 `aria-label`，新增 a11y 契约共 **6 passed**；研究页/a11y/页头串行回归 **35 passed**，前端全量 **53 个文件/293 passed**。该契约不等同于真实屏幕阅读器验收。 |
+| E1.10-PACKAGE | 🟢 GREEN | 完整研究交付闭包必须能在不含无关变更的独立 Git 副本中构建、回归并形成可审计提交 | 基于 `d0498b1` 的独立副本迁入 60 个明确归属文件；研究后端 **119 passed**、E-T21 认证/身份/artifact **6 passed**，前端研究集合 **7 个测试文件/49 passed**，lint/build/compileall/diff/乱码门禁通过；隔离分支 `codex/research-e110-isolated-20260901` 已形成可审计提交，最终提交 SHA 见交接文档。当前仓库因 `.git/FETCH_HEAD` 和 ref lock 无写权限，不能导入分支引用；真实屏幕阅读器验收仍未完成，因此 E1.10 聚合任务保持未勾选。 |
+| E-T02 | 绿色（通过） | 执行前修改范围时，只重算直接受影响步骤及其下游依赖步骤和预算；无关步骤成本保持不变，任务启动后拒绝调整 | `python -m pytest tests/test_research_plan_replanning.py tests/test_research_delivery_models.py tests/test_research_task_adapter.py tests/test_research_task_api.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e14verify`：RED 收集失败（`ResearchPlanReplanner` 不存在）→ GREEN 34 passed；覆盖范围依赖、下游闭包、预算重算、pending 门禁与 DAG/预算一致性拒绝。 |
+| E-T03 | 绿色（通过） | 未裁决关键冲突阻止正式报告签发 | E-T24：可信上下文冲突无裁决或最新裁决为保持未决时，签发返回 409，且不消费审批；已裁决状态才可继续检查签发审批。 |
+| E-T04 | 绿色（通过） | 用户可查看原冲突的双方事实 ID，并批准、驳回或保持未决；批准/驳回仅在匹配的冲突审批有效时消费审批并追加裁决历史 | `python -m pytest tests/test_research_conflict_review.py tests/test_governance_approval.py tests/test_financial_fact_conflict_repository.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e15verify`：RED 收集失败（模块不存在）→ GREEN 18 passed；同秒历史回放改按 SQLite 插入顺序，避免随机 ID 颠倒审计时间线。 |
 | E-T05 | 🔴 RED | 关键声明关联事实、计算或分析标签 | 报告模型不存在 |
-| E-T06 | 🔴 RED | 事实修订只使依赖声明失效 | 声明依赖图不存在 |
-| E-T07 | 🔴 RED | Markdown/HTML 导出保留声明和来源 ID | 导出器不存在 |
+| E-T06 | 绿色（通过） | 事实修订只使依赖该事实的声明进入待复核，并创建可比较的新报告版本；无关声明保持原状态 | `python -m pytest tests/test_research_report_invalidation.py tests/test_research_delivery_models.py tests/test_research_report_export.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e17green`：RED 收集失败（服务不存在）→ GREEN 7 passed。 |
+| E-T07 | 绿色（通过） | Markdown/HTML 导出保留报告、计划、数据版本、声明 ID 及其事实、计算、来源或分析依据；HTML 必须转义不可信文本 | `python -m pytest tests/test_research_report_export.py tests/test_research_delivery_models.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e16green`：RED 收集失败（导出器不存在）→ GREEN 6 passed。 |
 | E-T08 | 🔴 RED | 新任务页复用现有主题与证据组件 | 前端页面未实现 |
 | E-T09 | 🔴 RED | 旧聊天页与现有路由保持可用 | 新集成尚未验证 |
 
@@ -364,7 +408,7 @@
 - SSE 契约：逐事件 `data:` 帧（event_id/event_type/revision + payload 展开）+ 终帧 `window_end`（next_event_id/oldest_event_id/resync_required）；游标早于保留窗口时只发 `resync_required=true` 的 window_end 帧，不静默漏事件，与 C2.4 重同步语义一致。
 - GREEN：同一命令 14 passed。
 - 回归：`python -m pytest tests/test_research_task_adapter.py tests/test_research_task_stream_auth.py tests/test_durable_execution.py tests/test_research_task_api.py -q --basetemp=.tmp/pytest-reg-c26` 共 39 passed，零回归；旧即时问答 API 零改动（未触碰既有路由与响应模型，C-T15 兼容回归在 C2.10 全量回归时验证）。
-- 提交 SHA：未提交；按计划在 C2.10 统一提交 `feat(tasks): productize durable research execution` 后回填。
+- 提交 SHA：6a87782（feat(tasks): productize durable research execution）。
 
 ## 2026-08-30 C2.7 路由决策持久化与重试守卫实现记录（C-T22）
 
@@ -400,4 +444,23 @@
   - `src/research_task_orchestrator.py`（新增两方法，保留既有方法未动）：`handle_step_failure` 先 `failure_decision` 分类再 `record_failure` 只追加持久化，随后按动作分支——retry 返回当前快照（任务保持 running 等待重新领取步骤）、failed 走 `fail_task` CAS 终态、waiting_approval 走 `wait_for_approval`；`recover_interrupted_task` 委托 `recovery_decision` 推导可复用步骤与成功调用。
 - GREEN：`python -m pytest tests/test_research_task_fault_drills.py -q --basetemp=.tmp/pytest-green-c29b`，5 passed（首跑曾 2 failed，均为测试自身问题：`RoutePathConflictError` 误作 adapter 类属性、恢复断言应为两步均完成可复用 `("analyze", "fetch")`，已修正）。
 - 定向回归：`python -m pytest tests/test_research_task_adapter.py tests/test_research_task_fault_drills.py tests/test_durable_execution.py tests/test_research_task_api.py tests/test_research_task_route_persistence.py tests/test_research_task_stream_auth.py -q --basetemp=.tmp/pytest-reg-c29`，51 passed 零回归。
-- 提交 SHA：未提交；按计划在 C2.10 统一提交 `feat(tasks): productize durable research execution` 后回填。
+- 提交 SHA：6a87782（feat(tasks): productize durable research execution）。
+
+## 2026-08-30 D 包治理模块实现记录（D-T01~D-T12）
+
+- 设计依据：design.md D 段——五级工具风险（read_only/compute/external_read/external_write/privileged），有副作用才审批；审批绑定 task_revision/plan_hash/fact_version/artifact_version/index_generation 五维度与参数哈希，expires_at 时效，消费后不可复用；审计账本只追加；同事务原子性避免"已执行但无审计"或"已审计但未执行"；持久化前脱敏；提示词注入隔离；用量度量与预算控制；路由质量—成本比决策留痕。
+- 首次 RED：`python -m pytest tests/test_governance_tool_policy.py tests/test_governance_audit.py tests/test_governance_approval.py tests/test_governance_redaction.py tests/test_governance_security.py tests/test_governance_metrics.py tests/test_governance_budget.py tests/test_governance_routing_rationale.py -q --basetemp=C:/Users/111/AppData/Local/Temp/pytest-dred`，首批 13 failed（src/governance 模块不存在，预期失败）。
+- 最小实现（src/governance/ 九个模块 + src/v7_metadata_store.py 迁移 24/25）：
+  - `tool_policy.py`（D1.1）：五级 ToolRisk；ToolPolicyEngine 注册/校验，未注册默认拒绝，重复注册拒绝；无副作用（read_only/compute/external_read）自动放行，external_write/privileged 返回 required_approval。
+  - `audit.py`（D1.4）：GovernanceAuditStore 只追加事件（迁移 24 v7_governance_audit_events），append/replay_by_task；AuditRecord 提供 event 与便捷属性双访问；_insert 持久化前经 redact_sensitive_fields 脱敏 detail，原始事件对象不变。
+  - `approval.py`（D1.2/D1.2.1/D1.3/D1.4.1）：ApprovalBinding 五维度结构化绑定；digest = SHA-256(canonical[subject, subject_id, params_hash, binding_json])；check_gate 依次判 missing/params_changed/expired/dependencies_changed；consume_in_transaction 以 BEGIN IMMEDIATE 将审批消费、审计事件与 business_transition 放入同一事务，异常全回滚；三类 subject（冲突裁决/报告签发/工具执行）。
+  - `redaction.py`（D1.5）：键名规范化（小写、连字符转下划线）后子串匹配敏感标记；递归处理 dict/list/tuple 返回新结构，REDACTED_VALUE = "[REDACTED]"。
+  - `security.py`（D1.6）：不可信内容隔离块标记 + 结束标记转义（<<<ESCAPED_END_UNTRUSTED>>>）；validate_tool_params 顶层键白名单 + 递归保留控制键拒绝（system/system_prompt/instructions/developer/role/messages）；ensure_structured_payload 跨 Agent 仅接受 dict/list。
+  - `metrics.py`（D1.7）：UsageTracker 按任务/模型累计调用次数、token、延迟与成本估算，task_summary/model_breakdown 只读聚合。
+  - `budget.py`（D1.8）：BudgetPolicy(soft_cost, hard_cost) 两级阈值；evaluate 返回 ok/soft_warning，超硬预算抛 BudgetExceededError 携带成本快照与硬预算。
+  - `routing_rationale.py`（D1.9）：compare_routes 高复杂度/高风险质量优先，其余按 quality/cost 比值；save_routing_rationale 经审计账本持久化 route_selected 事件（含 chosen_path/reason/complexity/risk/alternatives）。
+  - 迁移 24（审计事件表）与 25（审批表）以部分暂存方式进入本提交（工作区 B2.5 未授权迁移 12-22 不混入）。
+- GREEN：同命令 `--basetemp=C:/Users/111/AppData/Local/Temp/pytest-dfinal`，43 passed。两轮修复：D1.2 首轮 2 failed（审批测试直接访问 record.action 而 AuditRecord 无该属性，补充便捷属性委托 event）；D1.5-D1.9 首轮 2 failed（UsageTracker.task_summary 误调用 self._aggregate，改为模块级 _Aggregate 类）。
+- 全量回归：`python -m pytest tests/ -q --basetemp=C:/Users/111/AppData/Local/Temp/pytest-d1verify`，641 passed + 1 skipped；首轮 19 failed 全部为 pymupdf 无法写中文路径临时目录的环境问题（FzErrorSystem: cannot open file），改用 ASCII basetemp 后视觉模块 29 passed 全绿，非 D 包改动导致。
+- 遗留：D-T09 的"超预算暂停并保存检查点"需 E 包任务状态机接入 BudgetExceededError 后才能转绿；审批门禁与冲突裁决/报告签发的实际编排接入在 E 包完成。
+- 提交 SHA：1428ef6（feat(governance): add agent policy audit and budgets）。
