@@ -23,6 +23,7 @@
 | A-T14 | 绿色（通过） | 覆盖报告显式暴露样本、公司、期间和分类缺口 | `pytest tests/test_evaluation_quality_gate.py -q`：19 passed |
 | A-T15 | 绿色（通过） | 发布模式拒绝未复核或覆盖不完整的数据集 | `pytest tests/test_evaluation_quality_gate.py -q`：20 passed |
 | A-T16 | 绿色（通过） | 未显式传入数据集版本时从样本元数据推导版本 | `pytest tests/test_evaluation_quality_gate.py -q`：20 passed |
+| A-T17 | 🟢 GREEN | v5.19 已跟踪配置基线必须以 Git 指纹冻结；未跟踪索引数据和未导出的 OpenAPI 必须显式标为未捕获，禁止用当前运行目录或占位内容冒充基线 | RED：夹具文件不存在，`tests/test_v519_compatibility_manifest.py` 2 failed；GREEN：新增不含配置正文的 v5.19 配置 blob 清单，回归 **2 passed**。OpenAPI、关键 JSON、company_registry/metadata 和无 v7 数据库夹具继续保持 RED。 |
 
 ## B. 金融可信内核
 
@@ -394,6 +395,12 @@
 - GREEN：同一命令 16 passed；`python -m compileall -q src/evaluation tests/test_evaluation_quality_gate.py` 通过。
 - CLI 冒烟：`python -m src.evaluation.cli --dataset evals/datasets/core.jsonl --fixtures evals/fixtures/offline-core.json --output-dir .tmp/evaluation-smoke` 生成 JSON/Markdown 报告并通过种子门禁。
 - 评测数据当前只有 1 条种子样本，A1.4/A1.5/A1.7 与 A 包退出条件尚未完成；不以种子结果代表 v5.19 全量质量。
+
+## 2026-09-12 v5.19 配置基线指纹记录
+
+- 首次 RED：`python -m pytest -q tests/test_v519_compatibility_manifest.py`，因 `evals/fixtures/v5.19-compatibility-manifest.json` 不存在而 **2 failed**。
+- 最小实现：`evals/fixtures/v5.19-compatibility-manifest.json` 只保存 v5.19 提交、`.env.example` 与三份已跟踪配置的 Git blob 指纹；不复制可能含敏感值的配置正文。`tests/test_v519_compatibility_manifest.py` 校验标签、提交与 blob 一致，并拒绝将未跟踪索引数据或未导出 OpenAPI 标为已冻结。
+- GREEN：同一命令 **2 passed**。这只完成 0.10 的配置指纹子集，不代表 v5.19 OpenAPI、关键 JSON、company_registry/metadata 或无 v7 数据库行为已完成基线冻结。
 
 ## 2026-08-28 B2.5 声明级 EvidenceBundle 实现记录
 

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "baseline_ref": "v5.19",
+  "baseline_commit": "a6bbad99bc72e66eaa5e7cd9cdd0194dc06bc591",
+  "tracked_configuration_files": [
+    {
+      "path": ".env.example",
+      "git_blob": "f3c5bedaeee88b882160a74646ab2504c3b1d63c"
+    },
+    {
+      "path": "config/agent_config.json",
+      "git_blob": "2c1dd0f64ff303f1f20b55bd2248ec01c4b3f6bc"
+    },
+    {
+      "path": "config/agent_prompts.yaml",
+      "git_blob": "79635d65288428862f8c26fb551dd3258474b869"
+    },
+    {
+      "path": "config/bm25_expansions.json",
+      "git_blob": "49981bdbee2222924b8af46b1f52c2e02d30d33b"
+    }
+  ],
+  "untracked_data_fixtures": [
+    {
+      "path": "data/vector_db/company_registry.json",
+      "status": "not_captured",
+      "reason": "v5.19 Git 树未跟踪该运行时数据，缺少可审计的历史副本。"
+    },
+    {
+      "path": "data/vector_db/*/metadata.json",
+      "status": "not_captured",
+      "reason": "v5.19 Git 树未跟踪索引元数据，不能用当前运行目录冒充历史基线。"
+    }
+  ],
+  "openapi_fixture_status": "not_captured",
+  "openapi_fixture_reason": "需要在可启动的 v5.19 隔离环境中导出 OpenAPI 和关键 JSON，当前未建立该环境。"
+}
