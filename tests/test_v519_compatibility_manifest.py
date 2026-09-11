@@ -41,4 +41,60 @@ def test_v519_manifest_does_not_claim_untracked_data_or_openapi_is_frozen() -> N
 
     assert manifest["untracked_data_fixtures"]
     assert all(item["status"] == "not_captured" for item in manifest["untracked_data_fixtures"])
-    assert manifest["openapi_fixture_status"] == "not_captured"
+    assert manifest["openapi_fixture_status"] == "fingerprint_captured"
+
+
+def test_v519_manifest_records_isolated_openapi_and_key_json_fingerprints() -> None:
+    """无密钥临时导出的接口指纹必须可审计，但不保存可能包含运行目录的响应正文。"""
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+    openapi = manifest["isolated_openapi_fingerprint"]
+    assert openapi["path_count"] == 17
+    assert openapi["sha256"] == "83267a172d0328fa17e479e9b35631212f2c73b567ecf84d2354510493f658e1"
+    assert openapi["paths"] == [
+        "/api/admin/filter-reload",
+        "/api/admin/filter-status",
+        "/api/agent/plan",
+        "/api/agent/query",
+        "/api/agent/stream",
+        "/api/charts/list",
+        "/api/companies",
+        "/api/comparisons/verified",
+        "/api/health",
+        "/api/knowledge/documents",
+        "/api/knowledge/documents/{filename}",
+        "/api/knowledge/upload",
+        "/api/langbot/chat",
+        "/api/query",
+        "/api/retrieve",
+        "/api/system/status",
+        "/v1/chat/completions",
+    ]
+    assert manifest["key_json_fingerprints"] == {
+        "/api/health": {
+            "status_code": 200,
+            "top_level_keys": ["agent_loaded", "filter_config_loaded", "filter_enabled", "rag_generator_loaded", "status", "vector_db_dir"],
+            "body_sha256": "9a9a5c15477d6f4e2f6a353c31cf6d76738a0d288ad1d965f1808ab2729f38f1",
+        },
+        "/api/system/status": {
+            "status_code": 401,
+            "top_level_keys": ["detail"],
+            "body_sha256": "818364ec80c3905abf446ec6a1037e0ef116d39b7e316fda567e5eab4dd9538e",
+        },
+        "/api/companies": {
+            "status_code": 401,
+            "top_level_keys": ["detail"],
+            "body_sha256": "818364ec80c3905abf446ec6a1037e0ef116d39b7e316fda567e5eab4dd9538e",
+        },
+    }
+
+
+def test_v519_manifest_records_candidate_openapi_as_additive() -> None:
+    """候选 OpenAPI 可以新增端点，但不得移除 v5.19 已冻结路径。"""
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+    probe = manifest["candidate_openapi_compatibility"]
+    assert probe["source_commit"] == "9e4f135"
+    assert probe["path_count"] == 39
+    assert probe["missing_v519_paths"] == []
+    assert probe["added_path_count"] == 22

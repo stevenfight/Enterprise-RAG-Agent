@@ -24,6 +24,7 @@
 | A-T15 | 绿色（通过） | 发布模式拒绝未复核或覆盖不完整的数据集 | `pytest tests/test_evaluation_quality_gate.py -q`：20 passed |
 | A-T16 | 绿色（通过） | 未显式传入数据集版本时从样本元数据推导版本 | `pytest tests/test_evaluation_quality_gate.py -q`：20 passed |
 | A-T17 | 🟢 GREEN | v5.19 已跟踪配置基线必须以 Git 指纹冻结；未跟踪索引数据和未导出的 OpenAPI 必须显式标为未捕获，禁止用当前运行目录或占位内容冒充基线 | RED：夹具文件不存在，`tests/test_v519_compatibility_manifest.py` 2 failed；GREEN：新增不含配置正文的 v5.19 配置 blob 清单，回归 **2 passed**。OpenAPI、关键 JSON、company_registry/metadata 和无 v7 数据库夹具继续保持 RED。 |
+| A-T18 | 🟢 GREEN | v5.19 无 Key、禁用 tracing 的临时导出副本必须记录 OpenAPI 与关键 JSON 指纹；候选可新增端点但不得移除 v5.19 路径 | RED：`candidate_openapi_compatibility` 缺失，兼容清单回归 **1 failed**；GREEN：v5.19 OpenAPI 为 17 路径，`/api/health` 为 200、`/api/system/status` 和 `/api/companies` 为 401；候选 39 路径且旧路径零缺失。夹具只保存字段、状态和哈希，不保存响应正文；相关回归 **30 passed**。 |
 
 ## B. 金融可信内核
 
@@ -401,6 +402,12 @@
 - 首次 RED：`python -m pytest -q tests/test_v519_compatibility_manifest.py`，因 `evals/fixtures/v5.19-compatibility-manifest.json` 不存在而 **2 failed**。
 - 最小实现：`evals/fixtures/v5.19-compatibility-manifest.json` 只保存 v5.19 提交、`.env.example` 与三份已跟踪配置的 Git blob 指纹；不复制可能含敏感值的配置正文。`tests/test_v519_compatibility_manifest.py` 校验标签、提交与 blob 一致，并拒绝将未跟踪索引数据或未导出 OpenAPI 标为已冻结。
 - GREEN：同一命令 **2 passed**。这只完成 0.10 的配置指纹子集，不代表 v5.19 OpenAPI、关键 JSON、company_registry/metadata 或无 v7 数据库行为已完成基线冻结。
+
+## 2026-09-12 v5.19 无 Key API 指纹记录
+
+- 首次 RED：`python -m pytest -q tests/test_v519_compatibility_manifest.py`，因 `isolated_openapi_fingerprint` 和后续候选兼容记录缺失，分别出现 **1 failed**。
+- 最小实现：从 `v5.19` Git archive 创建不含 `.git` 和 `data/v7` 的临时副本，清空 Provider/LangSmith 变量并禁用 tracing 后只导入应用、生成 OpenAPI 和调用无副作用端点；夹具记录 17 条路径、关键 JSON 指纹，以及源提交 `9e4f135` 的候选 39 路径与旧路径零缺失。
+- GREEN：`python -m pytest -q tests/test_v519_compatibility_manifest.py tests/test_evaluation_quality_gate.py tests/test_financial_fact_compatibility.py` 为 **30 passed**；未启动服务、未调用 Provider、未使用生产数据或密钥。完整 OpenAPI 正文、认证成功响应、运行时索引数据和无 v7 数据库夹具继续保持未完成。
 
 ## 2026-08-28 B2.5 声明级 EvidenceBundle 实现记录
 
