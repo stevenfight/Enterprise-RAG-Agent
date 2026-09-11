@@ -720,6 +720,8 @@ def signoff_report(task_id: str, payload: SignoffReportRequest, http_request: Re
     report = _report_repository().latest_for_task(task_id)
     if report is None:
         raise HTTPException(status_code=404, detail={"message": "报告不存在"})
+    if _report_signoff_repository().find_for_report(report.report_id) is not None:
+        raise HTTPException(status_code=409, detail={"message": "报告已正式签发"})
     if _has_unresolved_critical_conflicts(task_id):
         raise HTTPException(status_code=409, detail={"message": "存在未裁决关键冲突，禁止正式签发报告"})
     try:
@@ -740,6 +742,8 @@ def signoff_report(task_id: str, payload: SignoffReportRequest, http_request: Re
         raise HTTPException(status_code=404, detail={"message": "任务不存在"})
     except ValueError as exc:
         raise HTTPException(status_code=422, detail={"message": str(exc)}) from exc
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(status_code=409, detail={"message": "报告已正式签发"}) from exc
     assert record is not None
     return {"signoff_id": record.signoff_id, "report_id": record.report_id, "approval_id": record.approval_id, "actor": record.actor, "signed_at": record.signed_at}
 

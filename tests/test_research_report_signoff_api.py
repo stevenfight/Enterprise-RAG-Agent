@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """E-T24 正式报告签发门禁的 RED→GREEN 测试。"""
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -9,6 +10,7 @@ from fastapi.testclient import TestClient
 from src.durable_execution import DurableExecutionStore
 from src.financial_fact_conflict_repository import FinancialFactConflictRepository
 from src.financial_fact_conflict_service import FinancialFactConflictDecision
+from src.governance.approval import GovernanceApprovalStore
 from src.research_conflict_governance import ResearchConflictContext, ResearchConflictContextRepository
 from src.v7_metadata_store import V7MetadataStore
 
@@ -57,3 +59,19 @@ def test_signoff_rejects_pending_trusted_conflict_before_consuming_approval(tmp_
     blocked = client.post("/api/research/tasks/task-signoff/report/signoff", json={"approval_id": grant.json()["approval_id"]})
     assert blocked.status_code == 409
     assert blocked.json()["detail"]["message"] == "存在未裁决关键冲突，禁止正式签发报告"
+
+
+def test_signoff_rejects_second_valid_approval_without_consuming_it(tmp_path: Path, monkeypatch) -> None:
+    client, store = _client_with_report(tmp_path, monkeypatch)
+    first_grant = client.post("/api/research/tasks/task-signoff/report/signoff/approvals", json={"expires_in_seconds": 3600})
+    second_grant = client.post("/api/research/tasks/task-signoff/report/signoff/approvals", json={"expires_in_seconds": 3600})
+
+    assert first_grant.status_code == 200
+    assert second_grant.status_code == 200
+    assert client.post("/api/research/tasks/task-signoff/report/signoff", json={"approval_id": second_grant.json()["approval_id"]}).status_code == 200
+
+    duplicate = client.post("/api/research/tasks/task-signoff/report/signoff", json={"approval_id": first_grant.json()["approval_id"]})
+
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"]["message"] == "报告已正式签发"
+    assert GovernanceApprovalStore(store.metadata_store, clock=lambda: datetime.now(timezone.utc)).approval_status(first_grant.json()["approval_id"]) == "granted"
