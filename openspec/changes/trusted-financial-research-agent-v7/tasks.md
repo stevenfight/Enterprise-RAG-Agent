@@ -14,7 +14,7 @@
 - [ ] 0.7 确认 v7.0 是路线版本；禁止提前创建 Git 标签。
 - [ ] 0.8 逐项批准 `reuse-matrix.md` 的函数边界；实施中出现未列明替换、平行服务或新增依赖时先更新规格。
 - [ ] 0.9 核对多模态本地依赖：PyMuPDF/Pillow、MinerU 元数据、DashScope 实际版本和锁文件；当前未安装 OCR/OpenCV 相关包，不得默认引入。
-- [ ] 0.10 冻结 v5.19 OpenAPI、关键 JSON、配置、company_registry/metadata 和“无 v7 数据库”兼容夹具。（2026-09-12 已新增不含敏感值的 Git 配置指纹、无 Key OpenAPI/关键 JSON 指纹、旧操作签名一致、既有响应模型仅新增可选字段及 14 个无 Key 响应的脱敏正文指纹；另记录既有 `/api/agent/stream` 鉴权旁路为独立安全债务，不能被兼容证据掩盖。完整 OpenAPI 正文、认证成功响应、未跟踪运行时索引数据和无 v7 数据库夹具仍未捕获，任务不得标绿。）
+- [ ] 0.10 冻结 v5.19 OpenAPI、关键 JSON、配置、company_registry/metadata 和“无 v7 数据库”兼容夹具。（2026-09-12 已新增不含敏感值的 Git 配置指纹、无 Key OpenAPI/关键 JSON 指纹、旧操作签名一致、既有响应模型仅新增可选字段及 14 个无 Key 响应的脱敏正文指纹；既有 `/api/agent/stream` 鉴权旁路已由独立变更 `fix-agent-stream-authentication` 修复，候选对无 Key/错误 Key SSE 改为 401，作为安全例外保留历史 503 指纹。完整 OpenAPI 正文、认证成功响应、未跟踪运行时索引数据和无 v7 数据库夹具仍未捕获，任务不得标绿。）
 - [x] 0.11 定义 v7 四个默认关闭的功能开关及严格配置 schema；multimodal/research_tasks 依赖 financial_trust 与 durable_execution，依赖缺失时 fail closed 且不自动连带启用。
 
 ## A. 金融评测基线与发布门禁

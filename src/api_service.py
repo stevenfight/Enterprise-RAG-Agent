@@ -890,8 +890,6 @@ class APIAuthMiddleware(BaseHTTPMiddleware):
         "/docs",
         "/openapi.json",
         "/redoc",
-        # 前端页面内部接口：EventSource 无法携带自定义请求头
-        "/api/agent/stream",
     }
 
     # 无需鉴权的路径前缀（动态资源，如前端展示的图表图片）
@@ -899,7 +897,7 @@ class APIAuthMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        # 健康检查、文档接口及前端内部接口无需鉴权
+        # 健康检查、文档接口及静态展示资源无需鉴权；SSE 使用既有研究会话或 Bearer API Key。
         if path in self.SKIP_PATHS or path.startswith(self.SKIP_PREFIXES):
             return await call_next(request)
 

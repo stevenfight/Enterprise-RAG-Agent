@@ -123,12 +123,12 @@ def test_v519_manifest_records_field_level_openapi_compatibility() -> None:
 
 
 def test_v519_manifest_records_no_key_response_compatibility() -> None:
-    """无 Key 端点的状态、字段与脱敏正文指纹必须保持 v5.19 行为。"""
+    """除单独记录的 SSE 安全例外外，无 Key 基线必须保持可审计。"""
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
     compatibility = manifest["no_key_response_compatibility"]
-    assert compatibility["candidate_api_source_commit"] == "9e4f135"
-    assert compatibility["candidate_api_source_unchanged_through"] == "588855b"
+    assert compatibility["source_snapshot_commit"] == "588855b"
+    assert compatibility["scope_excludes_historical_stream_auth_debt"] is True
     assert compatibility["probe_count"] == 14
     assert compatibility["missing_v519_probes"] == []
     assert compatibility["changed_v519_probes"] == []
@@ -152,17 +152,23 @@ def test_v519_manifest_records_no_key_response_compatibility() -> None:
     }
 
 
-def test_v519_manifest_records_historical_stream_auth_bypass_as_unresolved() -> None:
-    """流式端点未进入 API Key 中间件必须被记录为安全债务，不能被兼容结论掩盖。"""
+def test_v519_manifest_records_stream_auth_remediation_as_security_exception() -> None:
+    """v5.19 流式鉴权旁路必须保留历史证据，并明确候选已安全修复。"""
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
     debt = manifest["historical_stream_auth_debt"]
-    assert debt["status"] == "unresolved_security_debt"
-    assert debt["v519_and_candidate_match"] is True
-    assert debt["no_key_with_query"] == {
+    assert debt["status"] == "remediated_security_exception"
+    assert debt["v519_behavior"]["no_key_with_query"] == {
         "status_code": 503,
         "top_level_keys": ["detail"],
         "body_sha256": "8ea356623b408e7a5ca0843ec88548beee6be96653e79d53cdc4d9ee85599531",
     }
-    assert debt["invalid_key_with_query"] == debt["no_key_with_query"]
-    assert debt["required_follow_up"] == "单独安全变更"
+    assert debt["v519_behavior"]["invalid_key_with_query"] == debt["v519_behavior"]["no_key_with_query"]
+    assert debt["candidate_remediation"] == {
+        "verification_test": "tests/test_agent_stream_auth.py",
+        "no_key_status_code": 401,
+        "invalid_key_status_code": 401,
+        "valid_bearer_reaches_downstream": True,
+        "valid_research_session_reaches_downstream": True,
+    }
+    assert debt["compatibility_exception_reason"] == "修复 API Key 中间件对白名单 SSE 路径的鉴权旁路。"

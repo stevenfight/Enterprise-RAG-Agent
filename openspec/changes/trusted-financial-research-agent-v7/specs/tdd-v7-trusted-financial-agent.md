@@ -426,8 +426,8 @@
 ## 2026-09-12 流式端点历史鉴权债务记录
 
 - 复用 v5.19 `p0_fixes_manual.py` 的错误 Bearer Key 输入，在无 Key、禁用 tracing 的 v5.19/候选隔离副本中验证：5 个普通受保护端点返回相同 401 正文；带有效 query 的 `/api/agent/stream` 无 Key 或错误 Key 均进入路由并返回 503，而不是中间件 401。
-- 该行为与 v5.19 一致，候选没有引入回归；但它是 API Key 中间件未覆盖 SSE 路由的安全债务，不属于可接受的发布结论。
-- 兼容清单先以 `historical_stream_auth_debt` 缺失形成 **1 failed**，补齐后相关回归 **33 passed**。本项只完成证据记录；必须在独立安全变更中将无 Key/错误 Key 流式请求改为 401，并补完整 SSE/认证回归后才可标记修复完成。
+- 该行为与 v5.19 一致，候选当时没有引入回归；但它是 API Key 中间件未覆盖 SSE 路由的安全债务，不属于可接受的发布结论。
+- 后续独立变更 `fix-agent-stream-authentication` 已移除 `/api/agent/stream` 静态白名单，`tests/test_agent_stream_auth.py` 验证无 Key/错误 Key 在下游前为 401，正确 Bearer Key 与有效研究会话仍透传。兼容清单将历史 503 指纹保留为 `remediated_security_exception`，不再声称此项与 v5.19 行为一致；相关定向回归 **36 passed**。完整 OpenAPI 正文、认证成功响应、未跟踪运行时索引数据和无 v7 数据库夹具仍待补齐。
 
 ## 2026-08-28 B2.5 声明级 EvidenceBundle 实现记录
 
