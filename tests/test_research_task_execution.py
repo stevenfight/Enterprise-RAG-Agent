@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """E-T33：研究任务的最小真实执行闭环。"""
 
+import time
 from decimal import Decimal
 from pathlib import Path
 
@@ -93,6 +94,50 @@ def test_executor_keeps_task_running_when_another_worker_holds_step_lease(tmp_pa
     assert snapshot.status == "running"
     assert reports.latest_for_task("execution-lease-held") is None
     assert all(item.decision_type != "failure" for item in adapter.route_decisions("execution-lease-held"))
+
+
+def test_executor_claims_step_before_external_query_when_lease_is_available(tmp_path: Path) -> None:
+    from src.research_task_execution import ResearchTaskExecutor
+
+    adapter, plans, reports = _running_task(tmp_path, "execution-lease-before-query")
+    adapter.claim_step("execution-lease-before-query", "retrieve", "other-worker")
+    calls: list[str] = []
+
+    def query(objective: str):
+        calls.append(objective)
+        return {"answer": "不应在租约竞争时调用", "sources": []}
+
+    executor = ResearchTaskExecutor(adapter, plans, reports, query=query)
+
+    snapshot = executor.execute("execution-lease-before-query", actor="worker")
+
+    assert snapshot.status == "running"
+    assert calls == []
+    assert reports.latest_for_task("execution-lease-before-query") is None
+
+
+def test_executor_renews_step_lease_during_long_query(tmp_path: Path) -> None:
+    from src.research_task_execution import ResearchTaskExecutor
+
+    adapter, plans, reports = _running_task(tmp_path, "execution-lease-renewal")
+
+    def query(_objective: str):
+        time.sleep(0.12)
+        return {"answer": "营业收入同比增长，详见年报披露。", "sources": [{"source_file": "annual-report.pdf", "pages": [12]}]}
+
+    executor = ResearchTaskExecutor(
+        adapter,
+        plans,
+        reports,
+        query=query,
+        lease_ttl_seconds=0.05,
+        lease_renew_interval_seconds=0.01,
+    )
+
+    snapshot = executor.execute("execution-lease-renewal", actor="worker")
+
+    assert snapshot.status == "completed"
+    assert reports.latest_for_task("execution-lease-renewal") is not None
 
 
 def test_final_report_write_failure_rolls_back_final_step_and_completion(tmp_path: Path, monkeypatch) -> None:

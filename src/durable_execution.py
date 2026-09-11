@@ -310,6 +310,32 @@ class DurableExecutionStore:
                 connection.rollback()
                 raise
 
+    def abandon_lease(self, attempt_token: str, owner_token: str, *, reason: str) -> None:
+        """由当前持有者释放未提交步骤，避免失败计算遗留活动租约。"""
+        with self.metadata_store.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    """
+                    SELECT leases.run_id, leases.step_id, attempts.attempt_id
+                    FROM v7_leases AS leases
+                    JOIN v7_step_attempts AS attempts
+                      ON attempts.attempt_id = leases.attempt_id
+                    WHERE attempts.attempt_token=? AND leases.owner_token=?
+                    """,
+                    (attempt_token, owner_token),
+                ).fetchone()
+                if row is None:
+                    connection.commit()
+                    return
+                connection.execute("UPDATE v7_step_attempts SET status='abandoned' WHERE attempt_id=?", (row[2],))
+                connection.execute("DELETE FROM v7_leases WHERE run_id=? AND step_id=? AND attempt_id=?", (row[0], row[1], row[2]))
+                self._append_event(connection, row[0], self._revision(connection, row[0]), "step_abandoned", {"step_id": row[1], "reason": reason})
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+
     def mark_attempt_timeout(self, attempt_token: str, owner_token: str) -> None:
         """记录等待超时；不把底层线程或远端调用误写为已取消。"""
         with self.metadata_store.connect() as connection:

@@ -51,6 +51,18 @@ def test_lease_renewal_keeps_current_attempt_exclusive(tmp_path: Path):
         store.acquire_lease("run-1", "parse", "worker-b", now=1011, ttl_seconds=10)
 
 
+def test_abandon_lease_releases_current_attempt_and_keeps_audit_event(tmp_path: Path):
+    store = _running_store(tmp_path)
+    attempt = store.acquire_lease("run-1", "parse", "worker-a", now=1000, ttl_seconds=10)
+
+    store.abandon_lease(attempt.attempt_token, "worker-a", reason="计算失败")
+
+    assert store.attempt_status(attempt.attempt_id) == "abandoned"
+    replacement = store.acquire_lease("run-1", "parse", "worker-b", now=1001, ttl_seconds=10)
+    assert replacement.owner_token == "worker-b"
+    assert store.events("run-1")[-2].event_type == "step_abandoned"
+
+
 def test_late_result_from_superseded_attempt_is_discarded_without_checkpoint(tmp_path: Path):
     store = _running_store(tmp_path)
     first = store.acquire_lease("run-1", "parse", "worker-a", now=1000, ttl_seconds=10)

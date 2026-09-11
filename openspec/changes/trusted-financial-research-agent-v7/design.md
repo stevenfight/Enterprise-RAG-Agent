@@ -263,6 +263,8 @@ C 分为 M 前的 C0 与 M 后的 C1。C0 是不绑定业务 UI 的通用 Execut
 
 每个 Run 和 StepAttempt 使用单调 `revision` 与租约。暂停、恢复、取消、审批等命令携带 `command_id + expected_revision`；重复 command_id 返回原结果，过期 revision 返回冲突而不覆盖新状态。执行者必须持有未过期 lease 才能提交步骤结果。
 
+每个步骤必须在外部检索或模型计算前领取 lease，计算期间按 TTL 续租；未提交异常由当前 owner 原子释放 lease 并追加 `step_abandoned` 事件，不能遗留活动 lease。租约竞争或续租失败只表示当前执行者失去执行权，不得把任务误记为业务失败。
+
 ### 存储
 
 首版复用 B 阶段 `V7MetadataStore` 的标准库 `sqlite3` 实现：短事务、每操作独立连接、WAL、busy timeout 和明确事务边界；异步 API 中的阻塞操作放入线程执行。当前部署是单 Uvicorn 进程，首版只承诺该部署模式。启用多 worker 前必须单独完成并发验收。不得再为任务创建第二个 SQLite 文件，也不得把多个任务以整文件覆盖方式写入同一 JSON。存储接口与实现分离，以便后续替换数据库。

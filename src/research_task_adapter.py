@@ -294,6 +294,14 @@ class ResearchTaskAdapter:
         checkpoint = self.build_checkpoint(normalized_task_id, dag_step_ids, dependency_versions=dependency_versions, artifact_ids=artifact_ids, fact_ids=fact_ids)
         return self.execution_store.commit_step(self.run_id_for(normalized_task_id), self._step_id(step_id), attempt_token, owner_token, expected_revision, checkpoint=checkpoint, invocation=invocation, on_commit=on_commit, completion_command_id=completion_command_id, completion_actor=completion_actor, now=now)
 
+    def renew_step_claim(self, claim: ResearchStepClaim, *, ttl_seconds: float = 30) -> None:
+        """续租当前步骤，令长耗时计算仍受 C0 当前持有者保护。"""
+        self.execution_store.renew_lease(claim.attempt.attempt_token, claim.attempt.owner_token, ttl_seconds=ttl_seconds)
+
+    def abandon_step_claim(self, claim: ResearchStepClaim, *, reason: str) -> None:
+        """释放当前工作者未提交的步骤租约，并留下 C0 事件。"""
+        self.execution_store.abandon_lease(claim.attempt.attempt_token, claim.attempt.owner_token, reason=reason)
+
     def dispose_legacy_running_task(
         self,
         task_id: str,

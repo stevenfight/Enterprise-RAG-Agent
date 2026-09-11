@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable, Mapping
+from threading import Event, Thread
 from typing import Any
 
 from src.agent_registry import AgentRegistry
@@ -13,8 +14,43 @@ from src.durable_execution import LeaseUnavailableError
 from src.research_delivery import Claim, ClaimSupportKind, ReportReviewStatus, ResearchReport
 from src.research_plan_repository import ResearchPlanRepository
 from src.research_report_repository import ResearchReportRepository
-from src.research_task_adapter import ResearchTaskAdapter, ResearchTaskSnapshot
+from src.research_task_adapter import ResearchStepClaim, ResearchTaskAdapter, ResearchTaskSnapshot
 from src.tools import BaseTool, ToolRegistry
+
+
+class _StepLeaseHeartbeat:
+    """在步骤计算期间续租；停止后由调用方检查续租错误。"""
+
+    def __init__(self, adapter: ResearchTaskAdapter, claim: ResearchStepClaim, *, ttl_seconds: float, interval_seconds: float) -> None:
+        self._adapter = adapter
+        self._claim = claim
+        self._ttl_seconds = ttl_seconds
+        self._interval_seconds = interval_seconds
+        self._stop = Event()
+        self._error: Exception | None = None
+        self._thread: Thread | None = None
+
+    def start(self) -> None:
+        self._thread = Thread(target=self._run, name="research-step-lease-heartbeat", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=max(self._interval_seconds, 1.0))
+
+    def raise_if_failed(self) -> None:
+        if self._error is not None:
+            raise self._error
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._interval_seconds):
+            try:
+                self._adapter.renew_step_claim(self._claim, ttl_seconds=self._ttl_seconds)
+            except Exception as exc:
+                self._error = exc
+                self._stop.set()
+                return
 
 
 class ResearchTaskExecutor:
@@ -30,7 +66,11 @@ class ResearchTaskExecutor:
         agent_registry: AgentRegistry | None = None,
         tool_registry: ToolRegistry | None = None,
         llm_provider: Any | None = None,
+        lease_ttl_seconds: float = 30,
+        lease_renew_interval_seconds: float = 10,
     ) -> None:
+        if lease_ttl_seconds <= 0 or lease_renew_interval_seconds <= 0 or lease_renew_interval_seconds >= lease_ttl_seconds:
+            raise ValueError("步骤租约时长和续租间隔必须为正，且续租间隔必须小于租约时长")
         self._adapter = task_adapter
         self._plans = plan_repository
         self._reports = report_repository
@@ -38,6 +78,8 @@ class ResearchTaskExecutor:
         self._agent_registry = agent_registry
         self._tool_registry = tool_registry
         self._llm_provider = llm_provider
+        self._lease_ttl_seconds = lease_ttl_seconds
+        self._lease_renew_interval_seconds = lease_renew_interval_seconds
 
     def execute(self, task_id: str, *, actor: str) -> ResearchTaskSnapshot:
         """执行当前计划；任一步骤异常均留下失败决策并终止任务。"""
@@ -59,9 +101,26 @@ class ResearchTaskExecutor:
         chart_result: Mapping[str, Any] | None = None
         plan_result: Mapping[str, Any] | None = None
         report_result: Mapping[str, Any] | None = None
+        active_claim: ResearchStepClaim | None = None
+        active_heartbeat: _StepLeaseHeartbeat | None = None
         try:
             self._validate_bindings(plan)
             for step_id in plan.step_ids:
+                active_claim = self._adapter.claim_step(
+                    task_id,
+                    step_id,
+                    f"{actor}:{task_id}:{step_id}",
+                    ttl_seconds=self._lease_ttl_seconds,
+                )
+                step_snapshot = self._adapter.task_snapshot(task_id)
+                heartbeat = _StepLeaseHeartbeat(
+                    self._adapter,
+                    active_claim,
+                    ttl_seconds=self._lease_ttl_seconds,
+                    interval_seconds=self._lease_renew_interval_seconds,
+                )
+                heartbeat.start()
+                active_heartbeat = heartbeat
                 artifact_ids: tuple[str, ...] = ()
                 tool_calls: tuple[dict[str, Any], ...] = ()
                 worker_call: dict[str, Any] | None = None
@@ -104,26 +163,48 @@ class ResearchTaskExecutor:
                     report=report if step_id == "report" else None,
                     report_result=report_result if step_id == "report" else None,
                 )
-                self._commit_step(
-                    task_id,
-                    step_id,
-                    plan.step_ids,
-                    dependency_versions,
-                    actor,
-                    artifact_ids=artifact_ids,
-                    step_trace=step_trace,
-                    tool_calls=tool_calls,
-                    worker_call=worker_call,
-                    report=report if step_id == "report" else None,
-                )
+                try:
+                    heartbeat.stop()
+                    heartbeat.raise_if_failed()
+                    active_heartbeat = None
+                    self._commit_step(
+                        task_id,
+                        step_id,
+                        plan.step_ids,
+                        dependency_versions,
+                        actor,
+                        claim=active_claim,
+                        expected_revision=step_snapshot.revision,
+                        artifact_ids=artifact_ids,
+                        step_trace=step_trace,
+                        tool_calls=tool_calls,
+                        worker_call=worker_call,
+                        report=report if step_id == "report" else None,
+                    )
+                    active_claim = None
+                finally:
+                    heartbeat.stop()
+                    active_heartbeat = None
         except LeaseUnavailableError:
+            if active_heartbeat is not None:
+                active_heartbeat.stop()
+            if active_claim is not None:
+                self._adapter.abandon_step_claim(active_claim, reason="租约竞争或续租失败")
             return self._adapter.task_snapshot(task_id)
         except ValueError as exc:
+            if active_heartbeat is not None:
+                active_heartbeat.stop()
+            if active_claim is not None:
+                self._adapter.abandon_step_claim(active_claim, reason=str(exc))
             current = self._adapter.task_snapshot(task_id)
             if current.status == "running":
                 return self._fail(task_id, current.revision, actor, reason=str(exc))
             return current
         except Exception:
+            if active_heartbeat is not None:
+                active_heartbeat.stop()
+            if active_claim is not None:
+                self._adapter.abandon_step_claim(active_claim, reason="执行器发生未分类错误")
             current = self._adapter.task_snapshot(task_id)
             if current.status == "running":
                 return self._fail(task_id, current.revision, actor, reason="执行器发生未分类错误")
@@ -313,20 +394,20 @@ class ResearchTaskExecutor:
         dependency_versions: dict[str, str],
         actor: str,
         *,
+        claim: ResearchStepClaim,
+        expected_revision: int,
         artifact_ids: tuple[str, ...],
         step_trace: dict[str, Any] | None = None,
         tool_calls: tuple[dict[str, Any], ...] = (),
         worker_call: dict[str, Any] | None = None,
         report: ResearchReport | None = None,
     ) -> None:
-        claim = self._adapter.claim_step(task_id, step_id, f"{actor}:{task_id}:{step_id}")
-        snapshot = self._adapter.task_snapshot(task_id)
         result = self._adapter.commit_step(
             task_id,
             step_id,
             claim.attempt.attempt_token,
             claim.attempt.owner_token,
-            snapshot.revision,
+            expected_revision,
             dag_step_ids=dag_step_ids,
             dependency_versions=dependency_versions,
             invocation={
