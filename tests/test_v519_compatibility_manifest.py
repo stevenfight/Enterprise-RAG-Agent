@@ -98,3 +98,25 @@ def test_v519_manifest_records_candidate_openapi_as_additive() -> None:
     assert probe["path_count"] == 39
     assert probe["missing_v519_paths"] == []
     assert probe["added_path_count"] == 22
+
+
+def test_v519_manifest_records_field_level_openapi_compatibility() -> None:
+    """旧操作签名必须不变，既有响应模型只允许新增非必填字段。"""
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+    compatibility = manifest["field_level_openapi_compatibility"]
+    assert compatibility["v5_operation_signature_sha256"] == "fa28c35a2e29fe57f78ce8a6ade3b99c2dae77ed8c75456a6f16ff4a752c7466"
+    assert compatibility["candidate_old_operation_signature_sha256"] == compatibility["v5_operation_signature_sha256"]
+    assert compatibility["missing_v5_components"] == []
+    assert compatibility["changed_components"] == {
+        "KnowledgeUploadResponse": {
+            "preserved_properties": ["filename", "size", "size_mb", "success"],
+            "added_optional_properties": ["document_version_id", "idempotent", "index_status", "logical_document_id", "physical_page_count", "processing_status", "sha256"],
+            "required_fields_unchanged": True,
+        },
+        "SourceInfo": {
+            "preserved_properties": ["company_name", "excerpt", "index", "pages", "scores", "source_file"],
+            "added_optional_properties": ["document_pages", "visual_locator", "visual_preview_status"],
+            "required_fields_unchanged": True,
+        },
+    }

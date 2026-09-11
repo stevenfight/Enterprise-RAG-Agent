@@ -86,5 +86,22 @@
     "path_count": 39,
     "missing_v519_paths": [],
     "added_path_count": 22
+  },
+  "field_level_openapi_compatibility": {
+    "v5_operation_signature_sha256": "fa28c35a2e29fe57f78ce8a6ade3b99c2dae77ed8c75456a6f16ff4a752c7466",
+    "candidate_old_operation_signature_sha256": "fa28c35a2e29fe57f78ce8a6ade3b99c2dae77ed8c75456a6f16ff4a752c7466",
+    "missing_v5_components": [],
+    "changed_components": {
+      "KnowledgeUploadResponse": {
+        "preserved_properties": ["filename", "size", "size_mb", "success"],
+        "added_optional_properties": ["document_version_id", "idempotent", "index_status", "logical_document_id", "physical_page_count", "processing_status", "sha256"],
+        "required_fields_unchanged": true
+      },
+      "SourceInfo": {
+        "preserved_properties": ["company_name", "excerpt", "index", "pages", "scores", "source_file"],
+        "added_optional_properties": ["document_pages", "visual_locator", "visual_preview_status"],
+        "required_fields_unchanged": true
+      }
+    }
   }
 }
