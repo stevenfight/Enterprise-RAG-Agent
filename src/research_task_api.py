@@ -246,13 +246,13 @@ def _configured_approval_authority(request: Request) -> str:
     return identity.username
 
 
-def _configured_researcher(request: Request) -> str:
-    """创建研究任务只接受当前会话中的 researcher 角色。"""
+def _configured_researcher(request: Request, *, operation: str = "提交研究任务") -> str:
+    """研究写操作只接受当前会话中的 researcher 角色。"""
     identity = _session_identity(request)
     if identity is None:
-        raise HTTPException(status_code=401, detail={"message": "提交研究任务需要登录"})
+        raise HTTPException(status_code=401, detail={"message": f"{operation}需要登录"})
     if "researcher" not in identity.roles:
-        raise HTTPException(status_code=403, detail={"message": "当前用户没有提交研究任务权限"})
+        raise HTTPException(status_code=403, detail={"message": f"当前用户没有{operation}权限"})
     return identity.username
 
 
@@ -652,8 +652,9 @@ def get_latest_report(task_id: str) -> dict[str, Any]:
 
 
 @router.post("/tasks/{task_id}/report", summary="创建任务报告")
-def create_report(task_id: str, request: CreateReportRequest) -> dict[str, Any]:
+def create_report(task_id: str, request: CreateReportRequest, http_request: Request) -> dict[str, Any]:
     """从当前持久化计划与声明输入生成只追加的待审核报告版本。"""
+    _configured_researcher(http_request, operation="创建报告")
     try:
         _adapter().task_snapshot(task_id)
     except KeyError:

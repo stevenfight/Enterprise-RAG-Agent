@@ -167,6 +167,31 @@ def test_create_report_uses_persisted_plan_and_generates_immutable_versions(tmp_
     assert client.get("/api/research/tasks/t-create-report/report").json()["claims"][0]["claim_id"] == "claim-2"
 
 
+def test_create_report_requires_researcher_role(tmp_path: Path):
+    client, store, _ = _build_client(tmp_path)
+    client.post("/api/research/tasks", json={
+        "task_id": "t-report-role", "dag_step_ids": ["retrieve"],
+        "objective": "比较收入", "scope": ["收入"], "estimated_cost": "2.50",
+    })
+    with store.metadata_store.connect() as connection:
+        connection.execute(
+            "DELETE FROM v7_research_user_roles WHERE user_id=? AND role_id=?",
+            ("user:admin", "researcher"),
+        )
+        connection.commit()
+
+    response = client.post("/api/research/tasks/t-report-role/report", json={
+        "data_version": "facts-1",
+        "claims": [{
+            "claim_id": "claim-1", "text": "收入增长", "support_kind": "fact",
+            "fact_ids": ["fact-1"],
+        }],
+    })
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["message"] == "当前用户没有创建报告权限"
+
+
 def test_create_report_rejects_unknown_task_or_task_without_persisted_plan(tmp_path: Path):
     client, _, _ = _build_client(tmp_path)
     payload = {
