@@ -287,7 +287,7 @@
 
 - [x] E1.1 定义 ResearchPlan、Claim、ResearchReport 与审核状态模型。（E-T10 RED→GREEN：稳定 ID、预算快照、声明依据与审核状态模型，4 passed）
 - [x] E1.2 新增研究任务列表和详情 API。（复用 C2.6 详情 API；新增只读列表 API，E-T11 RED→GREEN，研究任务定向回归 30 passed）
-- [x] E1.3 新增研究任务页面并复用现有布局、DAG、证据、图表组件。（E-T12 RED→GREEN：任务页、路由和无结果降级，前端定向 14 passed、build/lint 通过）
+- [x] E1.3 新增研究任务页面并复用现有布局、DAG、证据、图表组件。（E-T12 RED→GREEN：任务页、路由和无结果降级；2026-09-11 补充 E-T09 根聊天路由与 `/research` 分离契约，隔离 worktree 前端定向 37 passed、build 通过）
 - [x] E1.4 支持执行前调整范围和预算重新计算。（E-T02 RED→GREEN：范围直接影响与下游闭包、无关步骤成本保持、pending 门禁、DAG/预算一致性拒绝；研究任务定向回归 34 passed）
 - [x] E1.5 支持关键冲突批准、驳回和保持未决。（E-T04 RED→GREEN：原冲突不覆盖、裁决历史只追加、批准/驳回同事务消费匹配审批；18 passed）
 - [x] E1.6 生成声明级可追溯 Markdown/HTML 报告。（E-T07 RED→GREEN：报告/计划/数据版本、声明与证据 ID 完整输出，HTML 转义；6 passed）

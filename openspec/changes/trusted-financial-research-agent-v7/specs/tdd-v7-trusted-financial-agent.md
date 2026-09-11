@@ -356,11 +356,11 @@
 | E-T02 | 绿色（通过） | 执行前修改范围时，只重算直接受影响步骤及其下游依赖步骤和预算；无关步骤成本保持不变，任务启动后拒绝调整 | `python -m pytest tests/test_research_plan_replanning.py tests/test_research_delivery_models.py tests/test_research_task_adapter.py tests/test_research_task_api.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e14verify`：RED 收集失败（`ResearchPlanReplanner` 不存在）→ GREEN 34 passed；覆盖范围依赖、下游闭包、预算重算、pending 门禁与 DAG/预算一致性拒绝。 |
 | E-T03 | 绿色（通过） | 未裁决关键冲突阻止正式报告签发 | E-T24：可信上下文冲突无裁决或最新裁决为保持未决时，签发返回 409，且不消费审批；已裁决状态才可继续检查签发审批。 |
 | E-T04 | 绿色（通过） | 用户可查看原冲突的双方事实 ID，并批准、驳回或保持未决；批准/驳回仅在匹配的冲突审批有效时消费审批并追加裁决历史 | `python -m pytest tests/test_research_conflict_review.py tests/test_governance_approval.py tests/test_financial_fact_conflict_repository.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e15verify`：RED 收集失败（模块不存在）→ GREEN 18 passed；同秒历史回放改按 SQLite 插入顺序，避免随机 ID 颠倒审计时间线。 |
-| E-T05 | 🔴 RED | 关键声明关联事实、计算或分析标签 | 报告模型不存在 |
+| E-T05 | 🟢 GREEN | 关键声明关联事实、计算或分析标签 | 历史 RED 原因“报告模型不存在”已过期。`Claim.create` 拒绝无依据声明，并要求事实、计算、来源或明确分析标签；本轮隔离副本执行 `tests/test_research_delivery_models.py tests/test_research_report_export.py` 为 17 passed。 |
 | E-T06 | 绿色（通过） | 事实修订只使依赖该事实的声明进入待复核，并创建可比较的新报告版本；无关声明保持原状态 | `python -m pytest tests/test_research_report_invalidation.py tests/test_research_delivery_models.py tests/test_research_report_export.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e17green`：RED 收集失败（服务不存在）→ GREEN 7 passed。 |
 | E-T07 | 绿色（通过） | Markdown/HTML 导出保留报告、计划、数据版本、声明 ID 及其事实、计算、来源或分析依据；HTML 必须转义不可信文本 | `python -m pytest tests/test_research_report_export.py tests/test_research_delivery_models.py -q --basetemp=C:/Users/111/AppData/Local/Temp/e16green`：RED 收集失败（导出器不存在）→ GREEN 6 passed。 |
-| E-T08 | 🔴 RED | 新任务页复用现有主题与证据组件 | 前端页面未实现 |
-| E-T09 | 🔴 RED | 旧聊天页与现有路由保持可用 | 新集成尚未验证 |
+| E-T08 | 🟢 GREEN | 新任务页复用现有主题与证据组件 | 历史 RED 原因“前端页面未实现”已过期。`ResearchTasksPage` 复用 `PageShell`、`DagFlow`、`EvidenceContent` 和 `ChartContainer`；本轮隔离副本研究页、可访问性与页头定向回归为 35 passed，生产构建通过。 |
+| E-T09 | 🟢 GREEN | 旧聊天页与现有路由保持可用 | 新增 `frontend/src/__tests__/AppRoutes.test.tsx` 直接锁定根路由仍渲染 `ChatPage`，且仅 `/research` 渲染研究页；本轮 2 passed。研究页、可访问性、页头与路由合计 37 passed，生产构建通过。 |
 
 ## 全局回归
 
