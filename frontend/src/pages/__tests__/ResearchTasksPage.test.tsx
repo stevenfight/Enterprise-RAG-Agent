@@ -1,6 +1,6 @@
 // -*- coding: utf-8 -*-
 /** E1.3 研究任务页的 RED→GREEN 契约。 */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -125,6 +125,23 @@ describe('ResearchTasksPage', () => {
     expect(await screen.findByText('已完成步骤：plan、retrieve')).toBeInTheDocument();
     expect(await screen.findByText('完成时间：2026-09-01 01:00:00')).toBeInTheDocument();
     expect(getResearchTaskExecutionSummary).toHaveBeenCalledWith('task-progress');
+  });
+
+  it('E-T35: 运行中任务每 5 秒刷新任务状态和执行摘要', async () => {
+    vi.useFakeTimers();
+    listResearchTasks.mockResolvedValue([{ task_id: 'task-live', run_id: 'research:task-live', status: 'running', revision: 1, dag_step_ids: ['plan'] }]);
+    getResearchTaskExecutionSummary.mockResolvedValue({ completed_step_ids: [], current_step_id: 'plan', completed_at: null, failure_reason: null });
+
+    render(<ResearchTasksPage />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(listResearchTasks).toHaveBeenCalledTimes(1);
+    expect(getResearchTaskExecutionSummary).toHaveBeenCalledTimes(1);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+
+    expect(listResearchTasks).toHaveBeenCalledTimes(2);
+    expect(getResearchTaskExecutionSummary).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
   });
 
   it('E-T39: 展示服务端持久化的 Agent、工具和脱敏结果轨迹', async () => {

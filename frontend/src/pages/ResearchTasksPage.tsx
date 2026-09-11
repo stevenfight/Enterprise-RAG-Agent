@@ -93,6 +93,7 @@ export default function ResearchTasksPage() {
   const [form] = Form.useForm<{ objective: string; scope: string; estimated_cost: string }>();
   const [tasks, setTasks] = useState<ResearchTaskSnapshot[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string>();
+  const [detailsRefreshToken, setDetailsRefreshToken] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [report, setReport] = useState<ResearchTaskReport>();
@@ -160,6 +161,16 @@ export default function ResearchTasksPage() {
     () => tasks.find((task) => task.task_id === selectedTaskId),
     [selectedTaskId, tasks],
   );
+  const selectedTaskStatus = selectedTask?.status;
+
+  useEffect(() => {
+    if (!selectedTaskId || !selectedTaskStatus || ['completed', 'failed', 'cancelled'].includes(selectedTaskStatus)) return;
+    const timer = window.setInterval(() => {
+      void loadTasks();
+      setDetailsRefreshToken((current) => current + 1);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [loadTasks, selectedTaskId, selectedTaskStatus]);
 
   useEffect(() => {
     if (!selectedTaskId) {
@@ -185,7 +196,7 @@ export default function ResearchTasksPage() {
     return () => {
       active = false;
     };
-  }, [selectedTaskId]);
+  }, [selectedTaskId, detailsRefreshToken]);
 
   useEffect(() => {
     if (!selectedTaskId) {
@@ -203,7 +214,7 @@ export default function ResearchTasksPage() {
       .catch(() => { if (active) setExecutionError(true); })
       .finally(() => { if (active) setExecutionLoading(false); });
     return () => { active = false; };
-  }, [selectedTaskId]);
+  }, [selectedTaskId, detailsRefreshToken]);
 
   useEffect(() => {
     if (!selectedTaskId || !report) {
@@ -355,7 +366,7 @@ export default function ResearchTasksPage() {
       if (active) { setConflicts(items); setReviews(Object.fromEntries(histories)); }
     }).catch(() => { if (active) { setConflicts([]); setReviews({}); } });
     return () => { active = false; };
-  }, [selectedTaskId]);
+  }, [selectedTaskId, detailsRefreshToken]);
 
   return (
     <PageShell>
