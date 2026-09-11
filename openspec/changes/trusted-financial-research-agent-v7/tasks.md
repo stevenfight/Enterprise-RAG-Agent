@@ -298,7 +298,7 @@
 
 - [x] E-T01 创建研究任务时持久化计划与预算快照。（迁移 27、`ResearchPlanRepository`；创建响应/详情可读，25 passed）
 - [x] E-T14 在研究任务详情读取最新持久化报告，并在报告缺失时展示明确空态。（测试先行；当前 worktree 初次 RED 因无 `node_modules` 无法执行，复用原项目已安装依赖后 GREEN：前端定向 9 passed、build 通过）
-- [x] E-T15 从持久化计划和声明输入创建不可变报告版本。（RED：POST 报告路由返回 405；GREEN：定向 3 passed、关联回归 28 passed）
+- [x] E-T15 从持久化计划和声明输入创建不可变报告版本。（RED：POST 报告路由返回 405；GREEN：定向 3 passed、关联回归 28 passed；2026-09-12 补充断言：已持久化计划的 `pending` 任务可创建待审核草稿，防止后续无产品决策时擅自增加 `completed` 门禁。）
 - [x] E-T16 建立服务端任务—冲突依赖上下文并由当前任务/计划生成审批绑定。（RED：模块缺失 3 failed、过期有效期未拒绝 1 failed；GREEN：4 passed）
 - [x] E-T17 配置独立审批密钥和部署审批主体，开放只授予审批的受保护 API；缺配置或密钥不匹配必须拒绝，客户端不得提交审批主体或绑定字段。（RED：端点缺失 3 failed；GREEN：3 passed，关联治理/任务回归完成）
 - [x] E-T18 以可信任务—冲突上下文提供冲突列表/历史和受审批保护的裁决 API；批准/驳回必须服务端重建绑定并同事务消费审批，保持未决不消费审批。（RED 3 failed：端点缺失；GREEN 3 passed，关联回归 26 passed）

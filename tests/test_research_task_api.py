@@ -141,6 +141,8 @@ def test_create_report_uses_persisted_plan_and_generates_immutable_versions(tmp_
         "task_id": "t-create-report", "dag_step_ids": ["retrieve"],
         "objective": "比较收入", "scope": ["收入"], "estimated_cost": "2.50",
     })
+    # 已持久化计划的 pending 任务允许创建待审核草稿，避免擅自收紧既有兼容契约。
+    assert client.get("/api/research/tasks/t-create-report").json()["status"] == "pending"
     first = client.post("/api/research/tasks/t-create-report/report", json={
         "data_version": "facts-1",
         "claims": [{
