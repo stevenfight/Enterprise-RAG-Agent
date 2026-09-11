@@ -150,3 +150,19 @@ def test_v519_manifest_records_no_key_response_compatibility() -> None:
         "redacted_body_sha256": "5c80712364a40d67bde3a6ac1293d62bfd6b66c3c05b3401efd3b2cde199b527",
         "redacted_fields": ["vector_db_dir"],
     }
+
+
+def test_v519_manifest_records_historical_stream_auth_bypass_as_unresolved() -> None:
+    """流式端点未进入 API Key 中间件必须被记录为安全债务，不能被兼容结论掩盖。"""
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+    debt = manifest["historical_stream_auth_debt"]
+    assert debt["status"] == "unresolved_security_debt"
+    assert debt["v519_and_candidate_match"] is True
+    assert debt["no_key_with_query"] == {
+        "status_code": 503,
+        "top_level_keys": ["detail"],
+        "body_sha256": "8ea356623b408e7a5ca0843ec88548beee6be96653e79d53cdc4d9ee85599531",
+    }
+    assert debt["invalid_key_with_query"] == debt["no_key_with_query"]
+    assert debt["required_follow_up"] == "单独安全变更"

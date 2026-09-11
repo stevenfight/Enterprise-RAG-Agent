@@ -423,6 +423,12 @@
 - 最小实现：在无 Key、禁用 tracing 的 v5.19/候选临时 archive 中，对 14 个不触发写入、Provider 或真实数据访问的请求记录状态、顶层字段和正文哈希；仅 `vector_db_dir` 按路径占位规则脱敏，避免临时目录差异造成假回归。
 - GREEN：`python -m pytest -q tests/test_v519_compatibility_manifest.py tests/test_evaluation_quality_gate.py tests/test_financial_fact_compatibility.py` 为 **32 passed**。认证成功响应、携带有效请求的业务端点、运行时索引数据和无 v7 数据库夹具仍未覆盖。
 
+## 2026-09-12 流式端点历史鉴权债务记录
+
+- 复用 v5.19 `p0_fixes_manual.py` 的错误 Bearer Key 输入，在无 Key、禁用 tracing 的 v5.19/候选隔离副本中验证：5 个普通受保护端点返回相同 401 正文；带有效 query 的 `/api/agent/stream` 无 Key 或错误 Key 均进入路由并返回 503，而不是中间件 401。
+- 该行为与 v5.19 一致，候选没有引入回归；但它是 API Key 中间件未覆盖 SSE 路由的安全债务，不属于可接受的发布结论。
+- 兼容清单先以 `historical_stream_auth_debt` 缺失形成 **1 failed**，补齐后相关回归 **33 passed**。本项只完成证据记录；必须在独立安全变更中将无 Key/错误 Key 流式请求改为 401，并补完整 SSE/认证回归后才可标记修复完成。
+
 ## 2026-08-28 B2.5 声明级 EvidenceBundle 实现记录
 
 - 首次 RED：`python -m pytest tests/test_evidence_bundle.py -q --basetemp=.tmp/pytest-b25`，5 failed，关键失败原因均为 `ModuleNotFoundError: No module named 'src.evidence_bundle'`。
