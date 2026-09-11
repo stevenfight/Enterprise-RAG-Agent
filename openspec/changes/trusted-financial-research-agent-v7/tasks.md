@@ -338,7 +338,7 @@
 - [x] E-T43 为 approver 提供遗留 running 任务的审计处置入口；必须填写原因并调用既有 legacy-disposition API，不删除、重启或直接改写原记录。（页面测试 17 passed，前端 build 通过）
 - [x] E-T44 修复绑定 DataAgent 丢失审批范围的问题；Worker 查询上下文必须同时包含 objective 与已审批 scope，旧未绑定查询路径保持不变。（RED：scope 仅持久化但未传入 Worker，1 failed；GREEN：scope 上下文契约及 DataAgent Worker 回归通过，研究执行/轨迹 24 passed）
 - [x] E-T45 修复绑定 VerifyAgent 使用截断来源或模型自带来源的问题；回答级摘要保持兼容，审核 Worker 使用本次检索的完整进程内正文，执行器固定 canonical 声明/来源并忽略 action_input 的替换，C0 仍只保存脱敏审核摘要。（RED：200 字符摘要导致审核输入丢失，1 failed；GREEN：完整正文传递、输入固定及既有审核回归 3 passed）
-- [x] E-T46 人工创建待审核报告的端点必须要求当前会话具有 `researcher` 角色；服务端继续确定报告 ID、版本和 `pending_review` 状态，不接受客户端伪造身份。任务是否必须 `completed` 暂不在本项擅自收紧，保留现有 E-T15 的 pending 任务兼容。（RED：移除 researcher 角色后仍返回 200；GREEN：研究任务 API 与身份 API 25 passed。）
+- [x] E-T46 人工创建待审核报告的端点必须要求当前会话具有 `researcher` 角色；服务端继续确定报告 ID、版本和 `pending_review` 状态，不接受客户端伪造身份。任务是否必须 `completed` 暂不在本项擅自收紧，保留现有 E-T15 的 pending 任务兼容。（RED：移除 researcher 角色后仍返回 200；GREEN：补充匿名访问 401 后，研究任务 API、身份、报告、执行和 C0 关联回归 104 passed。）
 
 ### E 包退出条件
 

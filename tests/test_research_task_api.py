@@ -192,6 +192,26 @@ def test_create_report_requires_researcher_role(tmp_path: Path):
     assert response.json()["detail"]["message"] == "当前用户没有创建报告权限"
 
 
+def test_create_report_requires_authenticated_researcher(tmp_path: Path):
+    client, _, _ = _build_client(tmp_path)
+    client.post("/api/research/tasks", json={
+        "task_id": "t-report-auth", "dag_step_ids": ["retrieve"],
+        "objective": "比较收入", "scope": ["收入"], "estimated_cost": "2.50",
+    })
+    client.cookies.clear()
+
+    response = client.post("/api/research/tasks/t-report-auth/report", json={
+        "data_version": "facts-1",
+        "claims": [{
+            "claim_id": "claim-1", "text": "收入增长", "support_kind": "fact",
+            "fact_ids": ["fact-1"],
+        }],
+    })
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["message"] == "创建报告需要登录"
+
+
 def test_create_report_rejects_unknown_task_or_task_without_persisted_plan(tmp_path: Path):
     client, _, _ = _build_client(tmp_path)
     payload = {
