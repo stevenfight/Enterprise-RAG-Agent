@@ -120,3 +120,33 @@ def test_v519_manifest_records_field_level_openapi_compatibility() -> None:
             "required_fields_unchanged": True,
         },
     }
+
+
+def test_v519_manifest_records_no_key_response_compatibility() -> None:
+    """无 Key 端点的状态、字段与脱敏正文指纹必须保持 v5.19 行为。"""
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+
+    compatibility = manifest["no_key_response_compatibility"]
+    assert compatibility["candidate_api_source_commit"] == "9e4f135"
+    assert compatibility["candidate_api_source_unchanged_through"] == "588855b"
+    assert compatibility["probe_count"] == 14
+    assert compatibility["missing_v519_probes"] == []
+    assert compatibility["changed_v519_probes"] == []
+    assert compatibility["authentication_rejection"] == {
+        "count": 12,
+        "status_code": 401,
+        "top_level_keys": ["detail"],
+        "body_sha256": "818364ec80c3905abf446ec6a1037e0ef116d39b7e316fda567e5eab4dd9538e",
+    }
+    assert compatibility["validation_before_auth"] == {
+        "count": 1,
+        "status_code": 422,
+        "top_level_keys": ["detail"],
+        "body_sha256": "a6fbb2d832df15dd175890812c1f96f186422d38332b79c1421c8ef4977df57e",
+    }
+    assert compatibility["health"] == {
+        "status_code": 200,
+        "top_level_keys": ["agent_loaded", "filter_config_loaded", "filter_enabled", "rag_generator_loaded", "status", "vector_db_dir"],
+        "redacted_body_sha256": "5c80712364a40d67bde3a6ac1293d62bfd6b66c3c05b3401efd3b2cde199b527",
+        "redacted_fields": ["vector_db_dir"],
+    }

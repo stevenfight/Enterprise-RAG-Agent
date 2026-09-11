@@ -103,5 +103,30 @@
         "required_fields_unchanged": true
       }
     }
+  },
+  "no_key_response_compatibility": {
+    "candidate_api_source_commit": "9e4f135",
+    "candidate_api_source_unchanged_through": "588855b",
+    "probe_count": 14,
+    "missing_v519_probes": [],
+    "changed_v519_probes": [],
+    "authentication_rejection": {
+      "count": 12,
+      "status_code": 401,
+      "top_level_keys": ["detail"],
+      "body_sha256": "818364ec80c3905abf446ec6a1037e0ef116d39b7e316fda567e5eab4dd9538e"
+    },
+    "validation_before_auth": {
+      "count": 1,
+      "status_code": 422,
+      "top_level_keys": ["detail"],
+      "body_sha256": "a6fbb2d832df15dd175890812c1f96f186422d38332b79c1421c8ef4977df57e"
+    },
+    "health": {
+      "status_code": 200,
+      "top_level_keys": ["agent_loaded", "filter_config_loaded", "filter_enabled", "rag_generator_loaded", "status", "vector_db_dir"],
+      "redacted_body_sha256": "5c80712364a40d67bde3a6ac1293d62bfd6b66c3c05b3401efd3b2cde199b527",
+      "redacted_fields": ["vector_db_dir"]
+    }
   }
 }

@@ -26,6 +26,7 @@
 | A-T17 | 🟢 GREEN | v5.19 已跟踪配置基线必须以 Git 指纹冻结；未跟踪索引数据和未导出的 OpenAPI 必须显式标为未捕获，禁止用当前运行目录或占位内容冒充基线 | RED：夹具文件不存在，`tests/test_v519_compatibility_manifest.py` 2 failed；GREEN：新增不含配置正文的 v5.19 配置 blob 清单，回归 **2 passed**。OpenAPI、关键 JSON、company_registry/metadata 和无 v7 数据库夹具继续保持 RED。 |
 | A-T18 | 🟢 GREEN | v5.19 无 Key、禁用 tracing 的临时导出副本必须记录 OpenAPI 与关键 JSON 指纹；候选可新增端点但不得移除 v5.19 路径 | RED：`candidate_openapi_compatibility` 缺失，兼容清单回归 **1 failed**；GREEN：v5.19 OpenAPI 为 17 路径，`/api/health` 为 200、`/api/system/status` 和 `/api/companies` 为 401；候选 39 路径且旧路径零缺失。夹具只保存字段、状态和哈希，不保存响应正文；相关回归 **30 passed**。 |
 | A-T19 | 🟢 GREEN | v5.19 既有操作的方法、参数必填性、请求体必填性、内容类型、响应状态码与直接 JSON schema 引用必须保持；既有组件仅允许增加非必填字段 | RED：字段级兼容记录缺失，兼容清单回归 **1 failed**；GREEN：17 条旧路径的操作签名哈希在候选中完全相同，21 个 v5 schema 均存在；`KnowledgeUploadResponse` 与 `SourceInfo` 只新增可选字段，既有字段和 required 集合不变。相关回归 **31 passed**。 |
+| A-T20 | 🟢 GREEN | v5.19 无 Key 请求的状态、顶层字段和脱敏正文必须保持；运行目录等环境值只可按明确脱敏规则比较 | RED：无 Key 响应兼容记录缺失，兼容清单回归 **1 failed**；GREEN：14 个安全探测请求均无变化，12 个受保护请求为 401，缺 query 的 stream 为 422，health 为 200；仅将 `vector_db_dir` 替换为占位符后 health 正文哈希一致。相关回归 **32 passed**。 |
 
 ## B. 金融可信内核
 
@@ -415,6 +416,12 @@
 - 首次 RED：`python -m pytest -q tests/test_v519_compatibility_manifest.py`，因 `field_level_openapi_compatibility` 缺失而 **1 failed**。
 - 最小实现：比较 v5.19 与候选隔离 OpenAPI 的旧路径操作签名（方法、参数、请求体、内容类型、响应码和直接 JSON schema 引用），并比较 v5 已有组件 schema。只记录哈希、字段名和可选扩展，不保存完整 schema 或响应正文。
 - GREEN：`python -m pytest -q tests/test_v519_compatibility_manifest.py tests/test_evaluation_quality_gate.py tests/test_financial_fact_compatibility.py` 为 **31 passed**；旧操作签名哈希相同，旧组件零缺失。认证成功响应、深层 schema 语义、运行时索引数据和无 v7 数据库夹具仍未完成。
+
+## 2026-09-12 v5.19 无 Key 响应正文兼容记录
+
+- 首次 RED：`python -m pytest -q tests/test_v519_compatibility_manifest.py`，因 `no_key_response_compatibility` 缺失而 **1 failed**。
+- 最小实现：在无 Key、禁用 tracing 的 v5.19/候选临时 archive 中，对 14 个不触发写入、Provider 或真实数据访问的请求记录状态、顶层字段和正文哈希；仅 `vector_db_dir` 按路径占位规则脱敏，避免临时目录差异造成假回归。
+- GREEN：`python -m pytest -q tests/test_v519_compatibility_manifest.py tests/test_evaluation_quality_gate.py tests/test_financial_fact_compatibility.py` 为 **32 passed**。认证成功响应、携带有效请求的业务端点、运行时索引数据和无 v7 数据库夹具仍未覆盖。
 
 ## 2026-08-28 B2.5 声明级 EvidenceBundle 实现记录
 
