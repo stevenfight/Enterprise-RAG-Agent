@@ -76,6 +76,25 @@ def test_executor_fails_without_source_evidence_and_does_not_create_report(tmp_p
     assert reports.latest_for_task("execution-no-source") is None
 
 
+def test_executor_keeps_task_running_when_another_worker_holds_step_lease(tmp_path: Path) -> None:
+    from src.research_task_execution import ResearchTaskExecutor
+
+    adapter, plans, reports = _running_task(tmp_path, "execution-lease-held")
+    adapter.claim_step("execution-lease-held", "plan", "other-worker")
+    executor = ResearchTaskExecutor(
+        adapter,
+        plans,
+        reports,
+        query=lambda _: {"answer": "不应执行检索", "sources": []},
+    )
+
+    snapshot = executor.execute("execution-lease-held", actor="worker")
+
+    assert snapshot.status == "running"
+    assert reports.latest_for_task("execution-lease-held") is None
+    assert all(item.decision_type != "failure" for item in adapter.route_decisions("execution-lease-held"))
+
+
 def test_final_report_write_failure_rolls_back_final_step_and_completion(tmp_path: Path, monkeypatch) -> None:
     from src.research_task_execution import ResearchTaskExecutor
 

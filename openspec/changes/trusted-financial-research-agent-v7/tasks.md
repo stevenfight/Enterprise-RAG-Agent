@@ -319,7 +319,7 @@
 - [x] E-T30 知识库索引完成率优先使用热加载清单的 `index_status`，仅无清单记录时兼容旧向量目录推断，避免已索引文件被错误计为待索引。
 - [x] E-T31 研究员只能在有效会话下创建研究任务；创建后先形成只追加的“已提交”记录，审批人可批准并启动执行或驳回，任务快照公开当前提交状态与操作人。（RED→GREEN：提交审批 API 2 passed；研究任务/冲突/签发关联回归 28 passed）
 - [x] E-T32 研究任务页提供最小“提交研究任务”入口和提交状态展示；仅研究员可提交、仅审批人可决定执行或驳回，浏览器不提交审批人身份。（RED→GREEN：`ResearchTasksPage.test.tsx` 13 passed；生产构建和 lint 通过）
-- [x] E-T33 批准后的最小执行器按计划步骤顺序领取并提交 C0 检查点；仅在检索获得来源证据时写入待审核报告，全部步骤成功后完成任务。（RED→GREEN：`test_research_task_execution.py` 2 passed）
+- [x] E-T33 批准后的最小执行器按计划步骤顺序领取并提交 C0 检查点；仅在检索获得来源证据时写入待审核报告，全部步骤成功后完成任务。有效步骤租约由其他工作者持有时，本执行器保持任务 running 且不追加 failure 决策。（初始 RED→GREEN：2 passed；租约冲突 RED 为误迁移 failed，GREEN：执行/轨迹/提交/遗留处置关联回归 32 passed）
 - [x] E-T34 API 装配真实查询执行器；批准仅调度执行，执行异常应明确标记 failed，不能留下无产物的 running 状态。（RED→GREEN：提交审批 API 2 passed；端到端新任务 completed 且报告含 source）
 - [x] E-T35 任务详情公开只读执行进度：已完成步骤、当前步骤、终态完成时间与经脱敏的失败原因；页面据此展示 DAG 节点状态。（RED→GREEN：后端摘要 1 passed；研究页 14 passed）
 - [x] E-T36 审批人可处置无有效租约、检查点或调用记录的遗留 `running` 任务：仅允许以 CAS 标记 failed 并只追加原因，禁止删除/重置/伪造报告。（RED 端点 404 → GREEN `test_research_task_legacy_disposition_api.py` 2 passed）

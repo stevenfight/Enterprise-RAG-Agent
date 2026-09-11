@@ -9,6 +9,7 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from src.agent_registry import AgentRegistry
+from src.durable_execution import LeaseUnavailableError
 from src.research_delivery import Claim, ClaimSupportKind, ReportReviewStatus, ResearchReport
 from src.research_plan_repository import ResearchPlanRepository
 from src.research_report_repository import ResearchReportRepository
@@ -115,6 +116,8 @@ class ResearchTaskExecutor:
                     worker_call=worker_call,
                     report=report if step_id == "report" else None,
                 )
+        except LeaseUnavailableError:
+            return self._adapter.task_snapshot(task_id)
         except ValueError as exc:
             current = self._adapter.task_snapshot(task_id)
             if current.status == "running":
