@@ -270,6 +270,21 @@ def _plan_hash(plan: ResearchPlan) -> str:
         "estimated_cost": str(plan.estimated_cost),
         "risks": plan.risks,
         "plan_version": plan.plan_version,
+        "step_bindings": [
+            {
+                "step_id": binding.step_id,
+                "agent_name": binding.agent_name,
+                "tool_names": binding.tool_names,
+            }
+            for binding in plan.step_bindings
+        ],
+        "step_inputs": [
+            {
+                "step_id": step_input.step_id,
+                "payload": json.loads(step_input.payload_json),
+            }
+            for step_input in plan.step_inputs
+        ],
     }
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()

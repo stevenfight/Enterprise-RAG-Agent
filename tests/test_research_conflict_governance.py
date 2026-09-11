@@ -77,6 +77,33 @@ def test_server_grants_conflict_approval_from_current_task_plan_and_context(tmp_
     assert granted.binding.plan_hash
 
 
+def test_plan_binding_hash_includes_approved_step_inputs_and_agent_bindings() -> None:
+    """审批绑定必须覆盖所有会影响研究执行权限和结果的计划字段。"""
+    from src.research_conflict_governance import _plan_hash
+
+    calculated = ResearchPlan.create(
+        plan_id="plan-binding", task_id="task-binding", objective="计算收入同比",
+        scope=["营业收入"], step_ids=["calculate"], estimated_cost="1.00",
+        step_bindings={"calculate": {"agent_name": "CalcAgent", "tool_names": ["calculator"]}},
+        step_inputs={"calculate": {"operation": "yoy_growth", "current": 120, "previous": 100}},
+    )
+    changed_input = ResearchPlan.create(
+        plan_id="plan-binding", task_id="task-binding", objective="计算收入同比",
+        scope=["营业收入"], step_ids=["calculate"], estimated_cost="1.00",
+        step_bindings={"calculate": {"agent_name": "CalcAgent", "tool_names": ["calculator"]}},
+        step_inputs={"calculate": {"operation": "yoy_growth", "current": 121, "previous": 100}},
+    )
+    changed_binding = ResearchPlan.create(
+        plan_id="plan-binding", task_id="task-binding", objective="计算收入同比",
+        scope=["营业收入"], step_ids=["calculate"], estimated_cost="1.00",
+        step_bindings={"calculate": {"agent_name": "RestrictedCalcAgent", "tool_names": ["calculator"]}},
+        step_inputs={"calculate": {"operation": "yoy_growth", "current": 120, "previous": 100}},
+    )
+
+    assert _plan_hash(calculated) != _plan_hash(changed_input)
+    assert _plan_hash(calculated) != _plan_hash(changed_binding)
+
+
 def test_server_refuses_approval_when_context_is_missing_or_action_is_not_approvable(tmp_path) -> None:
     _, contexts, service, context = _harness(tmp_path)
 
