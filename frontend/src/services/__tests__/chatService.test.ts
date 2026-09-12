@@ -15,13 +15,20 @@ import { streamAgentQuery } from '@/services/chatService';
 
 class EventSourceMock {
   static latest: EventSourceMock | undefined;
+  url: string;
+  options: EventSourceInit | undefined;
   onopen: (() => void) | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
   readyState = 1;
   close = vi.fn();
 
-  constructor(_url: string) {
+  constructor(
+    url: string,
+    options?: EventSourceInit,
+  ) {
+    this.url = url;
+    this.options = options;
     EventSourceMock.latest = this;
   }
 }
@@ -54,5 +61,13 @@ describe('streamAgentQuery', () => {
     ]);
     expect(logOutput).not.toContain('内部执行细节');
     expect(logOutput).not.toContain('secret-value');
+  });
+
+  it('C-S01: 跨源 SSE 必须请求浏览器携带 HttpOnly 研究会话', () => {
+    streamAgentQuery('公开问题', {}, vi.fn());
+
+    expect(EventSourceMock.latest?.options).toEqual({ withCredentials: true });
+    expect(EventSourceMock.latest?.url).not.toContain('research_session');
+    expect(EventSourceMock.latest?.url).not.toContain('api_key');
   });
 });
