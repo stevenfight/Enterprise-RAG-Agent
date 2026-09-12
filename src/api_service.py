@@ -897,6 +897,14 @@ class APIAuthMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
+        # 仅让浏览器真实 CORS 预检进入内层 CORS 中间件；不放行实际业务请求或普通 OPTIONS。
+        if (
+            request.method == "OPTIONS"
+            and request.headers.get("Origin")
+            and request.headers.get("Access-Control-Request-Method")
+        ):
+            return await call_next(request)
+
         # 健康检查、文档接口及静态展示资源无需鉴权；SSE 使用既有研究会话或 Bearer API Key。
         if path in self.SKIP_PATHS or path.startswith(self.SKIP_PREFIXES):
             return await call_next(request)

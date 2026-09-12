@@ -3,6 +3,8 @@
 
 import asyncio
 
+from fastapi.testclient import TestClient
+
 
 def _stream_request_status(monkeypatch, headers, research_session_valid=False):
     """以无副作用下游应用验证中间件是否放行 SSE 请求。"""
@@ -113,3 +115,28 @@ def test_health_check_remains_anonymous_whitelist(monkeypatch):
 
     assert asyncio.run(request()) == 204
     assert calls == ["/api/health"]
+
+
+def test_cors_preflight_reaches_cors_middleware_without_weakening_sse_auth():
+    """真实 CORS 预检交由 CORS 中间件处理，实际 SSE 请求仍须认证。"""
+    from src import api_service
+
+    client = TestClient(api_service.app)
+    preflight_headers = {
+        "Origin": "http://localhost:5173",
+        "Access-Control-Request-Method": "GET",
+    }
+    allowed = client.options("/api/agent/stream", headers=preflight_headers)
+    assert allowed.status_code == 200
+    assert allowed.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert allowed.headers["access-control-allow-credentials"] == "true"
+
+    denied = client.options(
+        "/api/agent/stream",
+        headers={
+            "Origin": "https://unconfigured.example",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert denied.status_code == 400
+    assert denied.headers.get("access-control-allow-origin") is None
