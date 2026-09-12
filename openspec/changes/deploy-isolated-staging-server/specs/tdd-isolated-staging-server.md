@@ -7,6 +7,8 @@
 | D-S03 | RED | 服务可用性 | 后端健康检查和研究登录均返回成功。 |
 | D-S04 | RED | 安全回归 | 未授权 SSE 返回 401，CORS 预检允许测试前端来源。 |
 | D-S05 | RED | 隔离性 | 正式容器与正式端口运行态未被测试部署改变。 |
+| D-S06 | RED | 资源处置边界 | 仅清理可回收 BuildKit 缓存和悬空无标签镜像，正式容器、卷、网络、具名镜像和项目数据均保留。 |
+| D-S07 | RED | 无 Provider 验收启动条件 | 健康和鉴权验证不发起 Agent 请求；若服务启动仅要求非空 Key，可使用不可用于 Provider 的测试占位值。 |
 
 ## 运行记录
 
@@ -17,3 +19,10 @@
 | 2026-09-12 | D-S02 | GREEN | 已上传 `5e17993` 归档至独立目录，并写入仅含该提交标识的 `STAGING_CANDIDATE_COMMIT`。 |
 | 2026-09-12 | D-S03 至 D-S04 | RED | Compose 构建运行超过受限等待窗口仍未创建容器，不能执行健康、登录、SSE 与 CORS 验收。 |
 | 2026-09-12 | D-S05 | GREEN | 终止未完成测试构建后，未见测试容器或 18000/18081 监听；正式后端仍 `running/healthy`、正式前端仍 `running`。 |
+| 2026-09-12 | D-S06 | RED | 已获用户授权，但尚未读取 Docker 可回收对象或执行受限清理。 |
+| 2026-09-12 | D-S07 | RED | 后端构建完成后因 `DASHSCOPE_API_KEY` 未设置而退出，健康检查无法执行；尚未调用任何 Provider。 |
+| 2026-09-12 | D-S06 | GREEN | `docker builder prune -af` 回收 3.668GB，`docker image prune -f` 回收 6.3GB；未删除容器、卷、网络、具名镜像或项目数据。 |
+| 2026-09-12 | D-S07 | GREEN | 仅在 `.env.staging` 设置不可用于 Provider 的占位值后，后端健康启动；验收只访问健康、身份、SSE 未授权与 CORS，不调用 Agent 业务接口。 |
+| 2026-09-12 | D-S03 | GREEN | 后端 `/api/health`、登录、会话均为 200；隔离前端 Nginx `/api/health` 与登录代理也为 200。 |
+| 2026-09-12 | D-S04 | GREEN | 无凭据且带有效 query 的 SSE 为 401；测试 Origin 的预检为 200，并返回允许来源与凭据头。 |
+| 2026-09-12 | D-S05 | GREEN | 正式后端 `running/healthy`、正式前端 `running`；测试服务仅使用 `127.0.0.1:18000/18081` 和 `/opt/enterprise-rag-staging/.staging/data`。 |
