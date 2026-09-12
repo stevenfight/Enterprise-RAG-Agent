@@ -9,6 +9,8 @@
 | D-S05 | RED | 隔离性 | 正式容器与正式端口运行态未被测试部署改变。 |
 | D-S06 | RED | 资源处置边界 | 仅清理可回收 BuildKit 缓存和悬空无标签镜像，正式容器、卷、网络、具名镜像和项目数据均保留。 |
 | D-S07 | RED | 无 Provider 验收启动条件 | 健康和鉴权验证不发起 Agent 请求；若服务启动仅要求非空 Key，可使用不可用于 Provider 的测试占位值。 |
+| D-S08 | RED | 浏览器会话与 SSE 首帧 | 经本机 SSH 回环隧道，浏览器登录后 Cookie 可用，带会话的 SSE 收到不触发 Provider 的首个服务端事件。 |
+| D-S09 | RED | 真实 SSE 内容首帧 | 使用仅限测试的真实 Provider 凭据，浏览器在带会话的有效 SSE 查询中收到首个服务端事件。 |
 
 ## 运行记录
 
@@ -26,3 +28,6 @@
 | 2026-09-12 | D-S03 | GREEN | 后端 `/api/health`、登录、会话均为 200；隔离前端 Nginx `/api/health` 与登录代理也为 200。 |
 | 2026-09-12 | D-S04 | GREEN | 无凭据且带有效 query 的 SSE 为 401；测试 Origin 的预检为 200，并返回允许来源与凭据头。 |
 | 2026-09-12 | D-S05 | GREEN | 正式后端 `running/healthy`、正式前端 `running`；测试服务仅使用 `127.0.0.1:18000/18081` 和 `/opt/enterprise-rag-staging/.staging/data`。 |
+| 2026-09-12 | D-S08 | RED | 本机尚无到服务器 `127.0.0.1:18081` 的 SSH 隧道，无法验证真实浏览器 Cookie 与 EventSource。 |
+| 2026-09-12 | D-S08 | GREEN（会话与预检） | 临时 `127.0.0.1:19081` 隧道中，真实 Chrome 显示 `login=200`、`me=200`；带 Cookie 的 `fetch` SSE 安全参数预检为 400，`EventSource` 触发错误回调，标准工作台识别 `staging-admin`。请求 `max_steps=0`，在参数校验处停止且未调用 Provider。 |
+| 2026-09-12 | D-S09 | RED | 有效 SSE 查询会进入 Agent/Provider；当前只有不可用占位 Key，不能将预检错误回调表述为内容首帧。 |
