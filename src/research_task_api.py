@@ -236,6 +236,14 @@ def _session_identity(request: Request):
     return _identity_store().identity(request.cookies.get("research_session"))
 
 
+def _research_session_cookie_secure() -> bool:
+    """解析研究会话 Cookie 的 Secure 配置，非法值必须失败关闭。"""
+    value = os.getenv("RESEARCH_SESSION_COOKIE_SECURE", "true").strip().lower()
+    if value not in {"true", "false"}:
+        raise RuntimeError("RESEARCH_SESSION_COOKIE_SECURE 必须是 true 或 false")
+    return value == "true"
+
+
 def _configured_approval_authority(request: Request) -> str:
     """只接受当前 HttpOnly 会话中的 approver 角色，不信任客户端声明。"""
     identity = _session_identity(request)
@@ -264,7 +272,7 @@ def research_login(payload: LoginRequest, response: Response) -> dict[str, Any]:
     token, identity = result
     response.set_cookie(
         "research_session", token, httponly=True, samesite="strict",
-        secure=os.getenv("RESEARCH_SESSION_COOKIE_SECURE", "true").lower() == "true",
+        secure=_research_session_cookie_secure(),
         max_age=28800,
     )
     return {"username": identity.username, "roles": list(identity.roles)}
