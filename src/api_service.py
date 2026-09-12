@@ -13,6 +13,7 @@ FastAPI API 服务模块
 
 import logging
 import json
+import os
 import re
 import sys
 import time
@@ -20,6 +21,7 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, List, Literal, Optional, Union
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -860,6 +862,38 @@ def _get_or_create_conversation_memory(
 
 # ==================== FastAPI 应用 ====================
 
+_DEFAULT_CORS_ALLOWED_ORIGINS = (
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+)
+
+
+def _cors_allowed_origins() -> tuple[str, ...]:
+    """解析携带凭据请求的 CORS 来源，非法配置必须失败关闭。"""
+    configured = os.getenv("CORS_ALLOWED_ORIGINS")
+    if configured is None:
+        return _DEFAULT_CORS_ALLOWED_ORIGINS
+
+    origins = tuple(item.strip() for item in configured.split(","))
+    if not origins or any(not origin for origin in origins) or len(set(origins)) != len(origins):
+        raise RuntimeError("CORS_ALLOWED_ORIGINS 必须是唯一且非空的 HTTP(S) 来源列表")
+
+    for origin in origins:
+        parsed = urlsplit(origin)
+        if (
+            "*" in origin
+            or parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise RuntimeError("CORS_ALLOWED_ORIGINS 仅允许无路径的 HTTP(S) 来源")
+
+    return origins
+
 app = FastAPI(
     title="企业知识库 RAG API",
     description="基于混合检索与 RAG 生成的企业财报问答服务",
@@ -870,7 +904,7 @@ app = FastAPI(
 # CORS 中间件: 允许前端跨域访问（开发环境 Vite 代理 + 直连双模式）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_cors_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

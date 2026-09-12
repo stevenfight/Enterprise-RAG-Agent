@@ -4,6 +4,7 @@
 import asyncio
 
 from fastapi.testclient import TestClient
+import pytest
 
 
 def _stream_request_status(monkeypatch, headers, research_session_valid=False):
@@ -140,3 +141,28 @@ def test_cors_preflight_reaches_cors_middleware_without_weakening_sse_auth():
     )
     assert denied.status_code == 400
     assert denied.headers.get("access-control-allow-origin") is None
+
+
+def test_cors_allowed_origins_require_explicit_safe_configuration(monkeypatch):
+    """部署来源必须显式配置，非法值不能让携带 Cookie 的 CORS 放宽。"""
+    from src import api_service
+
+    monkeypatch.delenv("CORS_ALLOWED_ORIGINS", raising=False)
+    assert api_service._cors_allowed_origins() == (
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    )
+
+    monkeypatch.setenv(
+        "CORS_ALLOWED_ORIGINS",
+        "https://app.example.test,http://localhost:5173",
+    )
+    assert api_service._cors_allowed_origins() == (
+        "https://app.example.test",
+        "http://localhost:5173",
+    )
+
+    for value in ("", "*", "https://app.example.test/path", "ftp://app.example.test", "https://app.example.test,https://app.example.test"):
+        monkeypatch.setenv("CORS_ALLOWED_ORIGINS", value)
+        with pytest.raises(RuntimeError, match="CORS_ALLOWED_ORIGINS"):
+            api_service._cors_allowed_origins()
