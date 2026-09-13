@@ -15,6 +15,7 @@
 - [ ] 0.8 逐项批准 `reuse-matrix.md` 的函数边界；实施中出现未列明替换、平行服务或新增依赖时先更新规格。
 - [ ] 0.9 核对多模态本地依赖：PyMuPDF/Pillow、MinerU 元数据、DashScope 实际版本和锁文件；当前未安装 OCR/OpenCV 相关包，不得默认引入。
 - [ ] 0.10 冻结 v5.19 OpenAPI、关键 JSON、配置、company_registry/metadata 和“无 v7 数据库”兼容夹具。（2026-09-12 已新增不含敏感值的 Git 配置指纹、无 Key OpenAPI/关键 JSON 指纹、旧操作签名一致、既有响应模型仅新增可选字段及 14 个无 Key 响应的脱敏正文指纹；既有 `/api/agent/stream` 鉴权旁路已由独立变更 `fix-agent-stream-authentication` 修复，候选对无 Key/错误 Key SSE 改为 401，作为安全例外保留历史 503 指纹。2026-09-13 复核 `v5.19` 标签为 `a6bbad99`，且为 main/候选祖先；清单与结构化事实兼容回归 13 passed。该 Git 树仅跟踪 `data/stock_data/subset.csv`，不含 company_registry/metadata；正式服务器仍为更早的 `8f8b26b`、含未跟踪手工备份，实际存在索引元数据但时间为 2026-08-12/14，早于 v5.19 标签且服务器不能解析该标签，不能证明为 v5.19 数据来源。后续只读寻址确认 GitHub 远端全部标签/分支中，v5.17～v5.19、两个备份标签与 v1 分支的 data 树均只有 subset.csv，Release 为 0 条；本地同级旧项目也无 v5.19 对象，其 v1 索引备份与当前同名备份哈希一致且时间为 2026-05-28；服务器 `/opt/data` 索引时间为 2026-07-18，未发现版本化归档、Docker 卷或额外挂载备份盘。完整 OpenAPI 正文、认证成功响应、可审计历史运行时索引数据和无 v7 数据库夹具仍未捕获，任务不得标绿。）
+- [x] 0.10.1 将当前候选 `8486c0c` 同步并构建至隔离测试栈：Compose 隔离契约 2 passed，后端/前端健康为 200，匿名 SSE 401、CORS 预检 200、研究登录/会话 200，且仅挂载隔离数据目录；研究任务提交/立即驳回/读取/执行摘要为 200，未获批执行或调用 Provider。干净 Python 3.11 定向集合 36 passed、差异检查通过。真实浏览器读屏、候选远端 CI/分支保护和 A3.1 历史数据仍保持 RED，不得以本项替代。
 - [x] 0.11 定义 v7 四个默认关闭的功能开关及严格配置 schema；multimodal/research_tasks 依赖 financial_trust 与 durable_execution，依赖缺失时 fail closed 且不自动连带启用。
 
 ## A. 金融评测基线与发布门禁
