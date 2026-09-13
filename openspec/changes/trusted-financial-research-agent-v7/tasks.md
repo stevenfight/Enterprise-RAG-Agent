@@ -22,6 +22,7 @@
 - [ ] 0.10.5 完成合并权限与人工门禁：单人仓库例外已获用户明确授权。`main` 仍严格要求 `frontend`、`backend`、`workflow-lint`，管理员同样受限，禁止强制推送/删除且要求对话解决；已移除无法由单账号满足的独立批准审查要求。PR #1 三项 CI 成功且状态为 `clean`。真实浏览器/辅助技术读屏、历史 v5.19 运行时基线、真实 Provider 验收和明确最终合并授权仍不能被 CI 替代。
 - [ ] 0.10.6 外部验收前置复核：2026-09-13 复核 PR #1 仍为 `033dcbd`、`clean`，严格三项 CI 均 success；隔离 `4b8f0e1` 后端 healthy、前端运行、隔离/正式 `/api/health` 均 200。Chrome 可以枚举隔离页面标签但调试器未附加，不能进行真实浏览器或读屏验收；隔离 `.env.staging` 的 Provider 仍为 placeholder，不能调用真实模型。历史 v5.19 运行时副本仍未寻获。不得把这三项外部前置缺失表述为通过。
 - [x] 0.10.7 深度寻址本地 Git 悬挂对象：`git fsck --no-reflogs --unreachable` 仅发现悬挂提交 `2c40314c`（2026-08-25，`ci: gate image publishing on quality checks`）；其树仅含 `data/stock_data/subset.csv`，无 company_registry、metadata、SQLite、向量索引或运行时归档，不能作为 v5.19 基线。用户已明确接受历史运行时资料缺失例外；无需恢复该对象。
+- [x] 0.10.8 修复登录浮层键盘关闭：浏览器验收发现登录浮层打开后按 Escape 不会关闭。先以失败测试约束 Escape 必须关闭浮层且不得调用登录接口，再仅在顶部栏补充键盘关闭处理。`HeaderBar.test.tsx` 先 RED（12 passed / 1 failed）后 GREEN（13 passed）；生产构建通过。关闭后销毁浮层内容，避免残留密码输入和错误状态。
 - [x] 0.11 定义 v7 四个默认关闭的功能开关及严格配置 schema；multimodal/research_tasks 依赖 financial_trust 与 durable_execution，依赖缺失时 fail closed 且不自动连带启用。
 
 ## A. 金融评测基线与发布门禁

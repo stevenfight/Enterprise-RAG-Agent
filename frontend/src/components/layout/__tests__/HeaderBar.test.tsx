@@ -157,6 +157,24 @@ describe('HeaderBar 外观面板', () => {
     expect(loginResearch).toHaveBeenCalledWith({ username: 'alice', password: 'secret' });
   });
 
+  it('D-S17: 登录浮层在用户名输入框按 Escape 后关闭且不提交登录', async () => {
+    const user = userEvent.setup();
+    getCurrentResearchIdentity.mockRejectedValueOnce({ response: { status: 401 } });
+    render(<MemoryRouter><HeaderBar systemStatus="ready" /></MemoryRouter>);
+
+    const loginButton = await screen.findByRole('button', { name: '登录' });
+    await waitFor(() => expect(loginButton).not.toHaveClass('ant-btn-loading'));
+    await user.click(loginButton);
+    const usernameInput = screen.getByLabelText('用户名');
+    expect(usernameInput).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => expect(usernameInput.closest('.ant-popover')).toHaveClass('ant-zoom-big-leave-active'));
+    expect(loginResearch).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
+  });
+
   it('E-T22-04: 登出后回到明确未登录状态', async () => {
     getCurrentResearchIdentity.mockResolvedValueOnce({ user_id: 'user-1', username: 'alice', roles: ['approver'] });
     logoutResearch.mockResolvedValueOnce(undefined);
