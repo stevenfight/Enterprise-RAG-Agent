@@ -19,7 +19,7 @@
 - [ ] 0.10.2 恢复最新候选的服务器/浏览器外部门禁：2026-09-13 后续两次 SSH TCP 诊断均超时，Chrome 调试未附加，故不能复核服务器文件哈希、Nginx 代理、真实读屏或 Provider；未修改服务器。Quality Gate 只随面向 main 的 PR 触发，候选推送不触发 CI/镜像发布，创建 PR 需负责人明确授权。
 - [ ] 0.10.3 处置隔离测试目录完整性漂移：SSH 恢复后，`STAGING_CANDIDATE_COMMIT=8486c0c` 与三个关键文件 SHA-256 不一致，且不匹配本地候选、先前隔离候选或正式 `8f8b26b`；隔离容器已退出，来源未知。未取得目录维护者确认或显式覆盖授权前，不得启动、覆盖、删除或重建该目录。候选 `a046a6a` 的 GitHub 推送也须明确授权将源码外发至指定远端分支。
 - [x] 0.10.4 修复 PR 前端门禁中的 ChartsPage 异步测试竞态：GitHub PR #1 的 frontend 检查在 `ChartsPage.test.tsx:59` 失败；研究筛选条件区域会先于异步 `getCharts()` 结果渲染，原同步 `getByText` 不保证图表标题已出现。已改为等待型断言，未改产品数据或图表过滤逻辑；本地 `ChartsPage.test.tsx` 4 passed，生产构建通过。`033dcbd` 推送后，PR #1 的 frontend、backend、workflow-lint 均为 success。
-- [ ] 0.10.5 完成合并权限与人工门禁：PR #1 无冲突、可合并且三项 CI 成功，但 `main` 分支保护端点返回 404（未保护），PR 审查为 0 条。必须补充至少一次负责人审查并明确最终合并授权；真实浏览器/辅助技术读屏、历史 v5.19 运行时基线与真实 Provider 验收仍不能被 CI 替代。
+- [ ] 0.10.5 完成合并权限与人工门禁：已为 `main` 配置分支保护，要求严格通过 `frontend`、`backend`、`workflow-lint`，至少 1 个批准审查，管理员同样受限，禁止强制推送/删除且要求对话解决。PR #1 三项 CI 成功后状态变为 `blocked`，符合缺少独立批准审查的预期。仍须取得负责人批准和明确最终合并授权；真实浏览器/辅助技术读屏、历史 v5.19 运行时基线与真实 Provider 验收不能被 CI 替代。
 - [x] 0.11 定义 v7 四个默认关闭的功能开关及严格配置 schema；multimodal/research_tasks 依赖 financial_trust 与 durable_execution，依赖缺失时 fail closed 且不自动连带启用。
 
 ## A. 金融评测基线与发布门禁
