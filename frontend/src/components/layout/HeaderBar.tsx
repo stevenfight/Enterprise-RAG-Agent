@@ -225,8 +225,8 @@ export default function HeaderBar({ systemStatus = 'checking' }: HeaderBarProps)
             <Button type="text" aria-label="登出" onClick={() => void handleLogout()}>登出</Button>
           </Space>
         ) : (
-          <Popover content={loginContent} title="研究工作台登录" trigger="click" placement="bottomRight" open={loginOpen} onOpenChange={setLoginOpen} destroyOnHidden>
-            <Button type="text" aria-label="登录" loading={identityLoading} disabled={identityLoading}>登录</Button>
+          <Popover content={loginContent} title="研究工作台登录" trigger={[]} placement="bottomRight" open={loginOpen} destroyOnHidden>
+            <Button type="text" aria-label="登录" loading={identityLoading} disabled={identityLoading} onClick={() => setLoginOpen(true)}>登录</Button>
           </Popover>
         )}
         <Popover content={appearanceContent} title="外观" trigger="click" placement="bottomRight">
