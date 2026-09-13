@@ -56,7 +56,7 @@ describe('ChartsPage', () => {
     const { container } = render(<ChartsPage />);
 
     expect(await screen.findByRole('region', { name: '研究成果浏览条件' })).toHaveTextContent('2024 · 营业收入（亿元）');
-    expect(screen.getByText('2024年三大运营商营收对比')).toBeInTheDocument();
+    expect(await screen.findByText('2024年三大运营商营收对比')).toBeInTheDocument();
     expect(screen.queryByText('中芯国际研发费用趋势')).toBeNull();
     expect(container.querySelector('.charts-research-entry')).toBeInTheDocument();
   });

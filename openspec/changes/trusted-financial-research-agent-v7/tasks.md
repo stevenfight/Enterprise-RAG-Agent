@@ -18,6 +18,7 @@
 - [x] 0.10.1 将当前候选 `8486c0c` 同步并构建至隔离测试栈：Compose 隔离契约 2 passed，后端/前端健康为 200，匿名 SSE 401、CORS 预检 200、研究登录/会话 200，且仅挂载隔离数据目录；研究任务提交/立即驳回/读取/执行摘要为 200，未获批执行或调用 Provider。干净 Python 3.11 定向集合 36 passed、差异检查通过。真实浏览器读屏、候选远端 CI/分支保护和 A3.1 历史数据仍保持 RED，不得以本项替代。
 - [ ] 0.10.2 恢复最新候选的服务器/浏览器外部门禁：2026-09-13 后续两次 SSH TCP 诊断均超时，Chrome 调试未附加，故不能复核服务器文件哈希、Nginx 代理、真实读屏或 Provider；未修改服务器。Quality Gate 只随面向 main 的 PR 触发，候选推送不触发 CI/镜像发布，创建 PR 需负责人明确授权。
 - [ ] 0.10.3 处置隔离测试目录完整性漂移：SSH 恢复后，`STAGING_CANDIDATE_COMMIT=8486c0c` 与三个关键文件 SHA-256 不一致，且不匹配本地候选、先前隔离候选或正式 `8f8b26b`；隔离容器已退出，来源未知。未取得目录维护者确认或显式覆盖授权前，不得启动、覆盖、删除或重建该目录。候选 `a046a6a` 的 GitHub 推送也须明确授权将源码外发至指定远端分支。
+- [x] 0.10.4 修复 PR 前端门禁中的 ChartsPage 异步测试竞态：GitHub PR #1 的 frontend 检查在 `ChartsPage.test.tsx:59` 失败；研究筛选条件区域会先于异步 `getCharts()` 结果渲染，原同步 `getByText` 不保证图表标题已出现。已改为等待型断言，未改产品数据或图表过滤逻辑；本地 `ChartsPage.test.tsx` 4 passed，生产构建通过。更新候选远端分支后仍须等待 PR 门禁复核。
 - [x] 0.11 定义 v7 四个默认关闭的功能开关及严格配置 schema；multimodal/research_tasks 依赖 financial_trust 与 durable_execution，依赖缺失时 fail closed 且不自动连带启用。
 
 ## A. 金融评测基线与发布门禁
