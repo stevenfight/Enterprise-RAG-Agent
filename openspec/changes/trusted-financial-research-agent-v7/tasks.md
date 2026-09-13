@@ -8,7 +8,7 @@
 - [ ] 0.2 从最新 main 创建 `codex/trusted-financial-agent-v7` 开发分支或隔离 worktree。
 - [ ] 0.3 重新确认工作区干净、HEAD 与远端同步、v5.19 基线可定位。
 - [ ] 0.4 运行并记录现有后端、前端、构建和 OpenSpec 质量门禁基线。
-- [ ] 0.5 复核候选依赖的解释器可见性、包元数据和锁文件三者是否一致；本机 `openevals` 当前可定位但 `pip show` 与锁文件均不承认，首版不得依赖该状态。2026-09-12 复核确认 Python 3.11 与 CI 一致，但全局 `pip check` 仍存在大量无关冲突；前端 lock-only 图通过但复用共享 `node_modules`，且本机 Node 24 与 CI Node 20 不同，均不能标记为干净安装证据。
+- [ ] 0.5 复核候选依赖的解释器可见性、包元数据和锁文件三者是否一致；本机 `openevals` 当前可定位但 `pip show` 与锁文件均不承认，首版不得依赖该状态。2026-09-12 复核确认 Python 3.11 与 CI 一致，但全局 `pip check` 仍存在大量无关冲突；前端 lock-only 图通过但复用共享 `node_modules`，且本机 Node 24 与 CI Node 20 不同，均不能标记为干净安装证据。2026-09-13 已在隔离 Python 3.11 环境用 `requirements.lock` 完整安装，`pip check`、`compileall` 与 CI 指定后端集合 32 passed；已在隔离便携 Node 20.19.5 副本用 `npm ci` 完整安装并通过生产构建。完整 `npm test` 在本机 Windows 中于 Vitest 启动后无用例结论，单 worker forks 的全量运行同样未完成；仅单文件 19 passed，故本项仍不得标绿，需修复或在 Linux CI 取得完整结果。
 - [ ] 0.5.1 核查 OpenSpec CLI 是否可用；当前环境无 `openspec` 命令，如实施需要安装，先说明用途并征得用户同意。
 - [ ] 0.6 记录活动变更 `openspec-lifecycle-and-ci-quality-gate` 的未闭环项；它不阻塞 A1/A2 本地开发，但在修改现有 Quality Gate 前必须完成合并核查。
 - [ ] 0.7 确认 v7.0 是路线版本；禁止提前创建 Git 标签。
