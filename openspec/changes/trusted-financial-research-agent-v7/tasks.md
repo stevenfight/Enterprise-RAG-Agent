@@ -23,7 +23,7 @@
 - [ ] 0.10.6 外部验收前置复核：2026-09-13 复核 PR #1 仍为 `033dcbd`、`clean`，严格三项 CI 均 success；隔离 `4b8f0e1` 后端 healthy、前端运行、隔离/正式 `/api/health` 均 200。Chrome 可以枚举隔离页面标签但调试器未附加，不能进行真实浏览器或读屏验收；隔离 `.env.staging` 的 Provider 仍为 placeholder，不能调用真实模型。历史 v5.19 运行时副本仍未寻获。不得把这三项外部前置缺失表述为通过。
 - [x] 0.10.7 深度寻址本地 Git 悬挂对象：`git fsck --no-reflogs --unreachable` 仅发现悬挂提交 `2c40314c`（2026-08-25，`ci: gate image publishing on quality checks`）；其树仅含 `data/stock_data/subset.csv`，无 company_registry、metadata、SQLite、向量索引或运行时归档，不能作为 v5.19 基线。用户已明确接受历史运行时资料缺失例外；无需恢复该对象。
 - [x] 0.10.8 修复登录浮层键盘关闭：首次组件 GREEN 为 JSDOM CSSMotion 假阳性；2026-09-14 隔离真实浏览器中旧 `a60f061` 的 Escape 后用户名/密码仍在无障碍树。`6857eca` 改为显式受控打开状态后，`HeaderBar.test.tsx` 13 passed、生产构建通过；隔离候选恢复后，真实浏览器打开浮层并按 Escape，读屏树中的登录容器、用户名/密码输入框和提交按钮均消失，验证通过。
-- [ ] 0.10.9 真实 Provider 最小验收：仅在隔离后端容器以 `DASHSCOPE_API_KEY` 调用项目 `DashScopeProvider` 的 `qwen-turbo` 一次；不得调用默认的 qwen-plus/qwen-max、不得读取或输出密钥，结果只记录成功/失败与脱敏响应摘要。
+- [x] 0.10.9 真实 Provider 最小验收：仅在隔离后端容器以 `DASHSCOPE_API_KEY` 调用项目 `DashScopeProvider` 的 `qwen-turbo` 一次；不得调用默认的 qwen-plus/qwen-max、不得读取或输出密钥。2026-09-14 验收成功，输入 17 token、输出 1 token、响应长度 4、无错误；正式环境未改动。
 - [x] 0.11 定义 v7 四个默认关闭的功能开关及严格配置 schema；multimodal/research_tasks 依赖 financial_trust 与 durable_execution，依赖缺失时 fail closed 且不自动连带启用。
 
 ## A. 金融评测基线与发布门禁
