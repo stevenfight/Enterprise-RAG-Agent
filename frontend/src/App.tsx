@@ -17,6 +17,7 @@ const DagBoardPage = React.lazy(() => import('@/pages/DagBoardPage'));
 const ChartsPage = React.lazy(() => import('@/pages/ChartsPage'));
 const KnowledgePage = React.lazy(() => import('@/pages/KnowledgePage'));
 const SettingsPage = React.lazy(() => import('@/pages/SettingsPage'));
+const ResearchTasksPage = React.lazy(() => import('@/pages/ResearchTasksPage'));
 
 /** Suspense fallback 组件 */
 function LazyFallback() {
@@ -68,6 +69,10 @@ export default function App() {
             <Route path="/settings" element={
               <Suspense fallback={<LazyFallback />}>
                 <SettingsPage />
+              </Suspense>} />
+            <Route path="/research" element={
+              <Suspense fallback={<LazyFallback />}>
+                <ResearchTasksPage />
               </Suspense>} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

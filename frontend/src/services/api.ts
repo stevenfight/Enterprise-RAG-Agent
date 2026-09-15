@@ -9,6 +9,8 @@ import axios from 'axios';
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
   timeout: 120000, // Agent 推理可能耗时较长
+  // 研究身份仅由服务端 HttpOnly Cookie 保存，跨源开发代理请求也必须携带该 Cookie。
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },

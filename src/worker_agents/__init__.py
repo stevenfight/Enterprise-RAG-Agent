@@ -13,6 +13,8 @@ Orchestrator 通过 DelegateTool 将子任务分发给本包中的各个 Agent �
 """
 
 from .data_agent import DataAgent
+from .plan_agent import PlanAgent
+from .report_agent import ReportAgent
 from .calc_agent import CalcAgent
 from .compare_agent import CompareAgent
 from .chart_agent import ChartAgent
@@ -20,6 +22,8 @@ from .verify_agent import VerifyAgent
 
 __all__ = [
     "DataAgent",
+    "PlanAgent",
+    "ReportAgent",
     "CalcAgent",
     "CompareAgent",
     "ChartAgent",
