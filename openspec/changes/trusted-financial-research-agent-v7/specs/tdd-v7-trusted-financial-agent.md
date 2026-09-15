@@ -417,6 +417,13 @@
 - **故障/安全/成本预验收**：`tests/test_research_task_fault_drills.py` **5 passed**；`tests/test_governance_security.py tests/test_governance_tool_policy.py tests/test_governance_redaction.py tests/test_governance_audit.py` **19 passed**；`tests/test_governance_metrics.py tests/test_governance_budget.py tests/test_governance_routing_rationale.py tests/test_research_budget_pause.py tests/test_research_demo_scenarios.py` **12 passed**。
 - **结论**：C1/D 既有实现证据得到本轮复核，但 G-T05 仍为 RED，F2 仍未闭合。还缺至少 29 条样本、至少 9 条高风险样本、来源页/摘录人工复核、v5.19 可复现基线，以及基于真实批准价格的成本对比；真实 Provider 评测不在本轮无密钥预验收范围内。
 
+## 2026-09-15 F2 来源证据审计
+
+- **RED**：来源审计模块不存在，CLI 不能接受来源根目录；项目历史 PDF 清单与当前评测样本之间没有可执行的文件存在性门禁。
+- **GREEN**：新增 `src/evaluation/source_audit.py` 与 CLI `--source-root`；显式来源根目录下缺失的 `expected_sources` 会写入报告并返回非零，无来源根目录时不改变 offline-core 夹具模式。来源审计定向测试 **3 passed**，评测相关回归 **39 passed**。
+- **实际资产核查**：`--source-root data/stock_data` 只读检查得到 `checked_source_count=1`、`missing_source_files=[示例公司.pdf]`、`source_ready=false`、`coverage_ready=false`、退出码 1。候选工作树虽有 12 份历史 PDF 清单、4 家公司和 971 个物理页计数，但实际 PDF/Markdown 文件为 0，`data/v7/metadata.sqlite3` 的业务表均为空。
+- **结论**：来源审计能力完成，但它确认了 F2 的来源证据阻塞；G-T05 继续 RED，不能将历史清单、空 SQLite 或代码中的事实注册表直接升级为已复核完整评测集。
+
 ## 2026-09-12 v5.19 配置基线指纹记录
 
 - 首次 RED：`python -m pytest -q tests/test_v519_compatibility_manifest.py`，因 `evals/fixtures/v5.19-compatibility-manifest.json` 不存在而 **2 failed**。
