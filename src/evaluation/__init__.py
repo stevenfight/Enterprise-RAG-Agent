@@ -6,6 +6,7 @@ from .evaluators import compare_numeric, evaluate_case
 from .runner import EvaluationRunner
 from .coverage import CoverageRequirements, build_coverage_report, require_release_ready
 from .source_audit import audit_source_files
+from .source_binding import audit_source_binding
 from .source_integrity import audit_source_integrity
 from .thresholds import load_thresholds
 
@@ -22,6 +23,7 @@ __all__ = [
     "build_coverage_report",
     "require_release_ready",
     "audit_source_files",
+    "audit_source_binding",
     "audit_source_integrity",
     "load_thresholds",
 ]
