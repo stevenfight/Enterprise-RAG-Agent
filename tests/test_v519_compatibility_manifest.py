@@ -1,12 +1,16 @@
 """v5.19 兼容基线清单必须持续可定位且不可被静默篡改。"""
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
+
+import pytest
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPOSITORY_ROOT / "evals" / "fixtures" / "v5.19-compatibility-manifest.json"
+GIT_BASELINE_AVAILABLE = (REPOSITORY_ROOT / ".git").exists() and shutil.which("git") is not None
 
 
 def _git(*args: str) -> str:
@@ -22,6 +26,10 @@ def _git(*args: str) -> str:
     return result.stdout.strip()
 
 
+@pytest.mark.skipif(
+    not GIT_BASELINE_AVAILABLE,
+    reason="v5.19 Git 指纹核验需要包含 .git 的工作树和 git 可执行文件",
+)
 def test_v519_manifest_freezes_tracked_configuration_fingerprints() -> None:
     """配置夹具只记录 Git 指纹，避免将可能含敏感值的配置内容复制进测试数据。"""
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
