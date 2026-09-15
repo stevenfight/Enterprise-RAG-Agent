@@ -230,6 +230,30 @@ def test_cli_returns_nonzero_when_quality_gate_fails(tmp_path: Path, monkeypatch
     assert evaluation_cli_main() == 1
 
 
+def test_cli_applies_versioned_claim_evidence_threshold(tmp_path: Path, monkeypatch):
+    """CLI 必须消费 thresholds.yaml，不能绕过已启用的声明级证据门禁。"""
+    fixtures = tmp_path / "baseline-fixtures.json"
+    fixtures.write_text(
+        '{"seed-revenue-001":{"answer":"2024年营业收入为100亿元。",'
+        '"facts":[{"metric_key":"revenue","value":100,"unit":"亿元",'
+        '"currency":"CNY","period":"2024"}],'
+        '"sources":[{"source_file":"示例公司.pdf","pages":[12]}],'
+        '"tools":["retrieve"]}}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "evaluation",
+            "--dataset", "evals/datasets/core.jsonl",
+            "--fixtures", str(fixtures),
+            "--output-dir", str(tmp_path / "report"),
+        ],
+    )
+    assert evaluation_cli_main() == 1
+
+
 def test_coverage_report_exposes_missing_dimensions_without_lowering_requirements():
     cases = [EvaluationCase.from_dict(make_case())]
     report = build_coverage_report(cases, CoverageRequirements(minimum_cases=2, minimum_high_risk_cases=2, minimum_companies=2, minimum_periods=2))

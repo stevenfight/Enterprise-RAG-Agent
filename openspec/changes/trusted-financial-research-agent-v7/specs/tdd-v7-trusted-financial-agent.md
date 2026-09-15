@@ -406,8 +406,16 @@
 - 首次 RED：`python -m pytest tests/test_evaluation_quality_gate.py -q`，因 `src.evaluation` 不存在而收集失败。
 - 最小实现：`src/evaluation/`、`evals/schema/case.schema.json`、`evals/datasets/core.jsonl`、`evals/fixtures/offline-core.json`。
 - GREEN：同一命令 16 passed；`python -m compileall -q src/evaluation tests/test_evaluation_quality_gate.py` 通过。
-- CLI 冒烟：`python -m src.evaluation.cli --dataset evals/datasets/core.jsonl --fixtures evals/fixtures/offline-core.json --output-dir .tmp/evaluation-smoke` 生成 JSON/Markdown 报告并通过种子门禁。
+- CLI 冒烟：`python -m src.evaluation.cli --dataset evals/datasets/core.jsonl --fixtures evals/fixtures/offline-core.json --output-dir .tmp/evaluation-smoke` 可生成 JSON/Markdown 报告；在声明级证据门禁启用后，1 条答案级种子夹具返回退出码 1，不能冒充通过。
 - 评测数据当前只有 1 条种子样本，A1.4/A1.5/A1.7 与 A 包退出条件尚未完成；不以种子结果代表 v5.19 全量质量。
+
+## 2026-09-15 F2 无密钥预验收与评测 CLI 门禁修正
+
+- **RED**：新增 `test_cli_applies_versioned_claim_evidence_threshold`，在 `evals/config/thresholds.yaml` 已启用声明级证据门禁时，CLI 仍未加载配置，缺少声明级证据的完整种子夹具错误返回 0。
+- **GREEN**：`src/evaluation/cli.py` 现在加载并校验版本化阈值，默认使用配置中的 `minimum_pass_rate`，并把完整 thresholds 传入 `EvaluationRunner.passes_quality_gate`；支持显式 `--minimum-pass-rate` 覆盖总体通过率，但不能绕过声明级证据门禁。评测相关回归 `tests/test_evaluation_quality_gate.py tests/test_upgrade_benefit_validation.py tests/test_b28_review_fixes.py` 为 **36 passed**。
+- **离线金融评测**：`python -m src.evaluation.cli --dataset evals/datasets/core.jsonl --fixtures evals/fixtures/offline-core.json ...` 生成 1/1 样本通过、`external_service_called=false`，但 coverage `ready=false`；数据集元数据仍为 `draft`，不能作为 v5.19 或 v7.0 产品质量结论。
+- **故障/安全/成本预验收**：`tests/test_research_task_fault_drills.py` **5 passed**；`tests/test_governance_security.py tests/test_governance_tool_policy.py tests/test_governance_redaction.py tests/test_governance_audit.py` **19 passed**；`tests/test_governance_metrics.py tests/test_governance_budget.py tests/test_governance_routing_rationale.py tests/test_research_budget_pause.py tests/test_research_demo_scenarios.py` **12 passed**。
+- **结论**：C1/D 既有实现证据得到本轮复核，但 G-T05 仍为 RED，F2 仍未闭合。还缺至少 29 条样本、至少 9 条高风险样本、来源页/摘录人工复核、v5.19 可复现基线，以及基于真实批准价格的成本对比；真实 Provider 评测不在本轮无密钥预验收范围内。
 
 ## 2026-09-12 v5.19 配置基线指纹记录
 
