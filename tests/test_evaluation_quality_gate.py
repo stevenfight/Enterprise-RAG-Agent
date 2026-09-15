@@ -115,6 +115,24 @@ def test_expected_refusal_is_evaluated_as_refusal():
     assert result.metrics["refusal_accuracy"] == 1.0
 
 
+def test_conflict_safe_refusal_language_is_evaluated_as_refusal():
+    case = EvaluationCase.from_dict(
+        make_case(
+            expected_behavior="refuse",
+            expected_facts=[],
+            expected_sources=[],
+            expected_pages=[],
+            expected_tools=[],
+        )
+    )
+    result = evaluate_case(
+        case,
+        {"answer": "不能直接比较，应先核对指标定义并请求人工确认。", "facts": [], "sources": [], "tools": []},
+    )
+    assert result.metrics["refusal_accuracy"] == 1.0
+    assert result.passed is True
+
+
 def test_expected_tools_and_order_are_checked():
     case = EvaluationCase.from_dict(make_case(expected_tools=["retrieve", "verify"]))
     result = evaluate_case(
