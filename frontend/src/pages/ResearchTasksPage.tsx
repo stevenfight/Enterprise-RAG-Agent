@@ -143,7 +143,7 @@ export default function ResearchTasksPage() {
       setTasks(items);
       setSelectedTaskId((current) => current && items.some((item) => item.task_id === current)
         ? current
-        : items[0]?.task_id);
+        : items.find((item) => item.report)?.task_id ?? items[0]?.task_id);
     } catch {
       setError('无法加载研究任务，请确认后端服务已启动。');
       setTasks([]);
@@ -366,7 +366,7 @@ export default function ResearchTasksPage() {
       if (active) { setConflicts(items); setReviews(Object.fromEntries(histories)); }
     }).catch(() => { if (active) { setConflicts([]); setReviews({}); } });
     return () => { active = false; };
-  }, [selectedTaskId, detailsRefreshToken]);
+  }, [selectedTaskId]);
 
   return (
     <PageShell>
@@ -410,7 +410,7 @@ export default function ResearchTasksPage() {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, width: '100%', flexWrap: 'wrap' }}>
                       <span className="mono">{task.task_id}</span>
-                      <span>{statusTag(task.status)} {task.submission ? submissionTag(task.submission.status) : null} <Text type="secondary">revision {task.revision}</Text></span>
+                      <span>{statusTag(task.status)} {task.submission ? submissionTag(task.submission.status) : null} {task.report ? <Tag color="green">有报告 v{task.report.report_version}</Tag> : null} <Text type="secondary">revision {task.revision}</Text></span>
                     </div>
                   </Button>
                 </List.Item>

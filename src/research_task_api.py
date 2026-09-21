@@ -400,6 +400,12 @@ def _snapshot_payload(snapshot: ResearchTaskSnapshot) -> dict[str, Any]:
             "requester": submission.requester,
             "reviewer": submission.reviewer,
         }
+    report = _report_repository().latest_for_task(snapshot.task_id)
+    if report is not None:
+        payload["report"] = {
+            "report_version": report.report_version,
+            "review_status": report.review_status.value,
+        }
     return payload
 
 

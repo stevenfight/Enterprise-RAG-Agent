@@ -23,14 +23,14 @@ def _build_client(tmp_path: Path) -> tuple[TestClient, DurableExecutionStore, Re
     from src import research_task_api
 
     os.environ["RESEARCH_BOOTSTRAP_USERNAME"] = "admin"
-    os.environ["RESEARCH_BOOTSTRAP_PASSWORD"] = "strong-password"
+    os.environ["RESEARCH_BOOTSTRAP_PASSWORD"] = "local-test-credential"
     os.environ["RESEARCH_SESSION_COOKIE_SECURE"] = "false"
     store = DurableExecutionStore(V7MetadataStore(tmp_path / "v7_metadata.sqlite3"))
     research_task_api.configure_research_task_store(store)
     app = FastAPI()
     app.include_router(research_task_api.router)
     client = TestClient(app)
-    assert client.post("/api/research/auth/login", json={"username": "admin", "password": "strong-password"}).status_code == 200
+    assert client.post("/api/research/auth/login", json={"username": "admin", "password": "local-test-credential"}).status_code == 200
     return client, store, ResearchTaskAdapter(store)
 
 
@@ -276,6 +276,42 @@ def test_list_tasks_preserves_dag_steps_from_persisted_plan(tmp_path: Path):
     assert response.status_code == 200
     item = next(item for item in response.json()["items"] if item["task_id"] == "task-dag-list")
     assert item["dag_step_ids"] == ["plan", "retrieve", "report"]
+
+
+def test_list_tasks_exposes_latest_report_summary_without_report_body(tmp_path: Path):
+    """E-RRD-2：任务列表只暴露最新报告摘要，帮助前端选择可查看任务。"""
+    from src.research_delivery import Claim, ClaimSupportKind, ReportReviewStatus, ResearchReport
+    from src.research_report_repository import ResearchReportRepository
+
+    client, store, _ = _build_client(tmp_path)
+    client.post("/api/research/tasks", json={"task_id": "task-no-report", "dag_step_ids": ["plan"]})
+    client.post("/api/research/tasks", json={"task_id": "task-has-report", "dag_step_ids": ["plan"]})
+    ResearchReportRepository(store.metadata_store).append(ResearchReport.create(
+        report_id="report-rrd",
+        task_id="task-has-report",
+        plan_id="plan-rrd",
+        report_version=2,
+        data_version="facts-rrd",
+        review_status=ReportReviewStatus.PENDING_REVIEW,
+        claims=[Claim.create(claim_id="claim-rrd", text="不可提前展开的声明", support_kind=ClaimSupportKind.FACT, fact_ids=["fact-rrd"])],
+    ))
+    ResearchReportRepository(store.metadata_store).append(ResearchReport.create(
+        report_id="report-rrd-latest",
+        task_id="task-has-report",
+        plan_id="plan-rrd",
+        report_version=3,
+        data_version="facts-rrd-latest",
+        review_status=ReportReviewStatus.PENDING_REVIEW,
+        claims=[Claim.create(claim_id="claim-rrd-latest", text="最新声明不应展开", support_kind=ClaimSupportKind.FACT, fact_ids=["fact-rrd-latest"])],
+    ))
+
+    response = client.get("/api/research/tasks")
+
+    assert response.status_code == 200
+    items = {item["task_id"]: item for item in response.json()["items"]}
+    assert "report" not in items["task-no-report"]
+    assert items["task-has-report"]["report"] == {"report_version": 3, "review_status": "pending_review"}
+    assert "claims" not in items["task-has-report"]["report"]
 
 
 def test_pause_resume_cancel_control_endpoints(tmp_path: Path):

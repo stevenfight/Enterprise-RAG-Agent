@@ -172,6 +172,23 @@ describe('ResearchTasksPage', () => {
     expect(await screen.findByText('该任务尚未生成可查看的持久化报告')).toBeInTheDocument();
   });
 
+  it('E-RRD-2: 默认选中首个有报告任务并标记报告版本', async () => {
+    listResearchTasks.mockResolvedValue([
+      { task_id: 'task-without-report', run_id: 'research:task-without-report', status: 'failed', revision: 2, dag_step_ids: [] },
+      { task_id: 'task-with-report', run_id: 'research:task-with-report', status: 'completed', revision: 3, dag_step_ids: [], report: { report_version: 1, review_status: 'pending_review' } },
+    ]);
+    getResearchTaskReport.mockResolvedValue({
+      report_id: 'report-rrd', task_id: 'task-with-report', plan_id: 'plan-rrd', report_version: 1,
+      data_version: 'facts-rrd', review_status: 'pending_review', claims: [],
+    });
+
+    render(<ResearchTasksPage />);
+
+    expect(await screen.findByText(/报告版本 1/)).toBeInTheDocument();
+    expect(screen.getByText('有报告 v1')).toBeInTheDocument();
+    expect(getResearchTaskReport).toHaveBeenCalledWith('task-with-report');
+  });
+
   it('E-T19: 展示任务范围内冲突和无冲突明确空态', async () => {
     listResearchTasks.mockResolvedValue([{ task_id: 'task-conflict', run_id: 'research:task-conflict', status: 'completed', revision: 3, dag_step_ids: [] }]);
     listResearchTaskConflicts.mockResolvedValue([{ conflict_id: 'conflict-1', status: 'pending_review', conflict_type: 'VALUE_CONFLICT', fact_ids: ['fact-a', 'fact-b'], context_version: 1 }]);
