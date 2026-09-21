@@ -4,10 +4,22 @@
  */
 
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import HeaderBar from '../HeaderBar';
 import { appStore } from '@/stores/appStore';
+
+const getCurrentResearchIdentity = vi.hoisted(() => vi.fn());
+const loginResearch = vi.hoisted(() => vi.fn());
+const logoutResearch = vi.hoisted(() => vi.fn());
+
+vi.mock('@/services/researchAuthService', () => ({
+  getCurrentResearchIdentity,
+  loginResearch,
+  logoutResearch,
+  RESEARCH_IDENTITY_CHANGED_EVENT: 'research-identity-changed',
+}));
 
 const mockToggle = vi.fn();
 const mockSetTheme = vi.fn();
@@ -28,6 +40,9 @@ vi.mock('@/hooks/useTheme', () => ({
 describe('HeaderBar 外观面板', () => {
   beforeEach(() => {
     appStore.setState({ researchContext: {} });
+    getCurrentResearchIdentity.mockRejectedValue({ response: { status: 401 } });
+    loginResearch.mockReset();
+    logoutResearch.mockReset();
   });
   it('DS-R05-03: 渲染唯一外观入口', () => {
     render(
@@ -123,5 +138,68 @@ describe('HeaderBar 外观面板', () => {
   it('DS-R04-02: 健康检查失败显示暂不可用', () => {
     render(<MemoryRouter><HeaderBar systemStatus="unavailable" /></MemoryRouter>);
     expect(screen.getByText('暂不可用')).toBeInTheDocument();
+  });
+
+  it('E-T22-03: 未登录时提供登录入口，登录后显示当前用户名和角色', async () => {
+    getCurrentResearchIdentity.mockRejectedValueOnce({ response: { status: 401 } });
+    loginResearch.mockResolvedValueOnce({ username: 'alice', roles: ['approver'] });
+    render(<MemoryRouter><HeaderBar systemStatus="ready" /></MemoryRouter>);
+
+    const loginButton = await screen.findByRole('button', { name: '登录' });
+    await waitFor(() => expect(loginButton).not.toHaveClass('ant-btn-loading'));
+    fireEvent.click(loginButton);
+    fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'alice' } });
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '登录提交' }));
+
+    expect(await screen.findByText('alice')).toBeInTheDocument();
+    expect(screen.getByText('审批人')).toBeInTheDocument();
+    expect(loginResearch).toHaveBeenCalledWith({ username: 'alice', password: 'secret' });
+  });
+
+  it('D-S17: 登录浮层在用户名输入框按 Escape 后关闭且不提交登录', async () => {
+    const user = userEvent.setup();
+    getCurrentResearchIdentity.mockRejectedValueOnce({ response: { status: 401 } });
+    render(<MemoryRouter><HeaderBar systemStatus="ready" /></MemoryRouter>);
+
+    const loginButton = await screen.findByRole('button', { name: '登录' });
+    await waitFor(() => expect(loginButton).not.toHaveClass('ant-btn-loading'));
+    await user.click(loginButton);
+    const usernameInput = screen.getByLabelText('用户名');
+    expect(usernameInput).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => expect(usernameInput.closest('.ant-popover')).toHaveClass('ant-zoom-big-leave-active'));
+    expect(loginResearch).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
+  });
+
+  it('E-T22-04: 登出后回到明确未登录状态', async () => {
+    getCurrentResearchIdentity.mockResolvedValueOnce({ user_id: 'user-1', username: 'alice', roles: ['approver'] });
+    logoutResearch.mockResolvedValueOnce(undefined);
+    render(<MemoryRouter><HeaderBar systemStatus="ready" /></MemoryRouter>);
+
+    expect(await screen.findByText('alice')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '登出' }));
+
+    expect(await screen.findByRole('button', { name: '登录' })).toBeInTheDocument();
+    expect(logoutResearch).toHaveBeenCalledOnce();
+  });
+
+  it('E-T26: 键盘可提交登录，失败信息会被辅助技术明确通知', async () => {
+    const user = userEvent.setup();
+    getCurrentResearchIdentity.mockRejectedValueOnce({ response: { status: 401 } });
+    loginResearch.mockRejectedValueOnce(new Error('invalid credentials'));
+    render(<MemoryRouter><HeaderBar systemStatus="ready" /></MemoryRouter>);
+
+    const loginButton = await screen.findByRole('button', { name: '登录' });
+    await waitFor(() => expect(loginButton).not.toHaveClass('ant-btn-loading'));
+    await user.click(loginButton);
+    await user.type(screen.getByLabelText('用户名'), 'alice');
+    await user.type(screen.getByLabelText('密码'), 'wrong-password{enter}');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('登录失败，请检查用户名和密码。');
+    expect(loginResearch).toHaveBeenCalledWith({ username: 'alice', password: 'wrong-password' });
   });
 });

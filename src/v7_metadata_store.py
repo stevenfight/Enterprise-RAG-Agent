@@ -287,6 +287,99 @@ class V7MetadataStore:
             ),
         ),
         (
+            12,
+            (
+                """CREATE TABLE v7_fact_document_versions (fact_id TEXT NOT NULL, document_version_id TEXT NOT NULL, PRIMARY KEY(fact_id, document_version_id), FOREIGN KEY(fact_id) REFERENCES v7_financial_facts(fact_id) ON DELETE RESTRICT, FOREIGN KEY(document_version_id) REFERENCES v7_document_versions(document_version_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_artifact_fact_links (page_artifact_id TEXT NOT NULL, fact_id TEXT NOT NULL, PRIMARY KEY(page_artifact_id, fact_id), FOREIGN KEY(page_artifact_id) REFERENCES v7_page_artifacts(page_artifact_id) ON DELETE RESTRICT, FOREIGN KEY(fact_id) REFERENCES v7_financial_facts(fact_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_calculation_input_facts (calculation_id TEXT NOT NULL, fact_id TEXT NOT NULL, PRIMARY KEY(calculation_id, fact_id), FOREIGN KEY(calculation_id) REFERENCES v7_fact_calculations(calculation_id) ON DELETE RESTRICT, FOREIGN KEY(fact_id) REFERENCES v7_financial_facts(fact_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_claim_fact_links (claim_id TEXT NOT NULL, fact_id TEXT NOT NULL, PRIMARY KEY(claim_id, fact_id), FOREIGN KEY(claim_id) REFERENCES v7_claims(claim_id) ON DELETE RESTRICT, FOREIGN KEY(fact_id) REFERENCES v7_financial_facts(fact_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_claim_calculation_links (claim_id TEXT NOT NULL, calculation_id TEXT NOT NULL, PRIMARY KEY(claim_id, calculation_id), FOREIGN KEY(claim_id) REFERENCES v7_claims(claim_id) ON DELETE RESTRICT, FOREIGN KEY(calculation_id) REFERENCES v7_fact_calculations(calculation_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_reports (report_id TEXT PRIMARY KEY, report_title TEXT NOT NULL, report_status TEXT NOT NULL DEFAULT 'current', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                """CREATE TABLE v7_report_claim_links (report_id TEXT NOT NULL, claim_id TEXT NOT NULL, PRIMARY KEY(report_id, claim_id), FOREIGN KEY(report_id) REFERENCES v7_reports(report_id) ON DELETE RESTRICT, FOREIGN KEY(claim_id) REFERENCES v7_claims(claim_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_calculation_provenance_status (calculation_id TEXT PRIMARY KEY, provenance_status TEXT NOT NULL DEFAULT 'current', invalidated_at TEXT, FOREIGN KEY(calculation_id) REFERENCES v7_fact_calculations(calculation_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_claim_provenance_status (claim_id TEXT PRIMARY KEY, provenance_status TEXT NOT NULL DEFAULT 'current', invalidated_at TEXT, FOREIGN KEY(claim_id) REFERENCES v7_claims(claim_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_document_version_invalidations (document_version_id TEXT NOT NULL, reason TEXT NOT NULL, invalidated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(document_version_id, reason), FOREIGN KEY(document_version_id) REFERENCES v7_document_versions(document_version_id) ON DELETE RESTRICT)""",
+            ),
+        ),
+        (
+            13,
+            (
+                """CREATE TABLE v7_generation_candidates (generation_id TEXT PRIMARY KEY, corpus_revision TEXT NOT NULL, status TEXT NOT NULL, payload_json TEXT NOT NULL, artifact_manifest_json TEXT NOT NULL DEFAULT '[]', validation_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                """CREATE TABLE v7_generation_documents (generation_id TEXT NOT NULL, document_version_id TEXT NOT NULL, source_sha256 TEXT NOT NULL, PRIMARY KEY(generation_id, document_version_id), FOREIGN KEY(generation_id) REFERENCES v7_generation_candidates(generation_id) ON DELETE RESTRICT, FOREIGN KEY(document_version_id) REFERENCES v7_document_versions(document_version_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_generation_chunks (generation_id TEXT NOT NULL, chunk_id TEXT NOT NULL, document_version_id TEXT NOT NULL, text_sha256 TEXT NOT NULL, vector_action TEXT NOT NULL, evidence_json TEXT NOT NULL, PRIMARY KEY(generation_id, chunk_id), FOREIGN KEY(generation_id) REFERENCES v7_generation_candidates(generation_id) ON DELETE RESTRICT, FOREIGN KEY(document_version_id) REFERENCES v7_document_versions(document_version_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_generation_migration_audit (audit_id INTEGER PRIMARY KEY AUTOINCREMENT, generation_id TEXT NOT NULL, audit_type TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(generation_id) REFERENCES v7_generation_candidates(generation_id) ON DELETE RESTRICT)""",
+            ),
+        ),
+        (
+            14,
+            (
+                """CREATE TABLE v7_publication_sets (publication_id TEXT PRIMARY KEY, generation_id TEXT NOT NULL, corpus_revision TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(generation_id) REFERENCES v7_generation_candidates(generation_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_publication_document_versions (publication_id TEXT NOT NULL, document_version_id TEXT NOT NULL, PRIMARY KEY(publication_id, document_version_id), FOREIGN KEY(publication_id) REFERENCES v7_publication_sets(publication_id) ON DELETE RESTRICT, FOREIGN KEY(document_version_id) REFERENCES v7_document_versions(document_version_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_publication_page_artifacts (publication_id TEXT NOT NULL, page_artifact_id TEXT NOT NULL, PRIMARY KEY(publication_id, page_artifact_id), FOREIGN KEY(publication_id) REFERENCES v7_publication_sets(publication_id) ON DELETE RESTRICT, FOREIGN KEY(page_artifact_id) REFERENCES v7_page_artifacts(page_artifact_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_publication_financial_facts (publication_id TEXT NOT NULL, fact_id TEXT NOT NULL, PRIMARY KEY(publication_id, fact_id), FOREIGN KEY(publication_id) REFERENCES v7_publication_sets(publication_id) ON DELETE RESTRICT, FOREIGN KEY(fact_id) REFERENCES v7_financial_facts(fact_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_active_publication (singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1), publication_id TEXT NOT NULL, activated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(publication_id) REFERENCES v7_publication_sets(publication_id) ON DELETE RESTRICT)""",
+            ),
+        ),
+        (
+            15,
+            (
+                """CREATE TABLE v7_publication_builds (publication_id TEXT PRIMARY KEY, expected_active_publication_id TEXT, expected_corpus_revision TEXT, status TEXT NOT NULL, superseded_reason TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, published_at TEXT, FOREIGN KEY(publication_id) REFERENCES v7_publication_sets(publication_id) ON DELETE RESTRICT, FOREIGN KEY(expected_active_publication_id) REFERENCES v7_publication_sets(publication_id) ON DELETE RESTRICT)""",
+            ),
+        ),
+        (
+            16,
+            (
+                """CREATE TABLE v7_publication_rollbacks (rollback_publication_id TEXT PRIMARY KEY, restored_publication_id TEXT NOT NULL, replaced_publication_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(rollback_publication_id) REFERENCES v7_publication_sets(publication_id) ON DELETE RESTRICT, FOREIGN KEY(restored_publication_id) REFERENCES v7_publication_sets(publication_id) ON DELETE RESTRICT, FOREIGN KEY(replaced_publication_id) REFERENCES v7_publication_sets(publication_id) ON DELETE RESTRICT)""",
+            ),
+        ),
+        (
+            17,
+            (
+                """CREATE TABLE v7_visual_artifact_status_events (event_id INTEGER PRIMARY KEY AUTOINCREMENT, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, previous_status TEXT NOT NULL, next_status TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                """CREATE INDEX v7_visual_artifact_status_events_entity_idx ON v7_visual_artifact_status_events(entity_id, event_id)""",
+            ),
+        ),
+        (
+            18,
+            (
+                """ALTER TABLE v7_page_artifacts ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1""",
+                """ALTER TABLE v7_visual_regions ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1""",
+                """ALTER TABLE v7_table_artifacts ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1""",
+                """ALTER TABLE v7_chart_artifacts ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1""",
+                """ALTER TABLE v7_visual_evidence ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1""",
+            ),
+        ),
+        (
+            19,
+            (
+                """CREATE TABLE v7_visual_fact_candidates (candidate_id TEXT PRIMARY KEY, manifest_id TEXT NOT NULL, page_artifact_id TEXT NOT NULL, extracted_text TEXT NOT NULL, numeric_payload_json TEXT NOT NULL, confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1), review_status TEXT NOT NULL CHECK (review_status IN ('pending_review', 'verified', 'rejected')), fact_id TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, reviewed_at TEXT, FOREIGN KEY(manifest_id) REFERENCES v7_document_asset_manifests(manifest_id) ON DELETE RESTRICT, FOREIGN KEY(page_artifact_id) REFERENCES v7_page_artifacts(page_artifact_id) ON DELETE RESTRICT, FOREIGN KEY(fact_id) REFERENCES v7_financial_facts(fact_id) ON DELETE RESTRICT)""",
+                """CREATE INDEX v7_visual_fact_candidates_manifest_idx ON v7_visual_fact_candidates(manifest_id, review_status)""",
+            ),
+        ),
+        (
+            20,
+            (
+                """CREATE TABLE v7_publication_request_leases (lease_id TEXT PRIMARY KEY, publication_id TEXT NOT NULL, owner_token TEXT NOT NULL, expires_at REAL NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(publication_id) REFERENCES v7_publication_sets(publication_id) ON DELETE RESTRICT)""",
+                """CREATE INDEX v7_publication_request_leases_publication_expiry_idx ON v7_publication_request_leases(publication_id, expires_at)""",
+            ),
+        ),
+        (
+            21,
+            (
+                """CREATE TABLE v7_document_deletion_requests (document_version_id TEXT PRIMARY KEY, status TEXT NOT NULL CHECK (status IN ('waiting_for_active_requests', 'rebuild_required')), active_request_lease_count INTEGER NOT NULL CHECK (active_request_lease_count >= 0), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(document_version_id) REFERENCES v7_document_versions(document_version_id) ON DELETE RESTRICT)""",
+            ),
+        ),
+        (
+            22,
+            (
+                # M3.10：删除请求新增 cleanup_ready 终态，需重建表放宽 status CHECK 约束
+                """CREATE TABLE v7_document_deletion_requests_new (document_version_id TEXT PRIMARY KEY, status TEXT NOT NULL CHECK (status IN ('waiting_for_active_requests', 'rebuild_required', 'cleanup_ready')), active_request_lease_count INTEGER NOT NULL CHECK (active_request_lease_count >= 0), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(document_version_id) REFERENCES v7_document_versions(document_version_id) ON DELETE RESTRICT)""",
+                """INSERT INTO v7_document_deletion_requests_new(document_version_id, status, active_request_lease_count, created_at, updated_at) SELECT document_version_id, status, active_request_lease_count, created_at, updated_at FROM v7_document_deletion_requests""",
+                """DROP TABLE v7_document_deletion_requests""",
+                """ALTER TABLE v7_document_deletion_requests_new RENAME TO v7_document_deletion_requests""",
+            ),
+        ),
+        (
             23,
             (
                 # C2.7：研究任务路由决策只追加表，记录选定 single/multi 路径、失败分类与显式重试链，禁止覆盖历史
@@ -349,6 +442,128 @@ class V7MetadataStore:
                 )
                 """,
                 """CREATE INDEX idx_v7_governance_approvals_task ON v7_governance_approvals(task_id, subject, subject_id)""",
+            ),
+        ),
+        (
+            26,
+            (
+                # E1.5：原始冲突保持不可变，用户裁决以只追加历史保存。
+                """
+                CREATE TABLE v7_research_conflict_reviews (
+                    review_id TEXT PRIMARY KEY,
+                    task_id TEXT NOT NULL,
+                    run_id TEXT NOT NULL,
+                    conflict_id TEXT NOT NULL,
+                    action TEXT NOT NULL CHECK (action IN ('approve', 'reject', 'keep_pending')),
+                    selected_fact_id TEXT,
+                    fact_ids_json TEXT NOT NULL,
+                    actor TEXT NOT NULL,
+                    approval_id TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(conflict_id) REFERENCES v7_financial_fact_conflicts(conflict_id) ON DELETE RESTRICT,
+                    FOREIGN KEY(approval_id) REFERENCES v7_governance_approvals(approval_id) ON DELETE RESTRICT
+                )
+                """,
+                """CREATE INDEX idx_v7_research_conflict_reviews_conflict ON v7_research_conflict_reviews(conflict_id, created_at, review_id)""",
+            ),
+        ),
+        (
+            27,
+            (
+                # E-T01：研究计划按任务和版本只追加保存，预算以 Decimal 文本保留精度。
+                """
+                CREATE TABLE v7_research_plans (
+                    plan_id TEXT PRIMARY KEY,
+                    task_id TEXT NOT NULL,
+                    plan_version INTEGER NOT NULL CHECK (plan_version > 0),
+                    objective TEXT NOT NULL,
+                    scope_json TEXT NOT NULL,
+                    step_ids_json TEXT NOT NULL,
+                    estimated_cost TEXT NOT NULL,
+                    risks_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(task_id, plan_version)
+                )
+                """,
+                """CREATE INDEX idx_v7_research_plans_task ON v7_research_plans(task_id, plan_version DESC)""",
+            ),
+        ),
+        (
+            28,
+            (
+                # 研究报告版本只追加保存，声明保持 JSON 审计快照。
+                """CREATE TABLE v7_research_reports (report_id TEXT PRIMARY KEY, task_id TEXT NOT NULL, plan_id TEXT NOT NULL, report_version INTEGER NOT NULL CHECK (report_version > 0), data_version TEXT NOT NULL, review_status TEXT NOT NULL, claims_json TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(task_id, report_version))""",
+                """CREATE INDEX idx_v7_research_reports_task ON v7_research_reports(task_id, report_version DESC)""",
+            ),
+        ),
+        (
+            29,
+            (
+                # E-T16：冲突依赖上下文只由服务端工作流追加登记，供审批绑定读取。
+                """
+                CREATE TABLE v7_research_conflict_contexts (
+                    task_id TEXT NOT NULL,
+                    conflict_id TEXT NOT NULL,
+                    context_version INTEGER NOT NULL CHECK (context_version > 0),
+                    run_id TEXT NOT NULL,
+                    fact_version TEXT NOT NULL,
+                    artifact_version TEXT NOT NULL,
+                    index_generation TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (task_id, conflict_id, context_version),
+                    FOREIGN KEY(conflict_id) REFERENCES v7_financial_fact_conflicts(conflict_id) ON DELETE RESTRICT
+                )
+                """,
+                """CREATE INDEX idx_v7_research_conflict_contexts_current ON v7_research_conflict_contexts(task_id, conflict_id, context_version DESC)""",
+            ),
+        ),
+        (
+            30,
+            (
+                """CREATE TABLE v7_research_users (user_id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, enabled INTEGER NOT NULL CHECK (enabled IN (0,1)), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+                """CREATE TABLE v7_research_roles (role_id TEXT PRIMARY KEY)""",
+                """CREATE TABLE v7_research_user_roles (user_id TEXT NOT NULL, role_id TEXT NOT NULL, PRIMARY KEY(user_id, role_id), FOREIGN KEY(user_id) REFERENCES v7_research_users(user_id) ON DELETE RESTRICT, FOREIGN KEY(role_id) REFERENCES v7_research_roles(role_id) ON DELETE RESTRICT)""",
+                """CREATE TABLE v7_research_sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(user_id) REFERENCES v7_research_users(user_id) ON DELETE RESTRICT)""",
+            ),
+        ),
+        (
+            31,
+            (
+                # E-T24：正式签发与不可变报告分表保存，避免覆盖报告审计快照。
+                """CREATE TABLE v7_research_report_signoffs (signoff_id TEXT PRIMARY KEY, report_id TEXT NOT NULL UNIQUE, task_id TEXT NOT NULL, approval_id TEXT NOT NULL UNIQUE, actor TEXT NOT NULL, signed_at TEXT NOT NULL, FOREIGN KEY(report_id) REFERENCES v7_research_reports(report_id) ON DELETE RESTRICT, FOREIGN KEY(approval_id) REFERENCES v7_governance_approvals(approval_id) ON DELETE RESTRICT)""",
+                """CREATE INDEX idx_v7_research_report_signoffs_task ON v7_research_report_signoffs(task_id, signed_at DESC)""",
+            ),
+        ),
+        (
+            32,
+            (
+                # E-T31：任务提交与领导决策保持只追加历史，避免覆盖审批审计记录。
+                """
+                CREATE TABLE v7_research_task_submissions (
+                    task_id TEXT NOT NULL,
+                    submission_version INTEGER NOT NULL CHECK (submission_version > 0),
+                    status TEXT NOT NULL CHECK (status IN ('submitted', 'approved', 'rejected')),
+                    requester TEXT NOT NULL,
+                    reviewer TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY(task_id, submission_version)
+                )
+                """,
+                """CREATE INDEX idx_v7_research_task_submissions_current ON v7_research_task_submissions(task_id, submission_version DESC)""",
+            ),
+        ),
+        (
+            33,
+            (
+                # E-T39：研究计划快照保存每步 Agent/工具显式绑定，旧计划以空数组兼容。
+                """ALTER TABLE v7_research_plans ADD COLUMN step_bindings_json TEXT NOT NULL DEFAULT '[]'""",
+            ),
+        ),
+        (
+            34,
+            (
+                # E-T41.3：审批后的步骤工具参数独立保存，旧计划以空数组兼容。
+                """ALTER TABLE v7_research_plans ADD COLUMN step_inputs_json TEXT NOT NULL DEFAULT '[]'""",
             ),
         ),
     )

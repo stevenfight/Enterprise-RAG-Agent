@@ -6,6 +6,20 @@ from typing import Any
 from .models import CaseEvaluation, EvaluationCase, NumericComparison
 
 
+_REFUSAL_MARKERS = (
+    "无法",
+    "不足",
+    "不确定",
+    "待确认",
+    "暂停确定性回答",
+    "不能直接",
+    "不能自动",
+    "人工确认",
+    "人工复核",
+    "应先核对",
+)
+
+
 def compare_numeric(expected: float, actual: float, tolerance: float) -> NumericComparison:
     """按相对误差比较数字，避免把数量级错误当作舍入误差。"""
     if not isinstance(expected, (int, float)) or not isinstance(actual, (int, float)):
@@ -62,7 +76,7 @@ def evaluate_case(case: EvaluationCase, actual: dict[str, Any]) -> CaseEvaluatio
     actual_facts = actual.get("facts", [])
     if case.expected_behavior == "refuse":
         answer = str(actual.get("answer", ""))
-        refused = any(word in answer for word in ("无法", "不足", "不确定", "待确认"))
+        refused = any(marker in answer for marker in _REFUSAL_MARKERS)
         metrics["refusal_accuracy"] = 1.0 if refused else 0.0
         if not refused:
             failures.append("expected_refusal")

@@ -98,7 +98,7 @@ class AgentResult:
         total_elapsed_ms: 总耗时（毫秒）
         forced_stop: 是否因达到 max_steps 而强制停止
         error: 错误信息（success=False 时填充）
-        sources: 检索来源列表（含 source/content/pages/company_name 字段）
+        sources: 检索来源列表（含 source/content/pages/company_name 字段；审核路径可含进程内 verification_text）
         total_tokens: 总 Token 用量（input_tokens + output_tokens 之和）
         reflection: Reflector 反思结果（可选，由 api_service 填充）
     """
@@ -919,14 +919,20 @@ class ReActAgent:
             results_list = result.data.get("results", [])
             if results_list:
                 for r in results_list:
-                    self._sources.append({
+                    raw_text = r.get("text", "")
+                    source = {
                         "source": r.get("source_file", "未知来源"),
-                        "content": r.get("text", "")[:200],
+                        # 回答级来源仍使用短摘要，避免改变既有响应体大小。
+                        "content": raw_text[:200] if isinstance(raw_text, str) else "",
                         "pages": r.get("pages", ""),
                         "physical_pages": r.get("physical_pages", []),
                         "document_pages": r.get("document_pages", []),
                         "company_name": r.get("company_name", ""),
-                    })
+                    }
+                    if isinstance(raw_text, str) and raw_text:
+                        # 审核只在进程内使用完整正文；持久化调用摘要不会带出该字段。
+                        source["verification_text"] = raw_text
+                    self._sources.append(source)
                 logger.debug("[ReActAgent] 已收集 %d 条来源 (来自 retrieve)", len(self._sources))
 
         logger.info("[ReActAgent] Observation: %.100s...", obs)

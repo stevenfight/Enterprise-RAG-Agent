@@ -104,7 +104,8 @@ export function streamAgentQuery(
 
   logger.info('建立 SSE EventSource 连接', { url, query: query.slice(0, 80), params: Object.fromEntries(params) });
 
-  const es = new EventSource(url);
+  // 跨源 API 地址也由浏览器携带服务端 HttpOnly 研究会话，URL 不包含身份令牌。
+  const es = new EventSource(url, { withCredentials: true });
 
   // [streamAgentQuery] OPEN - 连接成功打开
   es.onopen = () => {

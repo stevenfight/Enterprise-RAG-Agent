@@ -115,6 +115,24 @@ def test_expected_refusal_is_evaluated_as_refusal():
     assert result.metrics["refusal_accuracy"] == 1.0
 
 
+def test_conflict_safe_refusal_language_is_evaluated_as_refusal():
+    case = EvaluationCase.from_dict(
+        make_case(
+            expected_behavior="refuse",
+            expected_facts=[],
+            expected_sources=[],
+            expected_pages=[],
+            expected_tools=[],
+        )
+    )
+    result = evaluate_case(
+        case,
+        {"answer": "不能直接比较，应先核对指标定义并请求人工确认。", "facts": [], "sources": [], "tools": []},
+    )
+    assert result.metrics["refusal_accuracy"] == 1.0
+    assert result.passed is True
+
+
 def test_expected_tools_and_order_are_checked():
     case = EvaluationCase.from_dict(make_case(expected_tools=["retrieve", "verify"]))
     result = evaluate_case(
@@ -228,6 +246,64 @@ def test_cli_returns_nonzero_when_quality_gate_fails(tmp_path: Path, monkeypatch
         ],
     )
     assert evaluation_cli_main() == 1
+
+
+def test_cli_applies_versioned_claim_evidence_threshold(tmp_path: Path, monkeypatch):
+    """CLI 必须消费 thresholds.yaml，不能绕过已启用的声明级证据门禁。"""
+    fixtures = tmp_path / "baseline-fixtures.json"
+    fixtures.write_text(
+        '{"seed-revenue-001":{"answer":"2024年营业收入为100亿元。",'
+        '"facts":[{"metric_key":"revenue","value":100,"unit":"亿元",'
+        '"currency":"CNY","period":"2024"}],'
+        '"sources":[{"source_file":"示例公司.pdf","pages":[12]}],'
+        '"tools":["retrieve"]}}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "evaluation",
+            "--dataset", "evals/datasets/core.jsonl",
+            "--fixtures", str(fixtures),
+            "--output-dir", str(tmp_path / "report"),
+        ],
+    )
+    assert evaluation_cli_main() == 1
+
+
+def test_cli_source_root_missing_file_returns_nonzero(tmp_path: Path, monkeypatch):
+    fixtures = tmp_path / "evidence-fixtures.json"
+    fixtures.write_text(
+        '{"seed-revenue-001":{"answer":"2024年营业收入为100亿元。",'
+        '"facts":[{"metric_key":"revenue","value":100,"unit":"亿元",'
+        '"currency":"CNY","period":"2024","raw_value":"100亿元",'
+        '"raw_unit":"亿元","normalized_value":"10000000000",'
+        '"normalized_unit":"元"}],"calculations":[],"conflicts":[],'
+        '"sources":[{"source_file":"示例公司.pdf","pages":[12]}],'
+        '"tools":["retrieve"]}}',
+        encoding="utf-8",
+    )
+    source_root = tmp_path / "sources"
+    source_root.mkdir()
+    output_dir = tmp_path / "report"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "evaluation",
+            "--dataset", "evals/datasets/core.jsonl",
+            "--fixtures", str(fixtures),
+            "--output-dir", str(output_dir),
+            "--source-root", str(source_root),
+        ],
+    )
+
+    assert evaluation_cli_main() == 1
+    report = __import__("json").loads(
+        (output_dir / "evaluation-report.json").read_text(encoding="utf-8")
+    )
+    assert report["metadata"]["source_audit"]["missing_source_files"] == ["示例公司.pdf"]
 
 
 def test_coverage_report_exposes_missing_dimensions_without_lowering_requirements():

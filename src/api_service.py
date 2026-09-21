@@ -13,20 +13,22 @@ FastAPI API 服务模块
 
 import logging
 import json
+import os
 import re
 import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, List, Literal, Optional, Union
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel, Field, field_validator
+from starlette.responses import FileResponse, StreamingResponse, JSONResponse
+from pydantic import BaseModel, Field, field_validator, model_serializer
 
 from .retrieval import RAGGenerator, HybridRetriever, COMPANY_ABBREV_MAP
 from .query_processor import QueryProcessor
@@ -359,6 +361,48 @@ class SourceInfo(BaseModel):
     company_name: str
     scores: dict
     excerpt: str = ""
+    visual_locator: Optional[dict] = None
+    visual_preview_status: Optional[Literal["incomplete"]] = None
+
+    @model_serializer(mode="wrap")
+    def _serialize_without_absent_visual_fields(self, handler):
+        """缺少视觉制品信息时保持旧来源 JSON 契约完全不变。"""
+        payload = handler(self)
+        if self.visual_locator is None:
+            payload.pop("visual_locator", None)
+        if self.visual_preview_status is None:
+            payload.pop("visual_preview_status", None)
+        return payload
+
+
+def _normalize_complete_visual_locator(raw_locator: object) -> dict | None:
+    """仅接受完整制品的规范化区域定位，不从缺失字段推断位置。"""
+    if not isinstance(raw_locator, dict) or raw_locator.get("artifact_status") != "complete":
+        return None
+    required_ids = ("manifest_id", "page_artifact_id", "visual_region_id")
+    locator = {
+        field_name: raw_locator.get(field_name)
+        for field_name in required_ids
+    }
+    if any(not isinstance(value, str) or not value.strip() for value in locator.values()):
+        return None
+    bbox = raw_locator.get("normalized_bbox")
+    if (
+        not isinstance(bbox, list)
+        or len(bbox) != 4
+        or any(type(value) not in (int, float) or value < 0 or value > 1 for value in bbox)
+        or bbox[0] >= bbox[2]
+        or bbox[1] >= bbox[3]
+    ):
+        return None
+    locator["normalized_bbox"] = bbox
+    locator["artifact_status"] = "complete"
+    return locator
+
+
+def _is_incomplete_visual_locator(raw_locator: object) -> bool:
+    """仅将内部来源明确标识的不完整制品转为不含坐标的预览状态。"""
+    return isinstance(raw_locator, dict) and raw_locator.get("artifact_status") == "incomplete"
 
 
 def _build_agent_answer_sources(raw_sources: List[dict]) -> List[dict]:
@@ -388,7 +432,7 @@ def _build_agent_answer_sources(raw_sources: List[dict]) -> List[dict]:
             continue
         seen.add(source_key)
         excerpt = re.sub(r"\s+", " ", str(raw_source.get("content") or raw_source.get("text") or "")).strip()[:240]
-        normalized_sources.append({
+        normalized_source = {
             "index": len(normalized_sources) + 1,
             "source_file": source_file,
             "pages": pages,
@@ -396,7 +440,13 @@ def _build_agent_answer_sources(raw_sources: List[dict]) -> List[dict]:
             "company_name": company_name,
             "scores": {},
             "excerpt": excerpt,
-        })
+        }
+        visual_locator = _normalize_complete_visual_locator(raw_source.get("visual_locator"))
+        if visual_locator is not None:
+            normalized_source["visual_locator"] = visual_locator
+        elif _is_incomplete_visual_locator(raw_source.get("visual_locator")):
+            normalized_source["visual_preview_status"] = "incomplete"
+        normalized_sources.append(normalized_source)
     return normalized_sources
 
 
@@ -529,6 +579,10 @@ class KnowledgeUploadResponse(BaseModel):
     sha256: Optional[str] = None
     index_status: str = "pending_index"
     idempotent: bool = False
+    processing_status: Optional[str] = None
+    logical_document_id: Optional[str] = None
+    document_version_id: Optional[str] = None
+    physical_page_count: Optional[int] = None
 
 
 class SystemStatusResponse(BaseModel):
@@ -602,6 +656,15 @@ def _init_globals():
     elapsed = time.time() - start_time
     logger.info("[api_service] RAGGenerator 实例创建完成，耗时: %.2f 秒", elapsed)
 
+    # 研究任务在批准后复用已初始化的真实 RAG 查询，不反向依赖本模块全局变量。
+    from src.research_task_api import (
+        configure_research_task_agent_registry,
+        configure_research_task_llm_provider,
+        configure_research_task_query,
+        configure_research_task_tool_registry,
+    )
+    configure_research_task_query(lambda objective: rag_generator.query(query=objective))
+
     logger.info("[api_service] 开始初始化 QueryProcessor 实例...")
     _shared_state["query_processor"] = QueryProcessor()
     logger.info("[api_service] QueryProcessor 实例创建完成")
@@ -616,6 +679,7 @@ def _init_globals():
     agent_registry.register(ChartTool())
     agent_registry.register(VerifyTool())
     logger.info("[api_service] Agent 工具注册完成: %d 个工具", len(agent_registry._tools))
+    configure_research_task_tool_registry(agent_registry)
 
     agent_planner = TaskPlanner()
 
@@ -666,6 +730,7 @@ def _init_globals():
     api_key_for_agent = get_api_key()
     llm_provider = DashScopeProvider(api_key=api_key_for_agent)
     _shared_state["llm_provider"] = llm_provider
+    configure_research_task_llm_provider(llm_provider)
     logger.info("[api_service] DashScopeProvider 初始化完成")
 
     # ---- 新增：QueryRouter 初始化（步骤 0.3） ----
@@ -681,6 +746,20 @@ def _init_globals():
     from src.shared_memory import SharedMemory
 
     agent_registry = AgentRegistry()
+    agent_registry.register(AgentCapability(
+        name="PlanAgent",
+        description="研究计划确认专家：只确认已审批计划快照，不调用工具或重规划",
+        tools=[],
+        max_parallel=1,
+        llm_model="qwen-turbo",
+    ))
+    agent_registry.register(AgentCapability(
+        name="ReportAgent",
+        description="研究报告确认专家：只确认已有不可变草稿，不调用工具或改写声明",
+        tools=[],
+        max_parallel=1,
+        llm_model="qwen-turbo",
+    ))
     agent_registry.register(AgentCapability(
         name="DataAgent",
         description="从向量数据库精确检索财务数据，支持指定公司名称",
@@ -721,6 +800,7 @@ def _init_globals():
         llm_model="qwen-plus",
     ))
     logger.info("[api_service] AgentRegistry 注册完成: %d 个 Worker", len(agent_registry.list_all()))
+    configure_research_task_agent_registry(agent_registry)
 
     logger.info("[api_service] FastAPI 应用启动完成")
     logger.info("=" * 60)
@@ -782,6 +862,38 @@ def _get_or_create_conversation_memory(
 
 # ==================== FastAPI 应用 ====================
 
+_DEFAULT_CORS_ALLOWED_ORIGINS = (
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+)
+
+
+def _cors_allowed_origins() -> tuple[str, ...]:
+    """解析携带凭据请求的 CORS 来源，非法配置必须失败关闭。"""
+    configured = os.getenv("CORS_ALLOWED_ORIGINS")
+    if configured is None:
+        return _DEFAULT_CORS_ALLOWED_ORIGINS
+
+    origins = tuple(item.strip() for item in configured.split(","))
+    if not origins or any(not origin for origin in origins) or len(set(origins)) != len(origins):
+        raise RuntimeError("CORS_ALLOWED_ORIGINS 必须是唯一且非空的 HTTP(S) 来源列表")
+
+    for origin in origins:
+        parsed = urlsplit(origin)
+        if (
+            "*" in origin
+            or parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise RuntimeError("CORS_ALLOWED_ORIGINS 仅允许无路径的 HTTP(S) 来源")
+
+    return origins
+
 app = FastAPI(
     title="企业知识库 RAG API",
     description="基于混合检索与 RAG 生成的企业财报问答服务",
@@ -792,7 +904,7 @@ app = FastAPI(
 # CORS 中间件: 允许前端跨域访问（开发环境 Vite 代理 + 直连双模式）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_cors_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -812,17 +924,26 @@ class APIAuthMiddleware(BaseHTTPMiddleware):
         "/docs",
         "/openapi.json",
         "/redoc",
-        # 前端页面内部接口：EventSource 无法携带自定义请求头
-        "/api/agent/stream",
     }
 
     # 无需鉴权的路径前缀（动态资源，如前端展示的图表图片）
-    SKIP_PREFIXES = ("/api/charts/images/",)
+    SKIP_PREFIXES = ("/api/charts/images/", "/api/research/auth/")
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        # 健康检查、文档接口及前端内部接口无需鉴权
+        # 仅让浏览器真实 CORS 预检进入内层 CORS 中间件；不放行实际业务请求或普通 OPTIONS。
+        if (
+            request.method == "OPTIONS"
+            and request.headers.get("Origin")
+            and request.headers.get("Access-Control-Request-Method")
+        ):
+            return await call_next(request)
+
+        # 健康检查、文档接口及静态展示资源无需鉴权；SSE 使用既有研究会话或 Bearer API Key。
         if path in self.SKIP_PATHS or path.startswith(self.SKIP_PREFIXES):
+            return await call_next(request)
+
+        if _research_session_is_valid(request):
             return await call_next(request)
 
         # 从模块级变量读取 API Key
@@ -844,6 +965,13 @@ class APIAuthMiddleware(BaseHTTPMiddleware):
             )
 
         return await call_next(request)
+
+
+def _research_session_is_valid(request: Request) -> bool:
+    """仅验证服务端签发且未过期的研究会话，不从请求体读取身份。"""
+    from .research_identity import ResearchIdentityStore
+    from .v7_metadata_store import V7MetadataStore
+    return ResearchIdentityStore(V7MetadataStore(project_root / "data" / "v7" / "metadata.sqlite3")).identity(request.cookies.get("research_session")) is not None
 
 
 app.add_middleware(APIAuthMiddleware)
@@ -2204,6 +2332,56 @@ def _stream_response(non_stream_resp: dict):
 from .knowledge_service import get_documents, upload_pdf, delete_pdf, retry_pdf_index
 
 
+def _v7_upload_kwargs(filename: str) -> dict:
+    """仅在多模态开关开启时装配 v7 上传依赖，关闭时不触碰 legacy 路径。"""
+    flags = _load_agent_config().get("v7_feature_flags")
+    if flags is None or not flags.multimodal_enabled:
+        return {}
+    from .v7_document_repository import V7DocumentRepository
+    from .v7_metadata_store import V7MetadataStore
+    from .v7_pdf_upload_service import V7PdfUploadService
+
+    v7_root = project_root / "data" / "v7"
+    repository = V7DocumentRepository(
+        V7MetadataStore(v7_root / "metadata.sqlite3"),
+        v7_root / "blobs",
+    )
+    return {
+        "v7_flags": flags,
+        "v7_upload_service": V7PdfUploadService(repository, v7_root / "staging"),
+        "logical_document_key": f"api-upload:{filename}",
+        "display_name": filename,
+    }
+
+
+def _get_page_artifact_access_service():
+    """构造 v7 页图受控读取服务；不暴露制品目录的静态路径。"""
+    from .page_artifact_access import PageArtifactAccessService
+    from .v7_metadata_store import V7MetadataStore
+
+    v7_root = project_root / "data" / "v7"
+    return PageArtifactAccessService(V7MetadataStore(v7_root / "metadata.sqlite3"))
+
+
+@app.get(
+    "/api/artifacts/manifests/{manifest_id}/pages/{page_artifact_id}/image",
+    summary="读取已登记的完整页图",
+)
+async def api_page_artifact_image(manifest_id: str, page_artifact_id: str):
+    """只在多模态开关开启后，以 manifest 和制品 ID 返回完整 PNG。"""
+    flags = _load_agent_config().get("v7_feature_flags")
+    if flags is None or not flags.multimodal_enabled:
+        raise HTTPException(status_code=404, detail="多模态页图读取未启用")
+    try:
+        image_path = _get_page_artifact_access_service().resolve_image(
+            manifest_id=manifest_id,
+            page_artifact_id=page_artifact_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="页图制品不可用") from exc
+    return FileResponse(image_path, media_type="image/png")
+
+
 @app.get("/api/knowledge/documents",
          response_model=KnowledgeListResponse,
          summary="获取知识库文档列表")
@@ -2244,7 +2422,7 @@ async def api_knowledge_upload(request: Request):
         filename = file.filename or "unnamed.pdf"
         logger.info("[api_service] 文件读取完成 | 文件名: %s | 实际大小: %d bytes",
                      filename, len(content))
-        result = upload_pdf(content, filename)
+        result = upload_pdf(content, filename, **_v7_upload_kwargs(filename))
         logger.info("[api_service] 上传处理完成 | 文件名: %s | 大小: %.2f MB",
                      result["filename"], result["size_mb"])
         return {"success": True, **result}
@@ -2265,7 +2443,18 @@ async def api_knowledge_delete(filename: str):
         logger.info("[api_service] 文件名已 URL 解码: %s -> %s",
                      filename, decoded)
     filename = decoded
-    if not delete_pdf(filename):
+    # M3.6：多模态开关开启时注入 V7 删除协调器，为同名版本创建删除请求
+    deletion_coordinator = None
+    flags = _load_agent_config().get("v7_feature_flags")
+    if flags is not None and flags.multimodal_enabled:
+        from .v7_document_deletion_coordinator import V7DocumentDeletionCoordinator
+        from .v7_metadata_store import V7MetadataStore
+
+        v7_root = project_root / "data" / "v7"
+        deletion_coordinator = V7DocumentDeletionCoordinator(
+            V7MetadataStore(v7_root / "metadata.sqlite3")
+        )
+    if not delete_pdf(filename, deletion_coordinator=deletion_coordinator):
         logger.warning("[api_service] 删除失败: 文档不存在 | 文件名: %s",
                         filename)
         raise HTTPException(status_code=404,

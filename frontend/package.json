@@ -24,7 +24,7 @@
     "echarts-for-react": "^3.0.6",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-router-dom": "^7.18.0",
+    "react-router-dom": "^7.18.3",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

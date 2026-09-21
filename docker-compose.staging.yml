@@ -1,0 +1,45 @@
+# 仅用于与正式栈共机的本地回环测试，不得替代正式 docker-compose.yml。
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: rag-backend-staging
+    restart: "no"
+    cpus: "0.75"
+    mem_limit: 1g
+    ports:
+      - "127.0.0.1:18000:8000"
+    volumes:
+      - "./.staging/data:/app/data"
+    env_file:
+      - ${STAGING_ENV_FILE:-.env.staging}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - rag-staging-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: rag-frontend-staging
+    restart: "no"
+    cpus: "0.25"
+    mem_limit: 128m
+    ports:
+      - "127.0.0.1:18081:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - rag-staging-network
+
+networks:
+  rag-staging-network:
+    name: rag-staging-network
+    driver: bridge

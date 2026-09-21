@@ -5,6 +5,7 @@
 .env.production
 .env.development
 .env.docker
+.env.staging
 
 # 虚拟环境
 env/
