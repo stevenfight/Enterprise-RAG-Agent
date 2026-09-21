@@ -11,6 +11,7 @@ import {
   ApartmentOutlined,
   BarChartOutlined,
   DatabaseOutlined,
+  ExperimentOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
 import { appStore } from '@/stores/appStore';
@@ -41,6 +42,11 @@ const menuItems = [
     key: '/knowledge',
     icon: <DatabaseOutlined />,
     label: '知识库管理',
+  },
+  {
+    key: '/research',
+    icon: <ExperimentOutlined />,
+    label: '研究任务',
   },
   {
     key: '/settings',

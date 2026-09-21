@@ -13,6 +13,10 @@ export interface ResearchTaskSnapshot {
     requester: string;
     reviewer: string | null;
   };
+  report?: {
+    report_version: number;
+    review_status: string;
+  };
 }
 
 export interface ResearchTaskExecutionSummary {
