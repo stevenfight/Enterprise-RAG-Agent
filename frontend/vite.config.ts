@@ -23,6 +23,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/vitest-setup.ts'],
+    // 限制测试 worker 数量，避免多个 jsdom/Ant Design 测试在高并行下互相干扰。
+    maxWorkers: 4,
     css: true,
     coverage: {
       provider: 'v8',
