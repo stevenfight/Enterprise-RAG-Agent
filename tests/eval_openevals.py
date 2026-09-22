@@ -58,6 +58,7 @@ from langchain_community.chat_models import ChatTongyi
 
 # ---- 项目模块导入 ----
 from src.agent_core import ReActAgent
+from src.evaluation import match_expected_keywords
 from src.agent_memory import AgentMemory
 from src.tools import ToolRegistry
 from src.tools.retrieve_tool import RetrieveTool
@@ -244,6 +245,7 @@ def run_openevals_evaluation(
         query = test_case.get("query", "")
         company_name = test_case.get("company_name")
         reference_answer = test_case.get("reference_answer", "")
+        expected_keywords = test_case.get("should_contain", [])
 
         print(f"\n[{i+1}/{len(test_cases)}] {test_case.get('id', '')} - {query}")
 
@@ -307,6 +309,12 @@ def run_openevals_evaluation(
             print(f"  [WARN] 相关性评估失败: {e}")
             relevance_score = 0.0
 
+        # 关键词命中率由 v7 确定性评估器计算，和 LLM-as-Judge 分数分开记录。
+        keyword_hit_rate, found_keywords, missing_keywords = match_expected_keywords(
+            expected_keywords,
+            answer,
+        )
+
         # 汇总单条结果
         entry = {
             "id": test_case.get("id", ""),
@@ -316,6 +324,9 @@ def run_openevals_evaluation(
             "correctness": round(correctness_score, 3) if correctness_score is not None else None,
             "groundedness": round(groundedness_score, 3) if groundedness_score is not None else None,
             "relevance": round(relevance_score, 3) if relevance_score is not None else None,
+            "keyword_hit_rate": round(keyword_hit_rate, 3) if keyword_hit_rate is not None else None,
+            "keyword_matches": found_keywords,
+            "keyword_missing": missing_keywords,
             "success": result.success if hasattr(result, "success") else False,
             "steps": result.total_steps if hasattr(result, "total_steps") else 0,
             "elapsed": round(elapsed, 2),
@@ -334,12 +345,15 @@ def run_openevals_evaluation(
     valid_correctness = [r["correctness"] for r in results if r["correctness"] is not None]
     valid_groundedness = [r["groundedness"] for r in results if r["groundedness"] is not None]
     valid_relevance = [r["relevance"] for r in results if r["relevance"] is not None]
+    valid_keyword_hit_rates = [r["keyword_hit_rate"] for r in results if r["keyword_hit_rate"] is not None]
 
     summary = {
         "total": total,
         "avg_correctness": round(sum(valid_correctness) / len(valid_correctness), 3) if valid_correctness else 0,
         "avg_groundedness": round(sum(valid_groundedness) / len(valid_groundedness), 3) if valid_groundedness else 0,
         "avg_relevance": round(sum(valid_relevance) / len(valid_relevance), 3) if valid_relevance else 0,
+        "avg_keyword_hit_rate": round(sum(valid_keyword_hit_rates) / len(valid_keyword_hit_rates), 3)
+        if valid_keyword_hit_rates else None,
         "pass_count": sum(1 for r in results if r["correctness"] and r["correctness"] >= 0.6),
         "results": results,
     }
@@ -354,6 +368,8 @@ def run_openevals_evaluation(
     print(f"  平均正确性 (Correctness): {summary['avg_correctness']:.2f}")
     print(f"  平均忠实度 (Groundedness): {summary['avg_groundedness']:.2f}")
     print(f"  平均相关性 (Relevance): {summary['avg_relevance']:.2f}")
+    if summary["avg_keyword_hit_rate"] is not None:
+        print(f"  平均关键词命中率: {summary['avg_keyword_hit_rate']:.2f}")
     print()
 
     # 逐维度分析

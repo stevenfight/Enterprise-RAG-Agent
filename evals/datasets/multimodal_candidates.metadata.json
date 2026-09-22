@@ -1,0 +1,10 @@
+{
+  "dataset_version": "v7-multimodal-candidates-20260829",
+  "status": "pending_review",
+  "case_file": "multimodal_candidates.jsonl",
+  "candidate_count": 385,
+  "document_count": 8,
+  "detector": "PyMuPDF page.find_tables",
+  "source_root": "data/stock_data/pdf_reports",
+  "note": "记录仅为真实 PDF 表格区域候选，不含人工核验的原始值、预期答案或评测分区；不得用于 release gate 或产品质量结论。"
+}

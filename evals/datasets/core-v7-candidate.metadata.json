@@ -1,0 +1,17 @@
+{
+  "dataset_version": "v7-core-candidate-20260902",
+  "status": "verified",
+  "case_file": "core-v7-candidate.jsonl",
+  "review_packet_file": "core-v7-candidate.review.jsonl",
+  "case_count": 30,
+  "risk_level": "high",
+  "source_evidence_status": "verified",
+  "review_packet_status": "approved",
+  "reviewed_case_count": 30,
+  "coverage": {
+    "categories": ["numeric", "unit", "period", "refusal", "conflict", "tool_trace"],
+    "companies": ["中芯国际", "中国移动", "中国电信", "中国联通"],
+    "periods": ["2023", "2024"]
+  },
+  "note": "A1.4 核心高风险候选集已完成 A1.5 自动核查与 30 条人工签核；来源、摘录、口径和标准答案均已确认，核心样本已提升为 verified。release-full 仍需按受控发布环境和其他 A-GATE 条件执行。"
+}

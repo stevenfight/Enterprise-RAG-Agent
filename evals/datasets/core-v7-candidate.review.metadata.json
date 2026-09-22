@@ -1,0 +1,10 @@
+{
+  "dataset_version": "v7-core-candidate-20260902",
+  "review_packet_file": "core-v7-candidate.review.jsonl",
+  "case_count": 30,
+  "financial_fact_case_count": 22,
+  "behavioral_contract_case_count": 8,
+  "status": "verified",
+  "automated_checks": ["document_exists", "physical_page_range", "excerpt_substring", "answer_alignment", "numeric_tolerance_alignment", "tool_contract_alignment"],
+  "note": "本包已完成自动化证据定位、候选答案核对和 30 条人工签核；状态为 verified，可作为核心集发布准入的证据包。拒答/冲突样本不适用财务 PDF 页码，使用规范或既有测试行为契约。"
+}

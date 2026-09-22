@@ -45,6 +45,7 @@ from langsmith.schemas import Example, Run
 
 # ---- 项目模块导入 ----
 from src.monitoring import is_available, get_client, LANGSMITH_PROJECT
+from src.evaluation import match_expected_keywords
 from src.agent_core import ReActAgent
 from src.agent_memory import AgentMemory
 from src.tools import ToolRegistry
@@ -246,10 +247,9 @@ def answer_completeness_eval(inputs: dict, outputs: dict, reference_outputs: dic
                 "comment": "Agent 未返回答案",
             }
 
-        # 检查关键词命中情况
-        answer_lower = answer.lower()
-        found_keywords = [kw for kw in expected_keywords if kw.lower() in answer_lower]
-        completeness = len(found_keywords) / len(expected_keywords) if expected_keywords else 0
+        # 复用 v7 确定性评估器，避免 LangSmith 与离线评测规则漂移。
+        completeness, found_keywords, _ = match_expected_keywords(expected_keywords, answer)
+        completeness = completeness or 0
 
         return {
             "key": "answer_completeness",
@@ -457,10 +457,9 @@ def run_local_evaluation(test_cases: List[Dict[str, Any]]) -> Dict[str, Any]:
             answer = f"执行错误: {str(e)}"
             result = type("R", (), {"success": False, "total_steps": 0})()
 
-        # 评估: 关键词覆盖率
-        answer_lower = answer.lower()
-        found_keywords = [kw for kw in expected_keywords if kw.lower() in answer_lower]
-        completeness = len(found_keywords) / len(expected_keywords) if expected_keywords else 0
+        # 复用 v7 确定性评估器，避免本地脚本重复实现关键词规则。
+        completeness, found_keywords, _ = match_expected_keywords(expected_keywords, answer)
+        completeness = completeness or 0
 
         # 评估: 成功率
         success = result.success if hasattr(result, "success") else False

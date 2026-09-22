@@ -30,6 +30,14 @@ class EvaluationCase:
     risk_level: str
     review_status: str
     dataset_version: str
+    expected_keywords: list[str] = field(default_factory=list)
+    source_document_id: str | None = None
+    region_id: str | None = None
+    region_type: str | None = None
+    modality: str | None = None
+    dataset_split: str | None = None
+    source_sha256: str | None = None
+    physical_page_number: int | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "EvaluationCase":
@@ -66,11 +74,41 @@ class EvaluationCase:
             not isinstance(page, int) or page < 1 for page in expected_pages
         ):
             raise ValidationError("expected_pages 必须是正整数列表")
+        expected_keywords = raw.get("expected_keywords", [])
+        if not isinstance(expected_keywords, list) or any(
+            not isinstance(keyword, str) or not keyword.strip() for keyword in expected_keywords
+        ):
+            raise ValidationError("expected_keywords 必须是非空字符串列表")
         if behavior == "answer" and (not sources or not expected_pages):
             raise ValidationError("回答样本必须包含来源和页码")
         tolerance = raw["numeric_tolerance"]
         if not isinstance(tolerance, (int, float)) or tolerance < 0:
             raise ValidationError("numeric_tolerance 必须是非负数字")
+        region_values = {
+            key: raw.get(key)
+            for key in ("source_document_id", "region_id", "region_type", "modality", "dataset_split")
+        }
+        has_region_fields = any(value is not None for value in region_values.values())
+        if has_region_fields and any(not isinstance(value, str) or not value.strip() for value in region_values.values()):
+            raise ValidationError("区域级样本必须完整提供文档、区域、模态和数据集分区")
+        if has_region_fields and region_values["dataset_split"] not in {"development", "holdout"}:
+            raise ValidationError("区域级样本 dataset_split 必须为 development 或 holdout")
+        source_sha256 = raw.get("source_sha256")
+        physical_page_number = raw.get("physical_page_number")
+        if has_region_fields and (source_sha256 is None or physical_page_number is None):
+            raise ValidationError("区域级样本必须提供来源 hash 与物理页")
+        if (source_sha256 is None) != (physical_page_number is None):
+            raise ValidationError("来源 hash 与物理页必须同时提供")
+        if source_sha256 is not None and (
+            not isinstance(source_sha256, str)
+            or len(source_sha256) != 64
+            or any(character not in "0123456789abcdef" for character in source_sha256)
+        ):
+            raise ValidationError("source_sha256 必须是小写 SHA-256")
+        if physical_page_number is not None and (
+            type(physical_page_number) is not int or physical_page_number <= 0
+        ):
+            raise ValidationError("physical_page_number 必须为正整数")
         return cls(
             case_id=case_id,
             category=str(raw["category"]),
@@ -86,6 +124,14 @@ class EvaluationCase:
             risk_level=str(raw["risk_level"]),
             review_status=str(raw["review_status"]),
             dataset_version=str(raw["dataset_version"]),
+            expected_keywords=list(expected_keywords),
+            source_document_id=region_values["source_document_id"],
+            region_id=region_values["region_id"],
+            region_type=region_values["region_type"],
+            modality=region_values["modality"],
+            dataset_split=region_values["dataset_split"],
+            source_sha256=source_sha256,
+            physical_page_number=physical_page_number,
         )
 
 

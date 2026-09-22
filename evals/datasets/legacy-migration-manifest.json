@@ -1,0 +1,626 @@
+{
+  "case_count": {
+    "generation": 10,
+    "retrieval": 10
+  },
+  "dataset_version": "legacy-v1-migrated",
+  "generation_criteria": {
+    "gen-001": {
+      "description": "单一事实生成 - 中芯国际营收",
+      "reference_answer": "中芯国际2024年营业收入为577.96亿元（约578亿元），同比增长27.7%，创历史新高。",
+      "should_contain": [
+        "577",
+        "578",
+        "营业收入",
+        "亿元"
+      ]
+    },
+    "gen-002": {
+      "description": "单一事实生成 - 中芯国际产能利用率",
+      "reference_answer": "中芯国际2024年产能利用率为85.6%。",
+      "should_contain": [
+        "85.6",
+        "产能利用率"
+      ]
+    },
+    "gen-003": {
+      "description": "单一事实生成 - 中国移动营收",
+      "reference_answer": "中国移动2024年营业收入达到人民币10,408亿元。",
+      "should_contain": [
+        "10,408",
+        "营业收入",
+        "亿元"
+      ]
+    },
+    "gen-004": {
+      "description": "单一事实生成 - 中国电信净利润",
+      "reference_answer": "中国电信2024年归属于上市公司股东的净利润为人民币330亿元，同比增长8.4%。",
+      "should_contain": [
+        "330",
+        "净利润",
+        "亿元"
+      ]
+    },
+    "gen-005": {
+      "description": "单一事实生成 - 中国联通营收",
+      "reference_answer": "中国联通2024年营业收入达到人民币3,896亿元，同比提升4.6%。",
+      "should_contain": [
+        "3,896",
+        "营业收入",
+        "亿元"
+      ]
+    },
+    "gen-006": {
+      "description": "多指标生成 - 中芯国际毛利率和净利率",
+      "reference_answer": "中芯国际2024年毛利率为18.6%，净利率为9.3%。相比2023年毛利率21.9%和净利率14.1%均有下降。",
+      "should_contain": [
+        "18.6",
+        "9.3",
+        "毛利率",
+        "净利率"
+      ]
+    },
+    "gen-007": {
+      "description": "对比生成 - 中芯国际营收同比增长",
+      "reference_answer": "中芯国际2024年营业收入为577.96亿元，2023年为452.50亿元，同比增长27.7%，增长约125亿元。",
+      "should_contain": [
+        "577",
+        "452",
+        "27.7",
+        "增长"
+      ]
+    },
+    "gen-008": {
+      "description": "跨公司对比生成 - 三大运营商营收",
+      "reference_answer": "2024年三大运营商营业收入分别为：中国移动10,408亿元，中国电信5,236亿元，中国联通3,896亿元。中国移动收入规模最大。",
+      "should_contain": [
+        "10,408",
+        "5,236",
+        "3,896"
+      ]
+    },
+    "gen-009": {
+      "description": "分析生成 - 中芯国际研发投入占比",
+      "reference_answer": "中芯国际2024年研发投入占营业收入的比例为9.4%，相比2023年的11.0%减少了1.6个百分点。",
+      "should_contain": [
+        "9.4",
+        "研发投入",
+        "营业收入"
+      ]
+    },
+    "gen-010": {
+      "description": "分析生成 - 中国联通利润情况",
+      "reference_answer": "中国联通2024年利润总额251亿元，归属于母公司净利润达到人民币90亿元，同比提升10.5%，加权平均净资产收益率提升至5.5%。",
+      "should_contain": [
+        "251",
+        "90",
+        "净利润",
+        "10.5"
+      ]
+    }
+  },
+  "outputs": {
+    "generation": "legacy-generation.jsonl",
+    "retrieval": "legacy-retrieval.jsonl"
+  },
+  "retrieval_criteria": {
+    "ret-001": {
+      "description": "单一事实查询 - 中芯国际营收",
+      "expected_keywords": [
+        "577",
+        "营业收入",
+        "亿元"
+      ],
+      "expected_sources": [
+        "中芯国际2024年年度报告"
+      ]
+    },
+    "ret-002": {
+      "description": "单一事实查询 - 中芯国际产能利用率",
+      "expected_keywords": [
+        "85.6",
+        "产能利用率"
+      ],
+      "expected_sources": [
+        "中芯国际2024年年度报告"
+      ]
+    },
+    "ret-003": {
+      "description": "单一事实查询 - 中国移动营收",
+      "expected_keywords": [
+        "10,408",
+        "营业收入",
+        "亿元"
+      ],
+      "expected_sources": [
+        "移动2024年度报告"
+      ]
+    },
+    "ret-004": {
+      "description": "单一事实查询 - 中国电信净利润",
+      "expected_keywords": [
+        "330",
+        "净利润",
+        "亿元"
+      ],
+      "expected_sources": [
+        "电信2024年度报告"
+      ]
+    },
+    "ret-005": {
+      "description": "单一事实查询 - 中国联通营收",
+      "expected_keywords": [
+        "3,896",
+        "营业收入",
+        "亿元"
+      ],
+      "expected_sources": [
+        "联通2024年度报告"
+      ]
+    },
+    "ret-006": {
+      "description": "财务指标查询 - 中芯国际毛利率",
+      "expected_keywords": [
+        "18.6",
+        "毛利率"
+      ],
+      "expected_sources": [
+        "中芯国际2024年年度报告"
+      ]
+    },
+    "ret-007": {
+      "description": "财务指标查询 - 中芯国际净利润",
+      "expected_keywords": [
+        "36",
+        "净利润",
+        "亿元"
+      ],
+      "expected_sources": [
+        "中芯国际2024年年度报告"
+      ]
+    },
+    "ret-008": {
+      "description": "研究报告检索 - 产能利用率相关研报",
+      "expected_keywords": [
+        "产能利用率",
+        "提升"
+      ],
+      "expected_sources": [
+        "产能利用率",
+        "中芯国际"
+      ]
+    },
+    "ret-009": {
+      "description": "跨公司查询 - 三大运营商营收对比",
+      "expected_keywords": [
+        "10,408",
+        "5,236",
+        "3,896"
+      ],
+      "expected_sources": [
+        "移动2024年度报告",
+        "电信2024年度报告",
+        "联通2024年度报告"
+      ]
+    },
+    "ret-010": {
+      "description": "研究报告检索 - DeepSeek影响分析",
+      "expected_keywords": [
+        "DeepSeek",
+        "代工",
+        "需求"
+      ],
+      "expected_sources": [
+        "华泰证券",
+        "DeepSeek"
+      ]
+    }
+  },
+  "review_note": "所有迁移样本均为 draft；来源页码已基于本地 PDF 只读核对，仍需人工逐条复核后才能进入 release-full。",
+  "source_format": "legacy-generation-retrieval-v1",
+  "source_mapping": {
+    "generation": {
+      "gen-001": {
+        "facts": [
+          {
+            "currency": "CNY",
+            "metric_key": "revenue",
+            "period": "2024",
+            "unit": "亿元",
+            "value": 577.96
+          }
+        ],
+        "sources": [
+          {
+            "pages": [
+              8
+            ],
+            "source_file": "【财报】中芯国际：中芯国际2024年年度报告.pdf"
+          }
+        ]
+      },
+      "gen-002": {
+        "facts": [
+          {
+            "currency": "",
+            "metric_key": "capacity_utilization",
+            "period": "2024",
+            "unit": "%",
+            "value": 85.6
+          }
+        ],
+        "sources": [
+          {
+            "pages": [
+              6
+            ],
+            "source_file": "【财报】中芯国际：中芯国际2024年年度报告.pdf"
+          }
+        ]
+      },
+      "gen-003": {
+        "facts": [
+          {
+            "currency": "CNY",
+            "metric_key": "revenue",
+            "period": "2024",
+            "unit": "亿元",
+            "value": 10408
+          }
+        ],
+        "sources": [
+          {
+            "pages": [
+              12
+            ],
+            "source_file": "移动2024年度报告.pdf"
+          }
+        ]
+      },
+      "gen-004": {
+        "facts": [
+          {
+            "currency": "CNY",
+            "metric_key": "net_profit_attributable_to_parent",
+            "period": "2024",
+            "unit": "亿元",
+            "value": 330
+          }
+        ],
+        "sources": [
+          {
+            "pages": [
+              11
+            ],
+            "source_file": "电信2024年度报告.pdf"
+          }
+        ]
+      },
+      "gen-005": {
+        "facts": [
+          {
+            "currency": "CNY",
+            "metric_key": "revenue",
+            "period": "2024",
+            "unit": "亿元",
+            "value": 3896
+          }
+        ],
+        "sources": [
+          {
+            "pages": [
+              10
+            ],
+            "source_file": "联通2024年度报告.pdf"
+          }
+        ]
+      },
+      "gen-006": {
+        "facts": [
+          {
+            "currency": "",
+            "metric_key": "gross_margin",
+            "period": "2024",
+            "unit": "%",
+            "value": 18.6
+          },
+          {
+            "currency": "",
+            "metric_key": "net_margin",
+            "period": "2024",
+            "unit": "%",
+            "value": 9.3
+          }
+        ],
+        "sources": [
+          {
+            "pages": [
+              9
+            ],
+            "source_file": "【财报】中芯国际：中芯国际2024年年度报告.pdf"
+          }
+        ]
+      },
+      "gen-007": {
+        "facts": [
+          {
+            "currency": "CNY",
+            "metric_key": "revenue",
+            "period": "2024",
+            "unit": "亿元",
+            "value": 577.96
+          },
+          {
+            "currency": "CNY",
+            "metric_key": "revenue",
+            "period": "2023",
+            "unit": "亿元",
+            "value": 452.5
+          },
+          {
+            "currency": "",
+            "metric_key": "revenue_growth",
+            "period": "2024",
+            "unit": "%",
+            "value": 27.7
+          }
+        ],
+        "sources": [
+          {
+            "pages": [
+              8
+            ],
+            "source_file": "【财报】中芯国际：中芯国际2024年年度报告.pdf"
+          }
+        ]
+      },
+      "gen-008": {
+        "companies": [
+          "中国移动",
+          "中国电信",
+          "中国联通"
+        ],
+        "facts": [
+          {
+            "company": "中国移动",
+            "currency": "CNY",
+            "metric_key": "revenue",
+            "period": "2024",
+            "unit": "亿元",
+            "value": 10408
+          },
+          {
+            "company": "中国电信",
+            "currency": "CNY",
+            "metric_key": "revenue",
+            "period": "2024",
+            "unit": "亿元",
+            "value": 5236
+          },
+          {
+            "company": "中国联通",
+            "currency": "CNY",
+            "metric_key": "revenue",
+            "period": "2024",
+            "unit": "亿元",
+            "value": 3896
+          }
+        ],
+        "sources": [
+          {
+            "pages": [
+              12
+            ],
+            "source_file": "移动2024年度报告.pdf"
+          },
+          {
+            "pages": [
+              11
+            ],
+            "source_file": "电信2024年度报告.pdf"
+          },
+          {
+            "pages": [
+              10
+            ],
+            "source_file": "联通2024年度报告.pdf"
+          }
+        ]
+      },
+      "gen-009": {
+        "facts": [
+          {
+            "currency": "",
+            "metric_key": "rd_revenue_ratio",
+            "period": "2024",
+            "unit": "%",
+            "value": 9.4
+          },
+          {
+            "currency": "",
+            "metric_key": "rd_revenue_ratio",
+            "period": "2023",
+            "unit": "%",
+            "value": 11.0
+          }
+        ],
+        "sources": [
+          {
+            "pages": [
+              9
+            ],
+            "source_file": "【财报】中芯国际：中芯国际2024年年度报告.pdf"
+          }
+        ]
+      },
+      "gen-010": {
+        "facts": [
+          {
+            "currency": "CNY",
+            "metric_key": "profit_total",
+            "period": "2024",
+            "unit": "亿元",
+            "value": 251
+          },
+          {
+            "currency": "CNY",
+            "metric_key": "net_profit_attributable_to_parent",
+            "period": "2024",
+            "unit": "亿元",
+            "value": 90
+          },
+          {
+            "currency": "",
+            "metric_key": "net_profit_growth",
+            "period": "2024",
+            "unit": "%",
+            "value": 10.5
+          },
+          {
+            "currency": "",
+            "metric_key": "roe",
+            "period": "2024",
+            "unit": "%",
+            "value": 5.5
+          }
+        ],
+        "sources": [
+          {
+            "pages": [
+              10
+            ],
+            "source_file": "联通2024年度报告.pdf"
+          }
+        ]
+      }
+    },
+    "retrieval": {
+      "ret-001": {
+        "sources": [
+          {
+            "pages": [
+              8
+            ],
+            "source_file": "【财报】中芯国际：中芯国际2024年年度报告.pdf"
+          }
+        ]
+      },
+      "ret-002": {
+        "sources": [
+          {
+            "pages": [
+              6
+            ],
+            "source_file": "【财报】中芯国际：中芯国际2024年年度报告.pdf"
+          }
+        ]
+      },
+      "ret-003": {
+        "sources": [
+          {
+            "pages": [
+              12
+            ],
+            "source_file": "移动2024年度报告.pdf"
+          }
+        ]
+      },
+      "ret-004": {
+        "sources": [
+          {
+            "pages": [
+              11
+            ],
+            "source_file": "电信2024年度报告.pdf"
+          }
+        ]
+      },
+      "ret-005": {
+        "sources": [
+          {
+            "pages": [
+              10
+            ],
+            "source_file": "联通2024年度报告.pdf"
+          }
+        ]
+      },
+      "ret-006": {
+        "sources": [
+          {
+            "pages": [
+              9
+            ],
+            "source_file": "【财报】中芯国际：中芯国际2024年年度报告.pdf"
+          }
+        ]
+      },
+      "ret-007": {
+        "sources": [
+          {
+            "pages": [
+              8
+            ],
+            "source_file": "【财报】中芯国际：中芯国际2024年年度报告.pdf"
+          }
+        ]
+      },
+      "ret-008": {
+        "companies": [
+          "中芯国际"
+        ],
+        "sources": [
+          {
+            "pages": [
+              1
+            ],
+            "source_file": "【东方证券】产能利用率提升，持续推进工艺迭代和产品性能升级.pdf"
+          },
+          {
+            "pages": [
+              1
+            ],
+            "source_file": "【中原证券】产能利用率显著提升，持续推进工艺迭代升级——中芯国际(688981)季报点评.pdf"
+          }
+        ]
+      },
+      "ret-009": {
+        "companies": [
+          "中国移动",
+          "中国电信",
+          "中国联通"
+        ],
+        "sources": [
+          {
+            "pages": [
+              12
+            ],
+            "source_file": "移动2024年度报告.pdf"
+          },
+          {
+            "pages": [
+              11
+            ],
+            "source_file": "电信2024年度报告.pdf"
+          },
+          {
+            "pages": [
+              10
+            ],
+            "source_file": "联通2024年度报告.pdf"
+          }
+        ]
+      },
+      "ret-010": {
+        "sources": [
+          {
+            "pages": [
+              1
+            ],
+            "source_file": "【华泰证券】中芯国际（688981）：上调港股目标价到63港币，看好DeepSeek推动代工需求强劲增长.pdf"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -17,7 +17,15 @@
     "expected_tools": {"type": "array", "items": {"type": "string"}},
     "risk_level": {"type": "string", "enum": ["low", "medium", "high"]},
     "review_status": {"type": "string", "enum": ["draft", "pending_review", "verified"]},
-    "dataset_version": {"type": "string", "minLength": 1}
+    "dataset_version": {"type": "string", "minLength": 1},
+    "expected_keywords": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "source_document_id": {"type": "string", "minLength": 1},
+    "region_id": {"type": "string", "minLength": 1},
+    "region_type": {"type": "string", "minLength": 1},
+    "modality": {"type": "string", "minLength": 1},
+    "dataset_split": {"type": "string", "enum": ["development", "holdout"]},
+    "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "physical_page_number": {"type": "integer", "minimum": 1}
   },
   "additionalProperties": false
 }
