@@ -66,7 +66,7 @@ export default function Sidebar() {
     navigate(key);
   };
 
-  const borderColor = isDark ? '#3A3550' : '#E8E3EF';
+  const borderColor = isDark ? colors.pageBorderDark : colors.pageBorderLight;
 
   return (
     <Sider
@@ -86,7 +86,7 @@ export default function Sidebar() {
         left: 0,
         background: isDark
           ? colors.pageSidebarDark
-          : 'linear-gradient(180deg, #FFF9F5 0%, #F8F4FA 50%, #F5F8FA 100%)',
+          : colors.pageSidebarLight,
       }}
     >
       {/* Logo 区域 - 马卡龙渐变 */}

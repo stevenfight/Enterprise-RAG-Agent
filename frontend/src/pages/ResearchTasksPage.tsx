@@ -379,138 +379,174 @@ export default function ResearchTasksPage() {
         />
 
       <div className="page-stack" role="region" aria-label="研究任务工作台">
-        <Card
-          className="page-card page-toolbar"
-          size="small"
-          title="任务列表"
-          extra={<Button icon={<ReloadOutlined />} aria-label="刷新" onClick={() => void loadTasks()} loading={loading}>刷新</Button>}
-        >
-          {error ? <Alert type="warning" showIcon message={error} /> : null}
-          {canSubmitTask ? <Form form={form} layout="vertical" onFinish={(values) => void submitTask(values)} style={{ marginBottom: 16 }}>
-            <Form.Item label="研究目标" name="objective" rules={[{ required: true, message: '请填写研究目标' }]}><Input aria-label="研究目标" placeholder="例如：核对 2024 年营业收入变化" /></Form.Item>
-            <Form.Item label="研究范围" name="scope" rules={[{ required: true, message: '请填写研究范围' }]}><Input aria-label="研究范围" placeholder="例如：营业收入，净利润" /></Form.Item>
-            <Form.Item label="预算" name="estimated_cost" rules={[{ required: true, message: '请填写预算' }]}><Input aria-label="预算" placeholder="例如：1.00" /></Form.Item>
-            <Button type="primary" htmlType="submit" aria-label="提交研究任务" loading={submittingTask}>提交研究任务</Button>
-          </Form> : <Text type="secondary">仅研究员可提交研究任务。</Text>}
-          {submissionError ? <Alert type="error" showIcon message={submissionError} style={{ marginBottom: 12 }} /> : null}
-          {loading ? (
-            <div className="page-state"><Spin tip="加载研究任务..." /></div>
-          ) : tasks.length === 0 ? (
-            <div className="page-state"><Empty description="当前没有可查看的研究任务" /></div>
-          ) : (
-            <List
-              dataSource={tasks}
-              renderItem={(task) => (
-                <List.Item>
-                  <Button
-                    type="text"
-                    onClick={() => setSelectedTaskId(task.task_id)}
-                    aria-pressed={selectedTaskId === task.task_id}
-                    style={{ width: '100%', height: 'auto', padding: '8px 4px', textAlign: 'left' }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, width: '100%', flexWrap: 'wrap' }}>
-                      <span className="mono">{task.task_id}</span>
-                      <span>{statusTag(task.status)} {task.submission ? submissionTag(task.submission.status) : null} {task.report ? <Tag color="green">有报告 v{task.report.report_version}</Tag> : null} <Text type="secondary">revision {task.revision}</Text></span>
-                    </div>
-                  </Button>
-                </List.Item>
+        <div className="research-task-workbench">
+          <section className="research-task-list-panel" aria-label="任务导航">
+            <Card
+              className="page-card page-toolbar research-task-list-card"
+              size="small"
+              title={`任务列表（${tasks.length}）`}
+              extra={<Button icon={<ReloadOutlined />} aria-label="刷新" onClick={() => void loadTasks()} loading={loading}>刷新</Button>}
+            >
+              {error ? <Alert type="warning" showIcon message={error} /> : null}
+              {canSubmitTask ? <div className="research-task-create">
+                <div className="research-task-create__heading">
+                  <Text strong>提交新研究任务</Text>
+                  <Text type="secondary">提交后进入审批流程，任务状态与报告只显示服务端已保存的结果。</Text>
+                </div>
+                <Form form={form} layout="vertical" onFinish={(values) => void submitTask(values)} className="research-task-form">
+                  <div className="research-task-form__fields">
+                    <Form.Item label="研究目标" name="objective" rules={[{ required: true, message: '请填写研究目标' }]}><Input aria-label="研究目标" placeholder="例如：核对 2024 年营业收入变化" /></Form.Item>
+                    <Form.Item label="研究范围" name="scope" rules={[{ required: true, message: '请填写研究范围' }]}><Input aria-label="研究范围" placeholder="例如：营业收入，净利润" /></Form.Item>
+                    <Form.Item label="预算" name="estimated_cost" rules={[{ required: true, message: '请填写预算' }]}><Input aria-label="预算" placeholder="例如：1.00" /></Form.Item>
+                  </div>
+                  <div className="research-task-form__actions">
+                    <Button type="primary" htmlType="submit" aria-label="提交研究任务" loading={submittingTask}>提交研究任务</Button>
+                  </div>
+                </Form>
+              </div> : <Text type="secondary" className="research-task-permission-hint">仅研究员可提交研究任务。</Text>}
+              {submissionError ? <Alert type="error" showIcon message={submissionError} className="research-task-inline-alert" /> : null}
+              {loading ? (
+                <div className="page-state"><Spin tip="加载研究任务..." /></div>
+              ) : tasks.length === 0 ? (
+                <div className="page-state"><Empty description="当前没有可查看的研究任务" /></div>
+              ) : (
+                <List
+                  className="research-task-list"
+                  dataSource={tasks}
+                  renderItem={(task) => (
+                    <List.Item className={selectedTaskId === task.task_id ? 'research-task-list__item research-task-list__item--selected' : 'research-task-list__item'}>
+                      <Button
+                        type="text"
+                        className="research-task-row"
+                        onClick={() => setSelectedTaskId(task.task_id)}
+                        aria-label={`选择研究任务 ${task.task_id}`}
+                        aria-pressed={selectedTaskId === task.task_id}
+                      >
+                        <span className="research-task-row__content">
+                          <span className="research-task-row__title mono">{task.task_id}</span>
+                          <span className="research-task-row__tags">
+                            {statusTag(task.status)}
+                            {task.submission ? submissionTag(task.submission.status) : null}
+                            {task.report ? <Tag color="green">有报告 v{task.report.report_version}</Tag> : null}
+                          </span>
+                        </span>
+                        <Text type="secondary" className="research-task-row__revision">修订 {task.revision}</Text>
+                      </Button>
+                    </List.Item>
+                  )}
+                />
               )}
-            />
-          )}
-        </Card>
-
-        {selectedTask ? (
-          <>
-            <Card className="page-card" title="任务详情">
-              <Descriptions column={{ xs: 1, sm: 2 }} size="small">
-                <Descriptions.Item label="任务 ID"><span className="mono">{selectedTask.task_id}</span></Descriptions.Item>
-                <Descriptions.Item label="运行状态">{statusTag(selectedTask.status)}</Descriptions.Item>
-                <Descriptions.Item label="运行 ID"><span className="mono">{selectedTask.run_id}</span></Descriptions.Item>
-                <Descriptions.Item label="修订版本">{selectedTask.revision}</Descriptions.Item>
-                <Descriptions.Item label="提交状态">{selectedTask.submission ? submissionTag(selectedTask.submission.status) : '历史任务未登记提交审批'}</Descriptions.Item>
-                {selectedTask.submission ? <Descriptions.Item label="提交人">{selectedTask.submission.requester}</Descriptions.Item> : null}
-                {selectedTask.submission?.reviewer ? <Descriptions.Item label="审批人">{selectedTask.submission.reviewer}</Descriptions.Item> : null}
-              </Descriptions>
-              {canDecideSubmission ? <Space style={{ marginTop: 12 }}><Button type="primary" aria-label="批准并执行" loading={decidingSubmission} onClick={() => void decideSubmission('approve')}>批准并执行</Button><Button danger disabled={decidingSubmission} onClick={() => void decideSubmission('reject')}>驳回任务</Button></Space> : null}
-              {selectedTask.status === 'failed' && identity?.roles.includes('approver') ? <Space style={{ marginTop: 12 }}><Button aria-label="创建重试任务" loading={retryingTask} onClick={() => void retryFailedTask()}>创建重试任务</Button><Text type="secondary">将复制计划并重新提交审批；原失败任务不会改写或自动恢复。</Text></Space> : null}
-              {selectedTask.status === 'running' && identity?.roles.includes('approver') ? <Space direction="vertical" style={{ marginTop: 12, width: '100%' }}><Text strong>遗留运行任务处置</Text><Input.TextArea aria-label="遗留任务处置原因" value={legacyReason} onChange={(event) => setLegacyReason(event.target.value)} maxLength={500} /><Space><Button danger aria-label="标记为失败并保留审计" loading={disposingLegacy} onClick={() => void disposeLegacyTask()} disabled={!legacyReason.trim()}>标记为失败并保留审计</Button><Text type="secondary">仅适用于无执行证据的遗留任务；不会删除、重启或直接改写执行记录。</Text></Space></Space> : null}
             </Card>
+          </section>
 
-            <Card className="page-card" title="执行 DAG" aria-label="执行 DAG">
-              <DagFlow nodes={taskNodes(selectedTask, execution)} edges={[]} height={280} />
-            </Card>
-            <Card className="page-card" title="执行进度" aria-label="执行进度">
-              {executionLoading ? <Spin tip="加载执行进度..." /> : null}
-              {execution ? <Space direction="vertical" size={4}>
-                <Text>已完成步骤：{execution.completed_step_ids.length > 0 ? execution.completed_step_ids.join('、') : '暂无'}</Text>
-                {execution.current_step_id ? <Text>当前步骤：{execution.current_step_id}</Text> : null}
-                {execution.completed_at ? <Text>完成时间：{execution.completed_at}</Text> : null}
-                {execution.failure_reason ? <Alert type="error" showIcon message={`失败原因：${execution.failure_reason}`} /> : null}
-                {execution.step_traces && execution.step_traces.length > 0 ? (
+          {selectedTask ? (
+            <section className="research-task-details" aria-label="任务详情">
+              <Card className="page-card research-task-detail-card" title="任务详情">
+                <Descriptions column={{ xs: 1, sm: 2 }} size="small">
+                  <Descriptions.Item label="任务 ID"><span className="mono">{selectedTask.task_id}</span></Descriptions.Item>
+                  <Descriptions.Item label="运行状态">{statusTag(selectedTask.status)}</Descriptions.Item>
+                  <Descriptions.Item label="运行 ID"><span className="mono">{selectedTask.run_id}</span></Descriptions.Item>
+                  <Descriptions.Item label="修订版本">{selectedTask.revision}</Descriptions.Item>
+                  <Descriptions.Item label="提交状态">{selectedTask.submission ? submissionTag(selectedTask.submission.status) : '历史任务未登记提交审批'}</Descriptions.Item>
+                  {selectedTask.submission ? <Descriptions.Item label="提交人">{selectedTask.submission.requester}</Descriptions.Item> : null}
+                  {selectedTask.submission?.reviewer ? <Descriptions.Item label="审批人">{selectedTask.submission.reviewer}</Descriptions.Item> : null}
+                </Descriptions>
+                {canDecideSubmission ? <Space className="research-task-action-row"><Button type="primary" aria-label="批准并执行" loading={decidingSubmission} onClick={() => void decideSubmission('approve')}>批准并执行</Button><Button danger disabled={decidingSubmission} onClick={() => void decideSubmission('reject')}>驳回任务</Button></Space> : null}
+                {selectedTask.status === 'failed' && identity?.roles.includes('approver') ? <Space className="research-task-action-row"><Button aria-label="创建重试任务" loading={retryingTask} onClick={() => void retryFailedTask()}>创建重试任务</Button><Text type="secondary">将复制计划并重新提交审批；原失败任务不会改写或自动恢复。</Text></Space> : null}
+                {selectedTask.status === 'running' && identity?.roles.includes('approver') ? <Space direction="vertical" className="research-task-legacy-action"><Text strong>遗留运行任务处置</Text><Input.TextArea aria-label="遗留任务处置原因" value={legacyReason} onChange={(event) => setLegacyReason(event.target.value)} maxLength={500} /><Space wrap><Button danger aria-label="标记为失败并保留审计" loading={disposingLegacy} onClick={() => void disposeLegacyTask()} disabled={!legacyReason.trim()}>标记为失败并保留审计</Button><Text type="secondary">仅适用于无执行证据的遗留任务；不会删除、重启或直接改写执行记录。</Text></Space></Space> : null}
+              </Card>
+
+              <div className="research-task-detail-grid research-task-detail-grid--execution">
+                <Card className="page-card" title="执行 DAG" aria-label="执行 DAG">
+                  <DagFlow nodes={taskNodes(selectedTask, execution)} edges={[]} height={280} />
+                </Card>
+                <Card className="page-card" title="执行进度" aria-label="执行进度">
+                  {executionLoading ? <Spin tip="加载执行进度..." /> : null}
+                  {execution ? <Space direction="vertical" size={4}>
+                    <Text>已完成步骤：{execution.completed_step_ids.length > 0 ? execution.completed_step_ids.join('、') : '暂无'}</Text>
+                    {execution.current_step_id ? <Text>当前步骤：{execution.current_step_id}</Text> : null}
+                    {execution.completed_at ? <Text>完成时间：{execution.completed_at}</Text> : null}
+                    {execution.failure_reason ? <Alert type="error" showIcon message={`失败原因：${execution.failure_reason}`} /> : null}
+                    {execution.step_traces && execution.step_traces.length > 0 ? (
+                      <List
+                        size="small"
+                        header={<Text strong>Agent / 工具结果轨迹</Text>}
+                        dataSource={execution.step_traces}
+                        renderItem={(trace) => (
+                          <List.Item>
+                            <Space wrap>
+                              <Text strong>{trace.step_id}</Text>
+                              <Tag>{trace.agent_name}</Tag>
+                              <Text type="secondary">工具：{trace.tool_names.length > 0 ? trace.tool_names.join('、') : '无'}</Text>
+                              <Text type="secondary">结果：{traceSummaryText(trace.result_summary)}</Text>
+                            </Space>
+                          </List.Item>
+                        )}
+                      />
+                    ) : null}
+                  </Space> : null}
+                  {executionError ? <Alert type="warning" showIcon message="无法读取执行进度，请刷新后重试。" /> : null}
+                </Card>
+              </div>
+
+              <Card className="page-card" title="报告详情" aria-label="报告详情">
+                {reportLoading ? <Spin tip="加载持久化报告..." /> : null}
+                {report ? (
                   <List
-                    size="small"
-                    header={<Text strong>Agent / 工具结果轨迹</Text>}
-                    dataSource={execution.step_traces}
-                    renderItem={(trace) => (
+                    header={<Text type="secondary">报告版本 {report.report_version} · 审核状态 {report.review_status}</Text>}
+                    dataSource={report.claims}
+                    locale={{ emptyText: '该报告未包含可展示的声明' }}
+                    renderItem={(claim) => (
                       <List.Item>
-                        <Space wrap>
-                          <Text strong>{trace.step_id}</Text>
-                          <Tag>{trace.agent_name}</Tag>
-                          <Text type="secondary">工具：{trace.tool_names.length > 0 ? trace.tool_names.join('、') : '无'}</Text>
-                          <Text type="secondary">结果：{traceSummaryText(trace.result_summary)}</Text>
-                        </Space>
+                        <div>
+                          <Text strong>{claim.text}</Text>
+                          <div><Text type="secondary">声明 ID：{claim.claim_id}</Text></div>
+                          {claim.fact_ids.map((factId) => <div key={factId}><Text type="secondary">事实：{factId}</Text></div>)}
+                          {claim.calculation_ids.map((calculationId) => <div key={calculationId}><Text type="secondary">计算：{calculationId}</Text></div>)}
+                          {claim.source_ids.map((sourceId) => <div key={sourceId}><Text type="secondary">来源：{sourceId}</Text></div>)}
+                          {claim.analysis_label ? <div><Text type="secondary">分析判断：{claim.analysis_label}</Text></div> : null}
+                        </div>
                       </List.Item>
                     )}
                   />
                 ) : null}
-              </Space> : null}
-              {executionError ? <Alert type="warning" showIcon message="无法读取执行进度，请刷新后重试。" /> : null}
-            </Card>
-            <Card className="page-card" title="报告详情" aria-label="报告详情">
-              {reportLoading ? <Spin tip="加载持久化报告..." /> : null}
-              {report ? (
-                <List
-                  header={<Text type="secondary">报告版本 {report.report_version} · 审核状态 {report.review_status}</Text>}
-                  dataSource={report.claims}
-                  locale={{ emptyText: '该报告未包含可展示的声明' }}
-                  renderItem={(claim) => (
-                    <List.Item>
-                      <div>
-                        <Text strong>{claim.text}</Text>
-                        <div><Text type="secondary">声明 ID：{claim.claim_id}</Text></div>
-                        {claim.fact_ids.map((factId) => <div key={factId}><Text type="secondary">事实：{factId}</Text></div>)}
-                        {claim.calculation_ids.map((calculationId) => <div key={calculationId}><Text type="secondary">计算：{calculationId}</Text></div>)}
-                        {claim.source_ids.map((sourceId) => <div key={sourceId}><Text type="secondary">来源：{sourceId}</Text></div>)}
-                        {claim.analysis_label ? <div><Text type="secondary">分析判断：{claim.analysis_label}</Text></div> : null}
-                      </div>
-                    </List.Item>
-                  )}
-                />
-              ) : null}
-              {reportMissing ? <Empty description="该任务尚未生成可查看的持久化报告" /> : null}
-              {report ? <div style={{ marginTop: 12 }}>
-                {reportSignoffLoading ? <Spin size="small" /> : null}
-                {reportSignoff ? <Space wrap><Tag color="success">已正式签发</Tag><Text type="secondary">签发人：{reportSignoff.actor} · {reportSignoff.signed_at}</Text></Space> : null}
-                {!reportSignoff && !reportSignoffLoading && canSignoffReport ? <Button type="primary" aria-label="正式签发报告" loading={signingReport} onClick={() => void signoffReport()}>正式签发报告</Button> : null}
-                {!reportSignoff && !reportSignoffLoading && !canSignoffReport ? <Text type="secondary">正式签发仅对审批人开放。</Text> : null}
-                {reportSignoffError ? <Alert type="error" showIcon message={reportSignoffError} style={{ marginTop: 12 }} /> : null}
-              </div> : null}
-            </Card>
-            <Card className="page-card" title="关键冲突" aria-label="关键冲突">
-              {conflictActionError ? <Alert type="error" showIcon message={conflictActionError} style={{ marginBottom: 12 }} /> : null}
-              {conflicts.length === 0 ? <Empty description="该任务当前没有可信上下文登记的关键冲突" /> : <List dataSource={conflicts} renderItem={(conflict) => (
-                <List.Item><div><Text strong>{conflict.conflict_id}</Text><div><Text type="secondary">事实：{conflict.fact_ids.join('、')}</Text></div><div><Text type="secondary">冲突类型：{conflict.conflict_type}</Text></div>{(reviews[conflict.conflict_id] ?? []).map((review) => <div key={review.review_id}><Text type="secondary">{review.action === 'approve' ? '批准' : review.action === 'reject' ? '驳回' : '保持未决'}</Text></div>)}{canResolveConflicts ? <Space size={8} style={{ marginTop: 8 }}><Button size="small" type="primary" aria-label={`批准 ${conflict.conflict_id}`} loading={resolvingConflictId === conflict.conflict_id} onClick={() => void resolveConflict(conflict, 'approve')}>批准</Button><Button size="small" danger aria-label={`驳回 ${conflict.conflict_id}`} disabled={Boolean(resolvingConflictId)} onClick={() => void resolveConflict(conflict, 'reject')}>驳回</Button><Button size="small" aria-label={`保持未决 ${conflict.conflict_id}`} disabled={Boolean(resolvingConflictId)} onClick={() => void resolveConflict(conflict, 'keep_pending')}>保持未决</Button></Space> : null}</div></List.Item>
-              )} />}
-              <Text type="secondary">{canResolveConflicts ? '裁决授权、依赖绑定和审批消费均由服务端当前会话处理。' : '仅审批人可提交裁决。'}</Text>
-            </Card>
-            <Card className="page-card" title="报告证据" aria-label="报告证据">
-              <EvidenceContent sources={[]} />
-            </Card>
-            <Card className="page-card" title="报告图表" aria-label="报告图表">
-              <ChartContainer data={EMPTY_REPORT_CHART} height={260} />
-            </Card>
-          </>
-        ) : null}
+                {reportMissing ? <Empty description="该任务尚未生成可查看的持久化报告" /> : null}
+                {report ? <div className="research-task-report-signoff">
+                  {reportSignoffLoading ? <Spin size="small" /> : null}
+                  {reportSignoff ? <Space wrap><Tag color="success">已正式签发</Tag><Text type="secondary">签发人：{reportSignoff.actor} · {reportSignoff.signed_at}</Text></Space> : null}
+                  {!reportSignoff && !reportSignoffLoading && canSignoffReport ? <Button type="primary" aria-label="正式签发报告" loading={signingReport} onClick={() => void signoffReport()}>正式签发报告</Button> : null}
+                  {!reportSignoff && !reportSignoffLoading && !canSignoffReport ? <Text type="secondary">正式签发仅对审批人开放。</Text> : null}
+                  {reportSignoffError ? <Alert type="error" showIcon message={reportSignoffError} className="research-task-inline-alert" /> : null}
+                </div> : null}
+              </Card>
+
+              <Card className="page-card" title="关键冲突" aria-label="关键冲突">
+                {conflictActionError ? <Alert type="error" showIcon message={conflictActionError} className="research-task-inline-alert" /> : null}
+                {conflicts.length === 0 ? <Empty description="该任务当前没有可信上下文登记的关键冲突" /> : <List dataSource={conflicts} renderItem={(conflict) => (
+                  <List.Item><div><Text strong>{conflict.conflict_id}</Text><div><Text type="secondary">事实：{conflict.fact_ids.join('、')}</Text></div><div><Text type="secondary">冲突类型：{conflict.conflict_type}</Text></div>{(reviews[conflict.conflict_id] ?? []).map((review) => <div key={review.review_id}><Text type="secondary">{review.action === 'approve' ? '批准' : review.action === 'reject' ? '驳回' : '保持未决'}</Text></div>)}{canResolveConflicts ? <Space size={8} wrap className="research-task-conflict-actions"><Button size="small" type="primary" aria-label={`批准 ${conflict.conflict_id}`} loading={resolvingConflictId === conflict.conflict_id} onClick={() => void resolveConflict(conflict, 'approve')}>批准</Button><Button size="small" danger aria-label={`驳回 ${conflict.conflict_id}`} disabled={Boolean(resolvingConflictId)} onClick={() => void resolveConflict(conflict, 'reject')}>驳回</Button><Button size="small" aria-label={`保持未决 ${conflict.conflict_id}`} disabled={Boolean(resolvingConflictId)} onClick={() => void resolveConflict(conflict, 'keep_pending')}>保持未决</Button></Space> : null}</div></List.Item>
+                )} />}
+                <Text type="secondary">{canResolveConflicts ? '裁决授权、依赖绑定和审批消费均由服务端当前会话处理。' : '仅审批人可提交裁决。'}</Text>
+              </Card>
+
+              <div className="research-task-detail-grid research-task-detail-grid--artifacts">
+                <Card className="page-card" title="报告证据" aria-label="报告证据">
+                  <Text type="secondary" className="research-task-supporting-copy">仅展示服务端已持久化的证据内容。</Text>
+                  <EvidenceContent sources={[]} />
+                </Card>
+                <Card className="page-card" title="报告图表" aria-label="报告图表">
+                  <Text type="secondary" className="research-task-supporting-copy">仅展示服务端已持久化的图表内容。</Text>
+                  <ChartContainer data={EMPTY_REPORT_CHART} height={260} />
+                </Card>
+              </div>
+            </section>
+          ) : (
+            <section className="research-task-details research-task-details--empty" aria-label="任务详情">
+              <Card className="page-card research-task-detail-empty" title="任务详情">
+                <Empty description="任务详情将在加载或选择任务后显示" />
+              </Card>
+            </section>
+          )}
+        </div>
       </div>
       </main>
     </PageShell>

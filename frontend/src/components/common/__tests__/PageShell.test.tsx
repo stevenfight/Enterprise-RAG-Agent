@@ -16,6 +16,12 @@ describe('PageShell', () => {
     expect(screen.getByText('页面内容')).toBeInTheDocument();
   });
 
+  it('FWC-T03: 页面容器保留跨页面的唯一布局语义', () => {
+    render(<PageShell>页面内容</PageShell>);
+
+    expect(screen.getByTestId('page-shell')).toHaveClass('page-shell');
+  });
+
   it('渲染统一标题、描述和图标', () => {
     render(
       <PageHeader

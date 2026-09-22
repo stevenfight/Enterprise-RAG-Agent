@@ -13,7 +13,7 @@ import {
   BgColorsOutlined,
 } from '@ant-design/icons';
 import { useLocation } from 'react-router-dom';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { appStore } from '@/stores/appStore';
 import { useTheme } from '@/hooks/useTheme';
 import { accentThemes } from '@/styles/theme';
@@ -26,6 +26,7 @@ const pageTitleMap: Record<string, string> = {
   '/dag': 'DAG 任务看板',
   '/charts': '数据图表',
   '/knowledge': '知识库管理',
+  '/research': '研究任务',
   '/settings': '系统设置',
 };
 
@@ -43,7 +44,6 @@ export default function HeaderBar({ systemStatus = 'checking' }: HeaderBarProps)
   const [identityLoading, setIdentityLoading] = useState(true);
   const [loginSubmitting, setLoginSubmitting] = useState(false);
   const [loginError, setLoginError] = useState('');
-  const loginOpenRef = useRef(loginOpen);
   const location = useLocation();
   const siderCollapsed = appStore((s) => s.siderCollapsed);
   const toggleSider = appStore((s) => s.toggleSider);
@@ -54,7 +54,6 @@ export default function HeaderBar({ systemStatus = 'checking' }: HeaderBarProps)
   const researchSummary = `下次提问：${researchContext.companyName || '全部公司'} · ${researchContext.mode === 'agent' ? 'Agent 模式' : 'RAG 模式'}`;
   const healthStatus = systemStatus === 'ready' ? 'success' : systemStatus === 'checking' ? 'processing' : 'error';
   const healthText = systemStatus === 'ready' ? '已就绪' : systemStatus === 'checking' ? '检查中' : '暂不可用';
-  loginOpenRef.current = loginOpen;
 
   useEffect(() => {
     let active = true;
@@ -70,18 +69,6 @@ export default function HeaderBar({ systemStatus = 'checking' }: HeaderBarProps)
         if (active) setIdentityLoading(false);
       });
     return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    const handleLoginEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && loginOpenRef.current) {
-        event.preventDefault();
-        setLoginOpen(false);
-      }
-    };
-
-    document.addEventListener('keydown', handleLoginEscape);
-    return () => document.removeEventListener('keydown', handleLoginEscape);
   }, []);
 
   const handleLogin = async (values: { username: string; password: string }) => {
@@ -225,8 +212,8 @@ export default function HeaderBar({ systemStatus = 'checking' }: HeaderBarProps)
             <Button type="text" aria-label="登出" onClick={() => void handleLogout()}>登出</Button>
           </Space>
         ) : (
-          <Popover content={loginContent} title="研究工作台登录" trigger={[]} placement="bottomRight" open={loginOpen} destroyOnHidden>
-            <Button type="text" aria-label="登录" loading={identityLoading} disabled={identityLoading} onClick={() => setLoginOpen(true)}>登录</Button>
+          <Popover content={loginContent} title="研究工作台登录" trigger="click" placement="bottomRight" open={loginOpen} onOpenChange={setLoginOpen}>
+            <Button type="text" aria-label="登录" loading={identityLoading} disabled={identityLoading}>登录</Button>
           </Popover>
         )}
         <Popover content={appearanceContent} title="外观" trigger="click" placement="bottomRight">

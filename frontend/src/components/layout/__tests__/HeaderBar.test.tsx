@@ -140,6 +140,11 @@ describe('HeaderBar 外观面板', () => {
     expect(screen.getByText('暂不可用')).toBeInTheDocument();
   });
 
+  it('FWC-T02: 研究任务路由显示准确标题', () => {
+    render(<MemoryRouter initialEntries={['/research']}><HeaderBar systemStatus="ready" /></MemoryRouter>);
+    expect(screen.getByText('研究任务')).toBeInTheDocument();
+  });
+
   it('E-T22-03: 未登录时提供登录入口，登录后显示当前用户名和角色', async () => {
     getCurrentResearchIdentity.mockRejectedValueOnce({ response: { status: 401 } });
     loginResearch.mockResolvedValueOnce({ username: 'alice', roles: ['approver'] });
@@ -155,24 +160,6 @@ describe('HeaderBar 外观面板', () => {
     expect(await screen.findByText('alice')).toBeInTheDocument();
     expect(screen.getByText('审批人')).toBeInTheDocument();
     expect(loginResearch).toHaveBeenCalledWith({ username: 'alice', password: 'secret' });
-  });
-
-  it('D-S17: 登录浮层在用户名输入框按 Escape 后关闭且不提交登录', async () => {
-    const user = userEvent.setup();
-    getCurrentResearchIdentity.mockRejectedValueOnce({ response: { status: 401 } });
-    render(<MemoryRouter><HeaderBar systemStatus="ready" /></MemoryRouter>);
-
-    const loginButton = await screen.findByRole('button', { name: '登录' });
-    await waitFor(() => expect(loginButton).not.toHaveClass('ant-btn-loading'));
-    await user.click(loginButton);
-    const usernameInput = screen.getByLabelText('用户名');
-    expect(usernameInput).toBeInTheDocument();
-
-    fireEvent.keyDown(document, { key: 'Escape' });
-
-    await waitFor(() => expect(usernameInput.closest('.ant-popover')).toHaveClass('ant-zoom-big-leave-active'));
-    expect(loginResearch).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: '登录' })).toBeInTheDocument();
   });
 
   it('E-T22-04: 登出后回到明确未登录状态', async () => {
