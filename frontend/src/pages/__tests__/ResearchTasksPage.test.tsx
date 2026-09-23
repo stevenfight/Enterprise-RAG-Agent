@@ -2,7 +2,7 @@
 /** E1.3 研究任务页的 RED→GREEN 契约。 */
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listResearchTasks = vi.hoisted(() => vi.fn());
 const getResearchTaskReport = vi.hoisted(() => vi.fn());
@@ -29,6 +29,10 @@ vi.mock('@/components/charts/ChartContainer', () => ({ default: () => <div data-
 import ResearchTasksPage from '@/pages/ResearchTasksPage';
 
 describe('ResearchTasksPage', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(() => {
     vi.resetAllMocks();
     getResearchTaskReport.mockRejectedValue({ response: { status: 404 } });
@@ -267,6 +271,37 @@ describe('ResearchTasksPage', () => {
     await user.click(screen.getByRole('button', { name: '批准并执行' }));
     expect(approveResearchTaskSubmission).toHaveBeenCalledWith('task-submitted', expect.objectContaining({ expected_revision: 0 }));
   }, 15000);
+
+  it('RTH-T01: 公共 HTTP 环境缺少 crypto.randomUUID 时仍可提交任务', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('crypto', {});
+    listResearchTasks.mockResolvedValue([]);
+    getCurrentResearchIdentity.mockResolvedValueOnce({ user_id: 'user-1', username: 'alice', roles: ['researcher'] });
+    createResearchTask.mockResolvedValueOnce({ task_id: 'task-http', run_id: 'research:task-http', status: 'pending', revision: 0, dag_step_ids: ['plan', 'retrieve', 'review', 'report'] });
+
+    render(<ResearchTasksPage />);
+    await user.type(await screen.findByRole('textbox', { name: '研究目标' }), '核对收入变化');
+    await user.type(screen.getByRole('textbox', { name: '研究范围' }), '营业收入');
+    await user.type(screen.getByRole('textbox', { name: '预算' }), '1.00');
+    await user.click(screen.getByRole('button', { name: '提交研究任务' }));
+
+    expect(createResearchTask).toHaveBeenCalledWith(expect.objectContaining({ task_id: expect.stringMatching(/^research-task-/) }));
+  });
+
+  it('RTH-T02: 展示服务端返回的任务提交失败原因', async () => {
+    const user = userEvent.setup();
+    listResearchTasks.mockResolvedValue([]);
+    getCurrentResearchIdentity.mockResolvedValueOnce({ user_id: 'user-1', username: 'alice', roles: ['researcher'] });
+    createResearchTask.mockRejectedValueOnce({ response: { data: { detail: { message: '计划必须同时提供 objective、scope 和 estimated_cost' } } } });
+
+    render(<ResearchTasksPage />);
+    await user.type(await screen.findByRole('textbox', { name: '研究目标' }), '核对收入变化');
+    await user.type(screen.getByRole('textbox', { name: '研究范围' }), '营业收入');
+    await user.type(screen.getByRole('textbox', { name: '预算' }), '1.00');
+    await user.click(screen.getByRole('button', { name: '提交研究任务' }));
+
+    expect(await screen.findByText('任务未提交：计划必须同时提供 objective、scope 和 estimated_cost')).toBeInTheDocument();
+  });
 
   it('E-T23.1: approver 驳回冲突时不提交事实选择', async () => {
     listResearchTasks.mockResolvedValue([{ task_id: 'task-reject', run_id: 'research:task-reject', status: 'completed', revision: 3, dag_step_ids: [] }]);
