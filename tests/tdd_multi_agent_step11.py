@@ -57,12 +57,12 @@ class TestPageNumberFormatting(unittest.TestCase):
         self.assertEqual(self._format([]), "页码未知")
 
     def test_a02_single_page(self):
-        """TC-11-A-02: 单页 → 第23页"""
-        self.assertEqual(self._format([23]), "第23页")
+        """TC-11-A-02: 单页 → PDF物理第23页（step14 起物理页码带前缀）"""
+        self.assertEqual(self._format([23]), "PDF物理第23页")
 
     def test_a03_multiple_pages(self):
-        """TC-11-A-03: 多页区间 → 第23-25页"""
-        self.assertEqual(self._format([23, 24, 25]), "第23-25页")
+        """TC-11-A-03: 多页区间 → PDF物理第23-25页（step14 起物理页码带前缀）"""
+        self.assertEqual(self._format([23, 24, 25]), "PDF物理第23-25页")
 
 
 class TestPromptPageRule(unittest.TestCase):

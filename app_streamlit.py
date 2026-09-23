@@ -445,7 +445,8 @@ def _run_agent_query(prompt):
         "agent_mode": True,
         "reasoning_chain": [
             {
-                "step_number": s["step_number"],
+                # 兼容 agent_core 步骤结构：字段名为 step
+                "step_number": s.get("step", "?"),
                 "thought": s.get("thought", ""),
                 "action": s.get("action", "?"),
                 "observation": s.get("observation", "")[:300],
