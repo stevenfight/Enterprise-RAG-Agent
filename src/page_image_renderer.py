@@ -97,12 +97,15 @@ class PageImageRenderer:
     @staticmethod
     def _save_pixmap_atomic(pixmap: fitz.Pixmap, output_path: Path) -> None:
         """写入后原子替换页图，避免读取端看到半张 PNG。"""
-        temporary_path = output_path.with_name(
-            f"{output_path.stem}.{uuid.uuid4().hex}.writing{output_path.suffix}"
-        )
+        temporary_path = PageImageRenderer._temporary_path(output_path)
         try:
             pixmap.save(temporary_path)
             os.replace(temporary_path, output_path)
         finally:
             if temporary_path.exists():
                 temporary_path.unlink()
+
+    @staticmethod
+    def _temporary_path(output_path: Path) -> Path:
+        """生成短临时 PNG 路径，避免深目录下超过 Windows 文件路径限制。"""
+        return output_path.with_name(f".{uuid.uuid4().hex}{output_path.suffix}")
