@@ -16,6 +16,7 @@
 
 import sys
 import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 # ============================================================
@@ -110,7 +111,7 @@ except ImportError:
     pass
 
 try:
-    from tools.verify_tool import VerifyTool
+    from src.tools.verify_tool import VerifyTool
     _VERIFY_TOOL_AVAILABLE = True
 except ImportError:
     pass
@@ -294,7 +295,7 @@ print("\n--- TC-T10: 数据与来源一致 ---")
 def test_t10():
     if not _VERIFY_TOOL_AVAILABLE:
         return False, ""
-    from tools.verify_tool import VerifyTool
+    from src.tools.verify_tool import VerifyTool
     tool = VerifyTool.__new__(VerifyTool)
     has_run = hasattr(tool, 'run') and callable(getattr(tool, 'run', None))
     has_name = hasattr(tool, 'name')
