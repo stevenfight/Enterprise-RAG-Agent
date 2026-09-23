@@ -1,5 +1,6 @@
 """v7 文档版本与内容寻址 blob 的确定性测试。"""
 
+import os
 from pathlib import Path
 
 
@@ -91,3 +92,32 @@ def test_document_repository_rejects_unsafe_windows_display_filenames(tmp_path: 
                 file_content=b"%PDF-1.7\ncontent",
                 physical_page_count=1,
             )
+
+
+def test_shared_blob_is_only_physically_reclaimed_after_last_reference_and_retention(
+    tmp_path: Path,
+):
+    repository = _repository(tmp_path)
+    first = repository.register_document_version(
+        logical_document_key="company-a", display_name="公司 A", original_filename="a.pdf",
+        file_content=b"%PDF-1.7\nshared", physical_page_count=1,
+    )
+    second = repository.register_document_version(
+        logical_document_key="company-b", display_name="公司 B", original_filename="b.pdf",
+        file_content=b"%PDF-1.7\nshared", physical_page_count=1,
+    )
+
+    with repository.store.connect() as connection:
+        connection.execute("DELETE FROM v7_document_versions WHERE document_version_id = ?", (first.document_version_id,))
+        connection.commit()
+    os.utime(second.blob_path, (1, 1))
+    assert repository.blob_reference_count(second.blob_sha256) == 1
+    assert repository.reclaim_blob_if_eligible(second.blob_sha256, retention_seconds=10, now=100) is False
+    assert second.blob_path.exists()
+
+    with repository.store.connect() as connection:
+        connection.execute("DELETE FROM v7_document_versions WHERE document_version_id = ?", (second.document_version_id,))
+        connection.commit()
+    assert repository.reclaim_blob_if_eligible(second.blob_sha256, retention_seconds=10, now=100) is True
+    assert not second.blob_path.exists()
+    assert repository.count_blobs() == 0

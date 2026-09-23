@@ -35,6 +35,16 @@ def test_upload_pdf_is_atomic_and_enters_pending_index(isolated_pdf_store):
     assert not list(isolated_pdf_store.glob("*.uploading"))
 
 
+def test_manifest_indexed_status_sets_document_indexed_flag(isolated_pdf_store):
+    uploaded = upload_pdf(b"%PDF-1.7\\nmanifest-indexed", "清单已索引.pdf")
+    assert mark_pdf_indexed("清单已索引.pdf", uploaded["sha256"], "generation-1") is True
+
+    document = get_documents()[0]
+
+    assert document["index_status"] == "indexed"
+    assert document["indexed"] is True
+
+
 def test_same_pdf_upload_is_idempotent(isolated_pdf_store):
     first = upload_pdf(b"%PDF-1.7\nsame", "同一报告.pdf")
     second = upload_pdf(b"%PDF-1.7\nsame", "同一报告.pdf")

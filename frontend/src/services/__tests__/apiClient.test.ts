@@ -16,6 +16,8 @@ import apiClient from '@/services/api';
 import { getCharts } from '@/services/chartService';
 import { getAgentPlan } from '@/services/dagService';
 import { checkHealth } from '@/services/chatService';
+import { getVisualArtifactImage } from '@/services/visualArtifactService';
+import { getResearchTaskReport } from '@/services/researchTaskService';
 
 const mockGet = apiClient.get as ReturnType<typeof vi.fn>;
 
@@ -38,5 +40,33 @@ describe('服务层统一 apiClient', () => {
     const health = await checkHealth();
     expect(mockGet).toHaveBeenCalledWith('/api/health');
     expect(health.status).toBe('ok');
+  });
+
+  it('M1.7: 页图读取复用 apiClient 鉴权链并只传制品标识', async () => {
+    const image = new Blob(['page-image']);
+    mockGet.mockResolvedValueOnce({ data: image });
+
+    const result = await getVisualArtifactImage({
+      manifest_id: 'manifest-1',
+      page_artifact_id: 'artifact-1',
+      visual_region_id: 'region-1',
+      normalized_bbox: [0.1, 0.2, 0.8, 0.9],
+      artifact_status: 'complete',
+    });
+
+    expect(mockGet).toHaveBeenCalledWith(
+      '/api/artifacts/manifests/manifest-1/pages/artifact-1/image',
+      { responseType: 'blob' },
+    );
+    expect(result).toBe(image);
+  });
+
+  it('E-T14: 报告详情通过 apiClient 请求任务最新报告', async () => {
+    mockGet.mockResolvedValueOnce({ data: { report_id: 'report-a', claims: [] } });
+
+    const report = await getResearchTaskReport('task-a');
+
+    expect(mockGet).toHaveBeenCalledWith('/api/research/tasks/task-a/report');
+    expect(report.report_id).toBe('report-a');
   });
 });

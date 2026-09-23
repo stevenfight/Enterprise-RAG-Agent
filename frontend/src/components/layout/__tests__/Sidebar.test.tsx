@@ -48,4 +48,16 @@ describe('Sidebar', () => {
 
     expect(screen.getByTestId('location-path')).toHaveTextContent('/research');
   });
+
+  it('FWC-T05: 亮色侧栏使用中性主题表面而非装饰性渐变', () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Sidebar />
+      </MemoryRouter>,
+    );
+
+    const sider = screen.getByRole('menu').closest('.ant-layout-sider');
+    expect(sider?.getAttribute('style')).toContain('background: rgb(255, 255, 255)');
+    expect(sider?.getAttribute('style')).not.toContain('linear-gradient');
+  });
 });

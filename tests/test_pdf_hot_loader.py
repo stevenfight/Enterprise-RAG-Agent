@@ -1,13 +1,20 @@
 """增量 PDF 处理 worker 的状态推进测试。"""
 
 from pathlib import Path
+import sqlite3
 import threading
 
 import pytest
 
 import src.knowledge_service as knowledge_service
 from src.knowledge_service import upload_pdf, get_documents
-from src.pdf_hot_loader import HotLoadRunResult, PdfHotLoadScheduler, PdfHotLoadWorker
+from src.pdf_hot_loader import (
+    HotLoadRunResult,
+    NonRetryablePdfProcessingError,
+    PdfHotLoadScheduler,
+    PdfHotLoadWorker,
+    classify_pdf_processing_error,
+)
 
 
 @pytest.fixture
@@ -86,6 +93,63 @@ def test_worker_stops_automatic_retries_after_max_attempts(isolated_pdf_store):
     assert len(calls) == 2
     assert get_documents()[0]["index_status"] == "index_failed"
     assert get_documents()[0]["index_attempts"] == 2
+
+
+def test_worker_records_stable_non_retryable_failure_and_never_marks_indexed(isolated_pdf_store):
+    """确定性输入错误只记录一次，不得被伪装成已完成索引。"""
+    upload_pdf(b"%PDF-1.7\ninvalid-result", "不可重试.pdf")
+    calls = []
+
+    def parse_document(_path, _document):
+        calls.append(True)
+        raise NonRetryablePdfProcessingError("invalid_pdf", "PDF 页面结构无效")
+
+    worker = PdfHotLoadWorker(parse_document, lambda _document, _parsed: "unused", max_attempts=3)
+
+    assert worker.run_once() == HotLoadRunResult(discovered=1, processed=0, failed=1)
+    assert worker.run_once() == HotLoadRunResult(discovered=0, processed=0, failed=0)
+    assert calls == [True]
+    document = get_documents()[0]
+    assert document["index_status"] == "index_failed"
+    assert document["index_generation"] is None
+    manifest_document = knowledge_service._read_manifest()["documents"]["不可重试.pdf"]
+    assert manifest_document["index_error_category"] == "invalid_pdf"
+    assert manifest_document["index_retryable"] is False
+
+
+def test_worker_classifies_disk_failures_as_retryable_without_completing(isolated_pdf_store):
+    """磁盘类暂态错误可有限重试，但任一次都不写入完成 generation。"""
+    upload_pdf(b"%PDF-1.7\ndisk-error", "磁盘异常.pdf")
+
+    def parse_document(_path, _document):
+        raise OSError("磁盘暂时不可用")
+
+    worker = PdfHotLoadWorker(parse_document, lambda _document, _parsed: "unused", max_attempts=2)
+
+    assert worker.run_once().failed == 1
+    document = get_documents()[0]
+    assert document["index_status"] == "index_failed"
+    assert document["index_generation"] is None
+    manifest_document = knowledge_service._read_manifest()["documents"]["磁盘异常.pdf"]
+    assert manifest_document["index_error_category"] == "disk_io"
+    assert manifest_document["index_retryable"] is True
+
+
+@pytest.mark.parametrize(
+    ("error", "stage", "category"),
+    [
+        (OSError("磁盘异常"), "disk", "disk_io"),
+        (sqlite3.OperationalError("数据库锁定"), "state", "database"),
+        (RuntimeError("解析器失败"), "parse", "parse_error"),
+        (RuntimeError("索引器失败"), "index", "index_error"),
+    ],
+)
+def test_error_classification_is_stable_by_failure_boundary(error, stage, category):
+    """分类以受控异常类型和阶段为准，不依赖可能变化的错误文案。"""
+    classification = classify_pdf_processing_error(error, stage)
+
+    assert classification.category == category
+    assert classification.retryable is True
 
 
 def test_scheduler_start_and_stop_are_explicit_and_idempotent():
@@ -452,3 +516,81 @@ def test_api_hot_load_config_creates_pipeline_only_when_indexing_enabled(monkeyp
     assert api_service.pdf_hot_load_pipeline.vector_dir == api_service.vector_db_dir
     api_service._close_pdf_hot_load_resources(scheduler)
     assert closed == [True]
+
+
+def test_page_artifact_cleanup_worker_removes_only_deleting_page_files_and_is_idempotent(
+    tmp_path: Path,
+):
+    """页图恢复 worker 只清理目标根目录内的 PNG 残留，并可重复执行。"""
+    from src.pdf_hot_loader import PageArtifactCleanupWorker
+
+    artifact_root = tmp_path / "page-images"
+    pending = artifact_root / "document-1" / "page-1.png.deleting"
+    pending.parent.mkdir(parents=True)
+    pending.write_bytes(b"pending")
+    (artifact_root / "document-1" / "notes.txt.deleting").write_text(
+        "keep", encoding="utf-8"
+    )
+    outside = tmp_path / "outside.png.deleting"
+    outside.write_bytes(b"keep")
+
+    worker = PageArtifactCleanupWorker(artifact_root)
+
+    assert worker.run_once() == (pending,)
+    assert not pending.exists()
+    assert (artifact_root / "document-1" / "notes.txt.deleting").exists()
+    assert outside.exists()
+    assert worker.run_once() == ()
+
+
+def test_api_multimodal_config_creates_page_cleanup_scheduler_only_when_enabled(
+    monkeypatch, tmp_path: Path
+):
+    """多模态关闭不创建恢复调度器，开启时复用显式页图根目录。"""
+    import src.api_service as api_service
+    from src.v7_feature_flags import V7FeatureFlags
+
+    scheduler_calls = []
+    worker_roots = []
+    stopped = []
+
+    class FakeWorker:
+        def __init__(self, artifact_root):
+            worker_roots.append(Path(artifact_root))
+
+    class FakeScheduler:
+        def __init__(self, worker, interval_seconds):
+            scheduler_calls.append((worker, interval_seconds))
+
+        def start(self):
+            scheduler_calls.append("started")
+
+        def stop(self, timeout=None):
+            stopped.append(timeout)
+            return True
+
+    monkeypatch.setattr(api_service, "PageArtifactCleanupWorker", FakeWorker)
+    monkeypatch.setattr(api_service, "PdfHotLoadScheduler", FakeScheduler)
+    monkeypatch.setattr(api_service, "project_root", tmp_path)
+
+    disabled = api_service._create_v7_page_artifact_cleanup_scheduler(
+        {"v7_feature_flags": V7FeatureFlags()}
+    )
+    assert disabled is None
+    assert scheduler_calls == []
+
+    enabled = V7FeatureFlags(
+        financial_trust_enabled=True,
+        durable_execution_enabled=True,
+        multimodal_enabled=True,
+    )
+    scheduler = api_service._create_v7_page_artifact_cleanup_scheduler(
+        {"v7_feature_flags": enabled}
+    )
+
+    assert scheduler is not None
+    assert worker_roots == [tmp_path / "data" / "v7" / "page_images"]
+    assert scheduler_calls[0][1] == 15.0
+    assert scheduler_calls[1] == "started"
+    api_service._close_v7_page_artifact_cleanup_resources(scheduler)
+    assert stopped == [5]

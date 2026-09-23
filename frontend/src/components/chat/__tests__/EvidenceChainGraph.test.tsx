@@ -32,4 +32,20 @@ describe('EvidenceChainGraph', () => {
     fireEvent.click(screen.getByRole('button', { name: /中国移动2024年度报告/ }));
     expect(onViewEvidence).toHaveBeenCalledWith(1);
   });
+
+  it('M4.2: 视觉来源展示证据类型与未完成制品警告', () => {
+    const visualSources: SourceInfo[] = [{
+      index: 3,
+      source_file: '扫描年报.pdf',
+      pages: [21],
+      company_name: '示例公司',
+      scores: {},
+      visual_preview_status: 'incomplete',
+    }];
+
+    render(<EvidenceChainGraph answer="结论[来源3]" sources={visualSources} onViewEvidence={vi.fn()} />);
+
+    expect(screen.getByText('视觉证据')).toBeInTheDocument();
+    expect(screen.getByText('视觉制品未完成')).toBeInTheDocument();
+  });
 });

@@ -6,20 +6,6 @@ from typing import Any
 from .models import CaseEvaluation, EvaluationCase, NumericComparison
 
 
-_REFUSAL_MARKERS = (
-    "无法",
-    "不足",
-    "不确定",
-    "待确认",
-    "暂停确定性回答",
-    "不能直接",
-    "不能自动",
-    "人工确认",
-    "人工复核",
-    "应先核对",
-)
-
-
 def compare_numeric(expected: float, actual: float, tolerance: float) -> NumericComparison:
     """按相对误差比较数字，避免把数量级错误当作舍入误差。"""
     if not isinstance(expected, (int, float)) or not isinstance(actual, (int, float)):
@@ -38,6 +24,54 @@ def _first_fact(facts: list[dict[str, Any]], metric_key: str) -> dict[str, Any] 
     return None
 
 
+def _matching_fact(
+    facts: list[dict[str, Any]],
+    expected_fact: dict[str, Any],
+) -> dict[str, Any] | None:
+    """按指标键及已声明的口径字段匹配事实，避免同指标事实串用。"""
+    metric_key = expected_fact.get("metric_key")
+    if not metric_key:
+        return None
+    for fact in facts:
+        if fact.get("metric_key") != metric_key:
+            continue
+        if any(
+            field in expected_fact and fact.get(field) != expected_fact[field]
+            for field in ("company", "unit", "currency", "period")
+        ):
+            continue
+        return fact
+    return None
+
+
+def _has_normalized_value(fact: dict[str, Any] | None) -> bool:
+    """判断归一值是否已提供，保留合法零值并拒绝空值。"""
+    return bool(
+        fact
+        and "normalized_value" in fact
+        and fact["normalized_value"] is not None
+        and fact["normalized_value"] != ""
+    )
+
+
+def _fact_matches_expected(
+    expected_fact: dict[str, Any],
+    actual_fact: dict[str, Any] | None,
+    tolerance: float,
+) -> bool:
+    """校验声明事实的归一值存在性及已声明的口径字段。"""
+    if not _has_normalized_value(actual_fact):
+        return False
+    if "value" in expected_fact:
+        actual_value = actual_fact.get("value") if actual_fact else None
+        if not compare_numeric(expected_fact["value"], actual_value, tolerance).passed:
+            return False
+    for field in ("unit", "currency", "period"):
+        if field in expected_fact and (not actual_fact or actual_fact.get(field) != expected_fact[field]):
+            return False
+    return True
+
+
 def _source_hit(expected, actual_sources: list[dict[str, Any]]) -> bool:
     for actual in actual_sources:
         if actual.get("source_file") != expected.source_file:
@@ -47,8 +81,8 @@ def _source_hit(expected, actual_sources: list[dict[str, Any]]) -> bool:
     return False
 
 
-def _claim_evidence_support(case: EvaluationCase, actual: dict[str, Any]) -> float | None:
-    """B 阶段声明级证据支持率：每个期望声明都要有可追溯的归一事实与来源证据。
+def evaluate_claim_evidence_support(case: EvaluationCase, actual: dict[str, Any]) -> float | None:
+    """计算声明级证据支持率，并区分未知、明确不支持和完全支持。
 
     候选完全未携带声明级字段时返回 None（A 阶段行为保持不变，不得冒充声明级指标）；
     部分携带或证据不完整时按不支持计分，无法确定时不得自动通过。
@@ -56,17 +90,61 @@ def _claim_evidence_support(case: EvaluationCase, actual: dict[str, Any]) -> flo
     actual_facts = actual.get("facts", [])
     if not case.expected_facts:
         return None
-    if all("normalized_value" not in fact for fact in actual_facts):
+    if not any(_has_normalized_value(fact) for fact in actual_facts):
         return None
     actual_sources = actual.get("sources", [])
+    sources_supported = bool(case.expected_sources) and all(
+        _source_hit(expected_source, actual_sources)
+        for expected_source in case.expected_sources
+    )
     supported = 0
     for expected_fact in case.expected_facts:
-        actual_fact = _first_fact(actual_facts, expected_fact.get("metric_key"))
-        has_normalized = bool(actual_fact and actual_fact.get("normalized_value"))
-        has_source = any(_source_hit(source, actual_sources) for source in case.expected_sources)
-        if has_normalized and has_source:
+        actual_fact = _matching_fact(actual_facts, expected_fact)
+        if _fact_matches_expected(expected_fact, actual_fact, case.numeric_tolerance) and sources_supported:
             supported += 1
     return supported / len(case.expected_facts)
+
+
+def _claim_evidence_support(case: EvaluationCase, actual: dict[str, Any]) -> float | None:
+    """保留旧版私有调用入口，统一复用公开声明级评估器。"""
+    return evaluate_claim_evidence_support(case, actual)
+
+
+KEYWORD_MINIMUM_HIT_RATE = 0.5
+REFUSAL_MARKERS = (
+    "无法",
+    "不足",
+    "不确定",
+    "待确认",
+    "暂停确定性",
+    "不能直接",
+    "不能自动",
+    "人工复核",
+)
+
+
+def _is_refusal_answer(answer: str) -> bool:
+    """识别拒答契约的确定性边界表达，不要求固定某一个措辞。"""
+    return any(marker in answer for marker in REFUSAL_MARKERS)
+
+
+def match_expected_keywords(
+    expected_keywords: list[str],
+    answer: str,
+) -> tuple[float | None, list[str], list[str]]:
+    """按旧版评测兼容规则计算答案关键词命中率。
+
+    关键词使用大小写不敏感的子串匹配；空关键词不参与匹配，直接视为调用错误。
+    没有配置期望关键词时返回 ``None``，让调用方区分“未配置”和“零命中”。
+    """
+    if not expected_keywords:
+        return None, [], []
+    if any(not isinstance(keyword, str) or not keyword.strip() for keyword in expected_keywords):
+        raise ValueError("expected_keywords 必须是非空字符串列表")
+    normalized_answer = str(answer or "").casefold()
+    matched = [keyword for keyword in expected_keywords if keyword.casefold() in normalized_answer]
+    missing = [keyword for keyword in expected_keywords if keyword not in matched]
+    return len(matched) / len(expected_keywords), matched, missing
 
 
 def evaluate_case(case: EvaluationCase, actual: dict[str, Any]) -> CaseEvaluation:
@@ -74,9 +152,17 @@ def evaluate_case(case: EvaluationCase, actual: dict[str, Any]) -> CaseEvaluatio
     metrics: dict[str, float] = {}
     failures: list[str] = []
     actual_facts = actual.get("facts", [])
+    keyword_hit_rate, _, _ = match_expected_keywords(
+        case.expected_keywords,
+        str(actual.get("answer") or ""),
+    )
+    if keyword_hit_rate is not None:
+        metrics["keyword_hit_rate"] = keyword_hit_rate
+        if keyword_hit_rate < KEYWORD_MINIMUM_HIT_RATE:
+            failures.append("expected_keywords_below_threshold")
     if case.expected_behavior == "refuse":
         answer = str(actual.get("answer", ""))
-        refused = any(marker in answer for marker in _REFUSAL_MARKERS)
+        refused = _is_refusal_answer(answer)
         metrics["refusal_accuracy"] = 1.0 if refused else 0.0
         if not refused:
             failures.append("expected_refusal")

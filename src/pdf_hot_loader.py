@@ -6,6 +6,7 @@
 from dataclasses import dataclass
 import logging
 import math
+import sqlite3
 import threading
 import tempfile
 from pathlib import Path
@@ -51,6 +52,44 @@ class HotLoadRunResult:
     failed: int
 
 
+class NonRetryablePdfProcessingError(ValueError):
+    """表示确定性失败，自动热加载不应再次调用外部服务。"""
+
+    def __init__(self, category: str, message: str) -> None:
+        if not category.strip():
+            raise ValueError("category 不能为空")
+        super().__init__(message)
+        self.category = category
+
+
+@dataclass(frozen=True)
+class PdfProcessingErrorClassification:
+    """热加载错误的稳定分类与自动重试决策。"""
+
+    category: str
+    retryable: bool
+
+
+def classify_pdf_processing_error(
+    error: Exception,
+    stage: str,
+) -> PdfProcessingErrorClassification:
+    """按失败边界返回稳定分类，避免以异常文案决定重试行为。"""
+    if isinstance(error, NonRetryablePdfProcessingError):
+        return PdfProcessingErrorClassification(error.category, False)
+    if isinstance(error, sqlite3.DatabaseError):
+        return PdfProcessingErrorClassification("database", True)
+    if isinstance(error, (PermissionError, FileNotFoundError, OSError)):
+        return PdfProcessingErrorClassification("disk_io", True)
+    if isinstance(error, (TimeoutError, ConnectionError)):
+        return PdfProcessingErrorClassification("external_service", True)
+    if stage == "parse":
+        return PdfProcessingErrorClassification("parse_error", True)
+    if stage == "index":
+        return PdfProcessingErrorClassification("index_error", True)
+    return PdfProcessingErrorClassification("state_store", True)
+
+
 class PdfHotLoadWorker:
     """把 pending_index 文档交给解析器和索引构建器处理。"""
 
@@ -82,23 +121,43 @@ class PdfHotLoadWorker:
             attempts = int(document.get("index_attempts", 0))
             if attempts >= self.max_attempts:
                 continue
+            stage = "disk"
             try:
                 if Path(filename).name != filename or not pdf_path.is_file():
                     raise FileNotFoundError(f"PDF 文件不存在: {filename}")
+                stage = "parse"
                 parsed = self.parser(pdf_path, document)
+                stage = "index"
                 generation = self.index_builder(document, parsed)
                 if not isinstance(generation, str) or not generation.strip():
-                    raise ValueError("索引构建器未返回有效 generation")
+                    raise NonRetryablePdfProcessingError(
+                        "invalid_index_generation",
+                        "索引构建器未返回有效 generation",
+                    )
+                stage = "state"
                 if knowledge_service.mark_pdf_indexed(
                     filename, document["sha256"], generation, attempts + 1
                 ):
                     processed += 1
                 else:
+                    logger.warning("PDF 索引完成状态未写入：%s", filename)
                     failed += 1
             except Exception as exc:
-                knowledge_service.mark_pdf_index_failed(
-                    filename, document["sha256"], str(exc), attempts + 1
-                )
+                classification = classify_pdf_processing_error(exc, stage)
+                recorded_attempts = attempts + 1 if classification.retryable else self.max_attempts
+                try:
+                    failure_recorded = knowledge_service.mark_pdf_index_failed(
+                        filename,
+                        document["sha256"],
+                        str(exc),
+                        recorded_attempts,
+                        retryable=classification.retryable,
+                        error_category=classification.category,
+                    )
+                    if not failure_recorded:
+                        logger.warning("PDF 索引失败状态未写入：%s", filename)
+                except Exception:
+                    logger.exception("PDF 索引失败状态写入异常：%s", filename)
                 failed += 1
         return HotLoadRunResult(len(pending), processed, failed)
 
@@ -159,6 +218,22 @@ class PdfDirectorySyncWorker:
 
     def run_once(self) -> dict[str, list[str]]:
         return knowledge_service.sync_pdf_directory()
+
+
+class PageArtifactCleanupWorker:
+    """恢复指定页图根目录内中断删除遗留的 `.deleting` 文件。"""
+
+    def __init__(self, artifact_root: str | Path) -> None:
+        self.artifact_root = Path(artifact_root)
+        self.artifact_root.mkdir(parents=True, exist_ok=True)
+
+    def run_once(self) -> tuple[Path, ...]:
+        """复用 V7 幂等清理器，不扫描页图根目录之外的文件。"""
+        from .v7_document_deletion import V7DocumentDeletionService
+
+        return V7DocumentDeletionService.resume_pending_page_file_cleanup(
+            self.artifact_root
+        )
 
 
 class MineruHotLoadPipeline:

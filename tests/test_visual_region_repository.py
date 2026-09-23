@@ -110,3 +110,30 @@ def test_visual_region_rejects_unordered_out_of_range_or_unknown_page_artifact(
             y1=0.9,
             region_status="complete",
         )
+
+
+def test_visual_region_status_transition_is_audited_and_complete_cannot_regress(tmp_path: Path):
+    from src.visual_region_repository import VisualRegionRepository
+
+    store, _, artifact = _registered_page_artifact(tmp_path)
+    repository = VisualRegionRepository(store)
+    region = repository.register(
+        page_artifact_id=artifact.page_artifact_id,
+        x0=0.1,
+        y0=0.2,
+        x1=0.8,
+        y1=0.9,
+        region_status="pending",
+    )
+
+    assert repository.transition_status(region.visual_region_id, "complete") == "complete"
+    with store.connect() as connection:
+        events = connection.execute(
+            """SELECT previous_status, next_status
+            FROM v7_visual_artifact_status_events
+            WHERE entity_type = 'visual_region' AND entity_id = ?""",
+            (region.visual_region_id,),
+        ).fetchall()
+    assert events == [("pending", "complete")]
+    with pytest.raises(ValueError, match="不允许"):
+        repository.transition_status(region.visual_region_id, "incomplete")

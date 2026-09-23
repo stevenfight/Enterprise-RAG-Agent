@@ -44,7 +44,18 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #C4B5D9, #A898B9);
+  background: color-mix(in srgb, var(--page-primary, #0F766E) 82%, #000000);
+}
+
+/* 浏览器原生交互表面也与当前研究工作台主题保持一致。 */
+::selection {
+  color: var(--page-surface, #FFFFFF);
+  background: color-mix(in srgb, var(--page-primary, #0F766E) 78%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--page-primary, #0F766E);
+  outline-offset: 3px;
 }
 
 /* 财务数字等宽字体 */
@@ -318,6 +329,178 @@ code {
   position: relative;
   border-color: color-mix(in srgb, var(--page-primary, #0F766E) 16%, var(--page-border, #E8E3EF));
   box-shadow: 0 4px 18px color-mix(in srgb, var(--page-primary, #0F766E) 6%, transparent);
+}
+
+/* 研究任务工作台：任务导航与详情遵循主从阅读顺序。 */
+.research-task-workbench {
+  display: grid;
+  grid-template-columns: minmax(292px, 0.38fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.research-task-list-panel,
+.research-task-details {
+  min-width: 0;
+}
+
+.research-task-list-card {
+  position: sticky;
+  top: 24px;
+}
+
+.research-task-details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.research-task-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.research-task-detail-grid > .page-card {
+  min-width: 0;
+  height: 100%;
+}
+
+.research-task-create {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--page-border, #E8E3EF);
+}
+
+.research-task-create__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.research-task-form {
+  margin-bottom: 0;
+}
+
+.research-task-form__fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.research-task-form__fields .ant-form-item {
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.research-task-form__actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.research-task-permission-hint {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.research-task-inline-alert {
+  margin-top: 12px;
+}
+
+.research-task-list {
+  margin-top: 4px;
+}
+
+.research-task-list__item {
+  padding: 4px 0;
+  border-block-end: 0;
+}
+
+.research-task-list__item--selected {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--page-primary, #0F766E) 7%, var(--page-card-bg, #FFFFFF));
+}
+
+.research-task-row.ant-btn {
+  display: flex;
+  width: 100%;
+  min-height: 72px;
+  height: auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  color: var(--page-text-primary, #3D3554);
+  text-align: left;
+  white-space: normal;
+}
+
+.research-task-row.ant-btn:hover {
+  color: var(--page-text-primary, #3D3554);
+  background: color-mix(in srgb, var(--page-primary, #0F766E) 5%, var(--page-card-bg, #FFFFFF));
+}
+
+.research-task-row__content {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.research-task-row__title {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.research-task-row__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.research-task-row__tags .ant-tag {
+  margin-inline-end: 0;
+}
+
+.research-task-row__revision {
+  flex: 0 0 auto;
+  padding-top: 2px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.research-task-action-row {
+  display: flex;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.research-task-legacy-action {
+  display: flex;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.research-task-report-signoff {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.research-task-supporting-copy {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.research-task-conflict-actions {
+  margin-top: 8px;
 }
 
 .page-state {
@@ -1649,7 +1832,24 @@ code {
 
 .page-shell {
   width: min(100%, 1320px);
+  min-width: 0;
+  margin: 0 auto;
   padding: 32px 32px 40px;
+}
+
+.app-workspace-content {
+  min-width: 0;
+}
+
+.research-task-detail-empty .ant-empty {
+  padding: 56px 24px;
+}
+
+.research-task-detail-empty .ant-empty-description {
+  max-width: 28ch;
+  margin-inline: auto;
+  color: var(--page-text-secondary, #66747A);
+  line-height: 1.6;
 }
 
 .page-header {

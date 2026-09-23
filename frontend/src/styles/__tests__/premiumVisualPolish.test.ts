@@ -39,4 +39,15 @@ describe('高级视觉样式规则', () => {
     expect(cssText).toContain('.research-output-strip');
     expect(cssText).toContain('minmax(180px, 1fr)');
   });
+
+  it('FWC-T04: 基础浏览器表面使用主题变量提供选择与焦点反馈', () => {
+    const cssText = Array.from(document.styleSheets)
+      .flatMap((sheet) => Array.from(sheet.cssRules))
+      .map((rule) => rule.cssText)
+      .join('\n');
+
+    expect(cssText).toContain('::selection');
+    expect(cssText).toContain(':focus-visible');
+    expect(cssText).toContain('var(--page-primary');
+  });
 });

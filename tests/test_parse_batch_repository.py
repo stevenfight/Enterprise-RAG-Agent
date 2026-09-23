@@ -109,3 +109,32 @@ def test_parse_batches_are_idempotent_and_reject_overlapping_or_out_of_range_pag
             parser_version="v4",
             batch_status="complete",
         )
+
+
+def test_parse_batch_status_transition_requires_processing_and_is_audited(tmp_path: Path):
+    from src.parse_batch_repository import ParseBatchRepository
+
+    store, manifest = _manifest(tmp_path)
+    repository = ParseBatchRepository(store)
+    repository.record(
+        manifest_id=manifest.manifest_id,
+        batch_id="pages-1-5",
+        physical_page_start=1,
+        physical_page_end=5,
+        parser_name="mineru",
+        parser_version="v4",
+        batch_status="pending",
+    )
+
+    assert repository.transition_status(manifest.manifest_id, "pages-1-5", "processing") == "processing"
+    assert repository.transition_status(manifest.manifest_id, "pages-1-5", "failed", error_code="remote_timeout") == "failed"
+    with store.connect() as connection:
+        events = connection.execute(
+            """SELECT previous_status, next_status
+            FROM v7_visual_artifact_status_events
+            WHERE entity_type = 'parse_batch' AND entity_id = ?""",
+            (f"{manifest.manifest_id}:pages-1-5",),
+        ).fetchall()
+    assert events == [("pending", "processing"), ("processing", "failed")]
+    with pytest.raises(ValueError, match="不允许"):
+        repository.transition_status(manifest.manifest_id, "pages-1-5", "complete")

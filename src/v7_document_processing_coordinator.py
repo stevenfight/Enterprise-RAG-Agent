@@ -2,7 +2,9 @@
 """默认关闭的 V7 文档处理协调器。"""
 
 import hashlib
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 import fitz
 
@@ -14,7 +16,18 @@ from .document_asset_manifest_repository import (
 from .durable_execution import AttemptClaim, DurableExecutionStore
 from .page_artifact_repository import PageArtifactRepository, RegisteredPageArtifact
 from .page_image_renderer import PageImageRenderer
+from .page_router import PageRouteDecision, PageRouter, PageSignals
 from .parse_batch_repository import ParseBatchRecord, ParseBatchRepository
+from .v7_document_deletion import V7DocumentDeletionService
+
+
+@dataclass(frozen=True)
+class PageRoutingSnapshot:
+    """一次经校验的文档处理路由快照，供后续受控视觉分发审计。"""
+
+    manifest_id: str
+    document_version_id: str
+    decisions: tuple[PageRouteDecision, ...]
 
 
 class V7DocumentProcessingCoordinator:
@@ -28,6 +41,7 @@ class V7DocumentProcessingCoordinator:
         page_image_renderer: PageImageRenderer,
         page_artifact_repository: PageArtifactRepository,
         durable_execution_store: DurableExecutionStore | None = None,
+        page_router: PageRouter | None = None,
     ) -> None:
         stores = {
             id(manifest_repository.store),
@@ -47,6 +61,7 @@ class V7DocumentProcessingCoordinator:
         ):
             raise ValueError("V7 协调器的执行仓储必须复用同一个 metadata store")
         self.execution_store = durable_execution_store
+        self.page_router = page_router or PageRouter()
 
     def claim_processing_attempt(
         self,
@@ -124,9 +139,55 @@ class V7DocumentProcessingCoordinator:
             )
         return tuple(registered)
 
+    def route_document_pages(
+        self,
+        *,
+        manifest_id: str,
+        document_version_id: str,
+        source_pdf_path: Path,
+        vision_dispatcher: Callable[[PageRouteDecision], None] | None = None,
+    ) -> PageRoutingSnapshot:
+        """用真实 PDF 页信号生成路由快照，只分发明确允许视觉处理的页面。"""
+        manifest = self._get_manifest(manifest_id)
+        if manifest.document_version_id != document_version_id:
+            raise ValueError("document_version_id 与 manifest 不一致")
+        self._validate_source_pdf(
+            source_pdf_path,
+            manifest.source_sha256,
+            manifest.physical_page_count,
+        )
+        decisions: list[PageRouteDecision] = []
+        document = fitz.open(source_pdf_path)
+        try:
+            for page_number in range(1, manifest.physical_page_count + 1):
+                page = document.load_page(page_number - 1)
+                decision = self.page_router.route(
+                    PageSignals(
+                        page_number=page_number,
+                        text_layer_chars=len(page.get_text("text")),
+                        image_count=len(page.get_images(full=True)),
+                    )
+                )
+                decisions.append(decision)
+                if decision.use_vision and vision_dispatcher is not None:
+                    vision_dispatcher(decision)
+        finally:
+            document.close()
+        return PageRoutingSnapshot(
+            manifest_id=manifest_id,
+            document_version_id=document_version_id,
+            decisions=tuple(decisions),
+        )
+
     def finalize(self, manifest_id: str) -> ManifestPageImageCompleteness:
         """以页图文件和解析批次的双门禁核验最终完整性。"""
         return self.manifest_repository.verify_page_image_completeness(manifest_id)
+
+    def recover_pending_page_file_cleanup(self) -> tuple[Path, ...]:
+        """在已配置的页图输出根目录恢复中断删除遗留文件。"""
+        return V7DocumentDeletionService.resume_pending_page_file_cleanup(
+            self.page_image_renderer.output_root
+        )
 
     def _validate_document_version(
         self,

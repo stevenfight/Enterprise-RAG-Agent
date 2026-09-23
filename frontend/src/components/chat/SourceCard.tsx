@@ -4,7 +4,7 @@
  * 展示 AI 回答引用的文档来源信息
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, Typography, Space, Tag } from 'antd';
 import {
   FileTextOutlined,
@@ -15,6 +15,8 @@ import type { SourceInfo, SourceScoreValue } from '@/types/chat';
 import { useTheme } from '@/hooks/useTheme';
 import { colors } from '@/styles/theme';
 import { createLogger } from '@/utils/logger';
+import { getVisualArtifactImage } from '@/services/visualArtifactService';
+import VisualChartEvidence from './VisualChartEvidence';
 
 const logger = createLogger('SourceCard');
 const { Text } = Typography;
@@ -43,11 +45,73 @@ function calcScorePercent(scores: Record<string, SourceScoreValue>): number | nu
   return null;
 }
 
+function formatVisualLocator(bbox: [number, number, number, number]): string {
+  /** 将规范化坐标转为只读百分比说明，不创建虚假的页图预览。 */
+  const [x0, y0, x1, y1] = bbox.map((value) => Math.round(value * 100));
+  return `x=${x0}%–${x1}%，y=${y0}%–${y1}%`;
+}
+
+function VisualEvidencePreview({ source }: { source: SourceInfo }) {
+  const locator = source.visual_locator!;
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | null = null;
+
+    getVisualArtifactImage(locator).then((image) => {
+      if (!active) return;
+      objectUrl = URL.createObjectURL(image);
+      setImageUrl(objectUrl);
+    }).catch(() => {
+      // 页图不可读取时不展示未经验证的替代内容，保留文字定位信息。
+    });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [locator]);
+
+  if (!imageUrl) return null;
+
+  const [x0, y0, x1, y1] = locator.normalized_bbox;
+  return (
+    <div style={{ position: 'relative', marginTop: 8, overflow: 'hidden', borderRadius: 6 }}>
+      <img
+        src={imageUrl}
+        alt={`${source.source_file} 第 ${source.pages[0] ?? '?'} 页视觉区域`}
+        style={{ display: 'block', width: '100%', height: 'auto' }}
+      />
+      <div
+        aria-label="视觉区域高亮"
+        style={{
+          position: 'absolute',
+          left: `${x0 * 100}%`,
+          top: `${y0 * 100}%`,
+          width: `${(x1 - x0) * 100}%`,
+          height: `${(y1 - y0) * 100}%`,
+          border: '2px solid #D97706',
+          background: 'rgba(245, 158, 11, 0.16)',
+          boxSizing: 'border-box',
+          pointerEvents: 'none',
+        }}
+      />
+    </div>
+  );
+}
+
 export default function SourceCard({ source, showScoreStatus = true, highlighted = false }: SourceCardProps) {
   logger.renderStart({ sourceFile: source.source_file, company: source.company_name, pages: source.pages });
-  const [expanded, setExpanded] = useState(false);
-  const [showScores, setShowScores] = useState(false);
+  const [expanded, setExpanded] = useState(highlighted);
+  const [showScores, setShowScores] = useState(highlighted);
   const { isDark } = useTheme();
+
+  useEffect(() => {
+    if (!highlighted) return;
+    setExpanded(true);
+    setShowScores(true);
+  }, [highlighted]);
 
   const scorePercent = calcScorePercent(source.scores || {});
 
@@ -130,6 +194,23 @@ export default function SourceCard({ source, showScoreStatus = true, highlighted
               <Text type="secondary" style={{ fontSize: 12, lineHeight: 1.6 }}>{source.excerpt}</Text>
             </div>
           )}
+          {source.visual_locator && (
+            <div style={{ marginBottom: 8 }} aria-label="已确认视觉区域定位">
+              <Text strong style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>视觉区域可定位</Text>
+              <Text type="secondary" style={{ fontSize: 12, lineHeight: 1.6 }}>
+                {formatVisualLocator(source.visual_locator.normalized_bbox)}
+              </Text>
+              <VisualEvidencePreview source={source} />
+            </div>
+          )}
+          {source.visual_preview_status === 'incomplete' && (
+            <div style={{ marginBottom: 8 }} aria-live="polite">
+              <Text type="secondary" style={{ fontSize: 12, lineHeight: 1.6 }}>
+                视觉页图尚未完成，当前无法预览。
+              </Text>
+            </div>
+          )}
+          {source.visual_chart && <VisualChartEvidence source={source} dark={isDark} />}
           {/* 评分详情 - 独立的可点击标题，不再使用 Collapse 避免事件冲突 */}
           <div
             onClick={(e) => {

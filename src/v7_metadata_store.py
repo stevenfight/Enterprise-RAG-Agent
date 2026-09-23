@@ -566,6 +566,49 @@ class V7MetadataStore:
                 """ALTER TABLE v7_research_plans ADD COLUMN step_inputs_json TEXT NOT NULL DEFAULT '[]'""",
             ),
         ),
+        (
+            35,
+            (
+                # M-T23：视觉成功响应按内容/版本缓存，调用事件保持只追加。
+                """
+                CREATE TABLE v7_vision_call_cache (
+                    cache_key TEXT PRIMARY KEY,
+                    manifest_id TEXT NOT NULL,
+                    artifact_id TEXT NOT NULL,
+                    content_sha256 TEXT NOT NULL,
+                    capability TEXT NOT NULL,
+                    provider_name TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    prompt_sha256 TEXT NOT NULL,
+                    prompt_version TEXT NOT NULL,
+                    code_version TEXT NOT NULL,
+                    artifact_version TEXT NOT NULL,
+                    response_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+                """CREATE INDEX idx_v7_vision_call_cache_artifact ON v7_vision_call_cache(manifest_id, artifact_id, capability)""",
+                """
+                CREATE TABLE v7_vision_call_ledger (
+                    ledger_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    cache_key TEXT NOT NULL,
+                    event_type TEXT NOT NULL CHECK (event_type IN ('provider_call', 'cache_hit')),
+                    status TEXT NOT NULL,
+                    manifest_id TEXT NOT NULL,
+                    artifact_id TEXT NOT NULL,
+                    content_sha256 TEXT NOT NULL,
+                    capability TEXT NOT NULL,
+                    provider_name TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    input_tokens INTEGER NOT NULL CHECK (input_tokens >= 0),
+                    output_tokens INTEGER NOT NULL CHECK (output_tokens >= 0),
+                    details_json TEXT NOT NULL DEFAULT '{}',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+                """CREATE INDEX idx_v7_vision_call_ledger_cache ON v7_vision_call_ledger(cache_key, ledger_id)""",
+            ),
+        ),
     )
 
     def __init__(

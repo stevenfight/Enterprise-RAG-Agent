@@ -15,6 +15,14 @@
     padding: 32px 28px 40px;
   }
 
+  .research-task-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .research-task-list-card {
+    position: static;
+  }
+
   .dag-task-summary__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -90,6 +98,28 @@
 
   .page-stack {
     gap: 16px;
+  }
+
+  .research-task-workbench,
+  .research-task-details {
+    gap: 16px;
+  }
+
+  .research-task-form__fields,
+  .research-task-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .research-task-row.ant-btn {
+    min-height: 76px;
+    padding-inline: 8px;
+  }
+
+  .research-task-row__revision {
+    max-width: 56px;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    text-align: right;
   }
 
   .page-card {

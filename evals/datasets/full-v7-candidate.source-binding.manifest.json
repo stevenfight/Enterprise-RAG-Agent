@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "dataset_path": "evals/datasets/full-v7-candidate.jsonl",
+  "dataset_sha256": "eefbc2c82ab0f629d94b44430c0cfc53e8498871018bb80848b2384e7b9ddb94",
+  "source_inventory_path": "data/stock_data/pdf_source_inventory.json",
+  "source_inventory_sha256": "bcbe3200f0f833dd94d4a9c1940c644c7a2cb40cbe4be2516ccca7a11cad927b"
+}

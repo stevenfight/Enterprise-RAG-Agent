@@ -91,9 +91,18 @@ class CompareTool(BaseTool):
         "经营现金流": ["经营活动.*现金流", "经营现金流"],
     }
 
-    def __init__(self, api_key=None):
+    def __init__(self, api_key=None, publication_resolver=None):
+        """初始化对比工具
+
+        Args:
+            api_key: DashScope API Key（可选，默认从环境读取）
+            publication_resolver: 统一 PublicationResolver（可选）。
+                注入后每次请求开始固定 publication 快照，检索使用快照代际，
+                返回结果携带 publication_id；未注入时行为保持不变。
+        """
         self._api_key = api_key
         self._retriever = None
+        self._publication_resolver = publication_resolver
         logger.info("[CompareTool] 初始化完成")
 
     # ============================================================
@@ -110,7 +119,14 @@ class CompareTool(BaseTool):
                 raise FileNotFoundError(
                     "向量数据库目录不存在: %s\n请先运行 python src/ingestion.py 构建向量数据库。" % vector_db_dir
                 )
-            self._retriever = HybridRetriever(vector_db_dir, api_key=self._api_key)
+            # M1.9：注入请求级快照代际解析（每次调用从固定快照动态读取）
+            generation_resolver = None
+            if self._publication_resolver is not None:
+                def generation_resolver(company_name):
+                    return self._publication_resolver.resolve_generation_id()
+
+            self._retriever = HybridRetriever(vector_db_dir, api_key=self._api_key,
+                                              generation_resolver=generation_resolver)
             logger.info("[CompareTool] HybridRetriever 已加载")
         return self._retriever
 
@@ -301,110 +317,122 @@ class CompareTool(BaseTool):
 
         valid_companies = [c for c in companies if c in self.KNOWN_COMPANIES]
 
-        # ---- 逐公司检索 ----
-        company_data = {}
-        all_results = {}
+        # M1.9：请求开始固定 publication 快照，整个请求使用同一视图
+        request_snapshot = None
+        if self._publication_resolver is not None:
+            request_snapshot = self._publication_resolver.begin_request()
+        request_publication_id = request_snapshot.publication_id if request_snapshot is not None else None
 
-        for cn in valid_companies:
-            results = self._search_company(cn, metric, year, top_n)
-            all_results[cn] = results
+        try:
+            # ---- 逐公司检索 ----
+            company_data = {}
+            all_results = {}
 
-            if not results:
-                logger.warning("[CompareTool] %s 无检索结果", cn)
-                company_data[cn] = {"value": "数据缺失", "source": "-", "pages": "-", "raw_value": None}
-                continue
+            for cn in valid_companies:
+                results = self._search_company(cn, metric, year, top_n)
+                all_results[cn] = results
 
-            value_text = self._extract_key_value(results, metric)
-            logger.info("[CompareTool] %s 提取到的数值文本: '%s'", cn, value_text[:80] if value_text else "None")
+                if not results:
+                    logger.warning("[CompareTool] %s 无检索结果", cn)
+                    company_data[cn] = {"value": "数据缺失", "source": "-", "pages": "-", "raw_value": None}
+                    continue
 
-            top_result = results[0]
-            source = top_result.get("source_file", "-")
-            if len(source) > 40:
-                source = source[:37] + "..."
+                value_text = self._extract_key_value(results, metric)
+                logger.info("[CompareTool] %s 提取到的数值文本: '%s'", cn, value_text[:80] if value_text else "None")
 
-            pages_raw = top_result.get("pages", [])
-            if pages_raw and len(pages_raw) >= 2:
-                pages = "第%d-%d页" % (pages_raw[0], pages_raw[-1])
-            elif pages_raw:
-                pages = "第%d页" % pages_raw[0]
-            else:
-                pages = "-"
+                top_result = results[0]
+                source = top_result.get("source_file", "-")
+                if len(source) > 40:
+                    source = source[:37] + "..."
 
-            raw_value = None
-            if value_text:
-                num_match = re.search(r"([\d,，.]+)\s*(?:亿[元]?|万[元]?)", value_text)
-                if num_match:
+                pages_raw = top_result.get("pages", [])
+                if pages_raw and len(pages_raw) >= 2:
+                    pages = "第%d-%d页" % (pages_raw[0], pages_raw[-1])
+                elif pages_raw:
+                    pages = "第%d页" % pages_raw[0]
+                else:
+                    pages = "-"
+
+                raw_value = None
+                if value_text:
+                    num_match = re.search(r"([\d,，.]+)\s*(?:亿[元]?|万[元]?)", value_text)
+                    if num_match:
+                        try:
+                            raw_str = num_match.group(1).replace(",", "").replace("，", "")
+                            raw_value = float(raw_str)
+                            if "万" in value_text:
+                                raw_value = raw_value / 10000
+                                logger.info("[CompareTool] %s 转换为亿: %.4f (原单位=万)", cn, raw_value)
+                            else:
+                                logger.info("[CompareTool] %s 提取到原始数值: %.4f (单位=亿)", cn, raw_value)
+                        except ValueError:
+                            logger.warning("[CompareTool] %s 数值转换失败: '%s'", cn, num_match.group(1))
+
+                company_data[cn] = {
+                    "value": value_text or "数据存在但未提取到具体数值",
+                    "source": source,
+                    "pages": pages,
+                    "raw_value": raw_value,
+                }
+
+            # ---- 三层保底 ----
+            missing = [cn for cn in valid_companies
+                       if company_data[cn]["value"] in ("数据缺失", "数据存在但未提取到具体数值")]
+            if missing:
+                logger.info("[CompareTool] 第一层保底触发: %d 家公司数据不足: %s", len(missing), ", ".join(missing))
+                for cn in missing:
+                    logger.info("[CompareTool] 第二层保底: %s | query='%s %s年 %s' (不限公司)",
+                                 cn, cn, year, metric)
                     try:
-                        raw_str = num_match.group(1).replace(",", "").replace("，", "")
-                        raw_value = float(raw_str)
-                        if "万" in value_text:
-                            raw_value = raw_value / 10000
-                            logger.info("[CompareTool] %s 转换为亿: %.4f (原单位=万)", cn, raw_value)
-                        else:
-                            logger.info("[CompareTool] %s 提取到原始数值: %.4f (单位=亿)", cn, raw_value)
-                    except ValueError:
-                        logger.warning("[CompareTool] %s 数值转换失败: '%s'", cn, num_match.group(1))
+                        retriever = self._get_retriever()
+                        fb_query = "%s %s年 %s" % (cn, year, metric)
+                        fallback_results = retriever.search(query=fb_query, company_name=None, top_n=5)
+                        fallback_for_cn = [r for r in fallback_results if r.get("company_name") == cn]
+                        logger.info("[CompareTool] 第二层保底: %s | 不限公司检索=%d条 | 过滤后=%d条",
+                                     cn, len(fallback_results), len(fallback_for_cn))
+                        if fallback_for_cn:
+                            value_text = self._extract_key_value(fallback_for_cn[:top_n], metric)
+                            if value_text:
+                                company_data[cn]["value"] = value_text
+                                company_data[cn]["source"] = fallback_for_cn[0].get("source_file", "-")[:40]
+                                company_data[cn]["pages"] = "保底检索"
+                                logger.info("[CompareTool] 第二层保底成功: %s | value='%s'", cn, value_text[:60])
+                    except Exception as e:
+                        logger.warning("[CompareTool] 第二层保底失败: %s | %s", cn, str(e))
 
-            company_data[cn] = {
-                "value": value_text or "数据存在但未提取到具体数值",
-                "source": source,
-                "pages": pages,
-                "raw_value": raw_value,
-            }
+            still_missing = [cn for cn in valid_companies
+                             if company_data[cn]["value"] in ("数据缺失", "数据存在但未提取到具体数值")]
+            if still_missing:
+                logger.info("[CompareTool] 第三层保底触发: %d 家仍缺失: %s", len(still_missing), ", ".join(still_missing))
+                for cn in still_missing:
+                    company_data[cn]["value"] = "数据缺失（经保底检索仍无法获取）"
 
-        # ---- 三层保底 ----
-        missing = [cn for cn in valid_companies
-                   if company_data[cn]["value"] in ("数据缺失", "数据存在但未提取到具体数值")]
-        if missing:
-            logger.info("[CompareTool] 第一层保底触发: %d 家公司数据不足: %s", len(missing), ", ".join(missing))
-            for cn in missing:
-                logger.info("[CompareTool] 第二层保底: %s | query='%s %s年 %s' (不限公司)",
-                             cn, cn, year, metric)
-                try:
-                    retriever = self._get_retriever()
-                    fb_query = "%s %s年 %s" % (cn, year, metric)
-                    fallback_results = retriever.search(query=fb_query, company_name=None, top_n=5)
-                    fallback_for_cn = [r for r in fallback_results if r.get("company_name") == cn]
-                    logger.info("[CompareTool] 第二层保底: %s | 不限公司检索=%d条 | 过滤后=%d条",
-                                 cn, len(fallback_results), len(fallback_for_cn))
-                    if fallback_for_cn:
-                        value_text = self._extract_key_value(fallback_for_cn[:top_n], metric)
-                        if value_text:
-                            company_data[cn]["value"] = value_text
-                            company_data[cn]["source"] = fallback_for_cn[0].get("source_file", "-")[:40]
-                            company_data[cn]["pages"] = "保底检索"
-                            logger.info("[CompareTool] 第二层保底成功: %s | value='%s'", cn, value_text[:60])
-                except Exception as e:
-                    logger.warning("[CompareTool] 第二层保底失败: %s | %s", cn, str(e))
+            # ---- 生成对比表 ----
+            table = self._build_markdown_table(valid_companies, metric, year, company_data)
+            difference = self._build_difference_analysis(company_data)
+            full_output = table + "\n" + difference
 
-        still_missing = [cn for cn in valid_companies
-                         if company_data[cn]["value"] in ("数据缺失", "数据存在但未提取到具体数值")]
-        if still_missing:
-            logger.info("[CompareTool] 第三层保底触发: %d 家仍缺失: %s", len(still_missing), ", ".join(still_missing))
-            for cn in still_missing:
-                company_data[cn]["value"] = "数据缺失（经保底检索仍无法获取）"
+            data_count = sum(1 for d in company_data.values()
+                             if d["value"] not in ("数据缺失", "数据缺失（经保底检索仍无法获取）",
+                                                    "数据存在但未提取到具体数值"))
 
-        # ---- 生成对比表 ----
-        table = self._build_markdown_table(valid_companies, metric, year, company_data)
-        difference = self._build_difference_analysis(company_data)
-        full_output = table + "\n" + difference
+            logger.info("[CompareTool] ====== 对比分析完成 ======")
+            logger.info("[CompareTool] 覆盖率: %d/%d | 输出: %d 字符",
+                         data_count, len(valid_companies), len(full_output))
 
-        data_count = sum(1 for d in company_data.values()
-                         if d["value"] not in ("数据缺失", "数据缺失（经保底检索仍无法获取）",
-                                                "数据存在但未提取到具体数值"))
-
-        logger.info("[CompareTool] ====== 对比分析完成 ======")
-        logger.info("[CompareTool] 覆盖率: %d/%d | 输出: %d 字符",
-                     data_count, len(valid_companies), len(full_output))
-
-        return ToolResult(
-            success=True,
-            data={
-                "table": full_output,
-                "metric": metric,
-                "year": year,
-                "companies_compared": len(valid_companies),
-                "companies_with_data": data_count,
-                "details": {cn: data["value"] for cn, data in company_data.items()},
-            }
-        )
+            return ToolResult(
+                success=True,
+                data={
+                    "table": full_output,
+                    "metric": metric,
+                    "year": year,
+                    "companies_compared": len(valid_companies),
+                    "companies_with_data": data_count,
+                    "details": {cn: data["value"] for cn, data in company_data.items()},
+                    "publication_id": request_publication_id,
+                }
+            )
+        finally:
+            # M1.9：请求结束释放固定快照（无论成败）
+            if self._publication_resolver is not None:
+                self._publication_resolver.end_request()

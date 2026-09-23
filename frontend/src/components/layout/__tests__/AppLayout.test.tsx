@@ -55,6 +55,14 @@ describe('AppLayout 聊天区铺满', () => {
     expect(content?.getAttribute('style')).toContain('overflow: auto');
   });
 
+  it('FWC-T01: 非聊天路由由 PageShell 独立承担页面留白', () => {
+    mockPathname.value = '/knowledge';
+    const { container } = render(<AppLayout />);
+    const content = container.querySelector('.ant-layout-content');
+
+    expect(content?.getAttribute('style')).toContain('padding: 0px');
+  });
+
   it('DS-R05-05 将当前主体色写入页面 CSS 变量', () => {
     mockPathname.value = '/';
     const { container } = render(<AppLayout />);

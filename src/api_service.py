@@ -46,6 +46,7 @@ from .reflector import AnswerReflector
 from .orchestrator_agent import OrchestratorAgent
 from .pdf_hot_loader import (
     MineruHotLoadPipeline,
+    PageArtifactCleanupWorker,
     PdfDirectorySyncWorker,
     PdfHotLoadScheduler,
 )
@@ -330,6 +331,7 @@ _api_key: str = ""
 _max_steps_hard_limit: int = 15
 pdf_hot_load_scheduler: Optional[PdfHotLoadScheduler] = None
 pdf_hot_load_pipeline: Optional[MineruHotLoadPipeline] = None
+v7_page_artifact_cleanup_scheduler: Optional[PdfHotLoadScheduler] = None
 
 
 # ==================== 请求模型 ====================
@@ -635,6 +637,31 @@ def _close_pdf_hot_load_resources(scheduler: Optional[PdfHotLoadScheduler]) -> N
         pdf_hot_load_pipeline = None
 
 
+def _create_v7_page_artifact_cleanup_scheduler(
+    ag_cfg: dict,
+) -> Optional[PdfHotLoadScheduler]:
+    """仅在多模态开启时启动页图残留的启动与周期恢复。"""
+    flags = ag_cfg.get("v7_feature_flags")
+    if flags is None or not flags.multimodal_enabled:
+        return None
+
+    artifact_root = project_root / "data" / "v7" / "page_images"
+    worker = PageArtifactCleanupWorker(artifact_root)
+    scheduler = PdfHotLoadScheduler(worker, interval_seconds=15.0)
+    scheduler.start()
+    return scheduler
+
+
+def _close_v7_page_artifact_cleanup_resources(
+    scheduler: Optional[PdfHotLoadScheduler],
+) -> None:
+    """停止页图残留恢复调度器，不影响 PDF 热加载资源。"""
+    if scheduler is None:
+        return
+    if not scheduler.stop(timeout=5):
+        logger.warning("[api_service] 页图残留恢复线程仍在运行，未确认停止")
+
+
 def _init_globals():
     """初始化所有全局变量（必须在普通函数中执行，@asynccontextmanager 会破坏 global 声明）"""
     global rag_generator, agent, agent_registry, agent_planner, agent_reflector
@@ -686,14 +713,19 @@ def _init_globals():
     # 从 config 文件加载 Agent 配置参数
     ag_cfg = _load_agent_config()
 
-    global pdf_hot_load_scheduler
+    global pdf_hot_load_scheduler, v7_page_artifact_cleanup_scheduler
     pdf_hot_load_scheduler = _create_pdf_hot_load_scheduler(ag_cfg)
+    v7_page_artifact_cleanup_scheduler = _create_v7_page_artifact_cleanup_scheduler(
+        ag_cfg
+    )
     if pdf_hot_load_scheduler is not None:
         logger.info(
             "[api_service] PDF 热加载已启动 | indexing=%s | interval=%s 秒",
             ag_cfg.get("pdf_hot_load_indexing_enabled", False),
             ag_cfg.get("pdf_hot_load_interval_seconds"),
         )
+    if v7_page_artifact_cleanup_scheduler is not None:
+        logger.info("[api_service] V7 页图残留恢复已启动 | interval=15 秒")
 
     agent_reflector = AnswerReflector(
         enable_verification=ag_cfg["enable_verification"],
@@ -819,11 +851,17 @@ async def lifespan(app: FastAPI):
 
     logger.info("=" * 60)
     logger.info("[api_service] FastAPI 应用关闭中...")
-    global pdf_hot_load_scheduler
+    global pdf_hot_load_scheduler, v7_page_artifact_cleanup_scheduler
     if pdf_hot_load_scheduler is not None or pdf_hot_load_pipeline is not None:
         _close_pdf_hot_load_resources(pdf_hot_load_scheduler)
         pdf_hot_load_scheduler = None
         logger.info("[api_service] PDF 热加载已停止")
+    if v7_page_artifact_cleanup_scheduler is not None:
+        _close_v7_page_artifact_cleanup_resources(
+            v7_page_artifact_cleanup_scheduler
+        )
+        v7_page_artifact_cleanup_scheduler = None
+        logger.info("[api_service] V7 页图残留恢复已停止")
     global rag_generator, agent, agent_registry, agent_planner, agent_reflector
     rag_generator = None
     _shared_state["query_processor"] = None

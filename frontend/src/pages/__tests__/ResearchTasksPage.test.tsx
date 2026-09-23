@@ -70,7 +70,34 @@ describe('ResearchTasksPage', () => {
     render(<ResearchTasksPage />);
 
     expect(await screen.findByText('当前没有可查看的研究任务')).toBeInTheDocument();
-    expect(screen.queryByText('任务详情')).not.toBeInTheDocument();
+    expect(screen.getByText('任务详情')).toBeInTheDocument();
+    expect(screen.queryByText('任务 ID')).not.toBeInTheDocument();
+    expect(screen.queryByText('报告详情')).not.toBeInTheDocument();
+  });
+
+  it('RTW-T01/T02: 以真实数量展示任务导航，并将当前任务放入详情区域', async () => {
+    listResearchTasks.mockResolvedValue([
+      { task_id: 'task-a', run_id: 'research:task-a', status: 'running', revision: 2, dag_step_ids: [] },
+      { task_id: 'task-b', run_id: 'research:task-b', status: 'paused', revision: 4, dag_step_ids: [] },
+    ]);
+
+    render(<ResearchTasksPage />);
+
+    expect(await screen.findByText('任务列表（2）')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '任务导航' })).toHaveClass('research-task-list-panel');
+    fireEvent.click(screen.getByRole('button', { name: /task-b/ }));
+    expect(screen.getByRole('region', { name: '任务详情' })).toHaveClass('research-task-details');
+  });
+
+  it('RTW-T04: 报告证据和图表只说明服务端持久化内容', async () => {
+    listResearchTasks.mockResolvedValue([
+      { task_id: 'task-empty-report', run_id: 'research:task-empty-report', status: 'completed', revision: 3, dag_step_ids: [] },
+    ]);
+
+    render(<ResearchTasksPage />);
+
+    expect(await screen.findByText('仅展示服务端已持久化的证据内容。')).toBeInTheDocument();
+    expect(screen.getByText('仅展示服务端已持久化的图表内容。')).toBeInTheDocument();
   });
 
   it('E-T42: approver 只能为失败任务创建新的待审批重试任务', async () => {
@@ -170,6 +197,14 @@ describe('ResearchTasksPage', () => {
     render(<ResearchTasksPage />);
 
     expect(await screen.findByText('该任务尚未生成可查看的持久化报告')).toBeInTheDocument();
+  });
+
+  it('FWC-T06: 没有选中任务时详情区域说明下一步', async () => {
+    listResearchTasks.mockResolvedValue([]);
+
+    render(<ResearchTasksPage />);
+
+    expect(await screen.findByText('任务详情将在加载或选择任务后显示')).toBeInTheDocument();
   });
 
   it('E-RRD-2: 默认选中首个有报告任务并标记报告版本', async () => {

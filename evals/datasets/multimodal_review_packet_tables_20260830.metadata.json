@@ -1,0 +1,215 @@
+{
+  "development": {
+    "companies": [
+      "中国电信",
+      "中国移动",
+      "中芯国际"
+    ],
+    "count": 30,
+    "source_files": [
+      "【上海证券】中芯国际深度研究报告：晶圆制造龙头，领航国产芯片新征程.pdf",
+      "【东方证券】产能利用率提升，持续推进工艺迭代和产品性能升级.pdf",
+      "【中原证券】产能利用率显著提升，持续推进工艺迭代升级——中芯国际(688981)季报点评.pdf",
+      "【光大证券】中芯国际2025年一季度业绩点评：1Q突发生产问题，2Q业绩有望筑底，自主可控趋势不改.pdf",
+      "【兴证国际】季度盈利低于预期，看好国产芯片长期空间.pdf",
+      "【华泰证券】中芯国际（688981）：上调港股目标价到63港币，看好DeepSeek推动代工需求强劲增长.pdf",
+      "【国信证券】工业与汽车触底反弹，良率影响短期营收.pdf",
+      "【财报】中芯国际：中芯国际2024年年度报告.pdf",
+      "电信2024年度报告.pdf",
+      "移动2024年度报告.pdf"
+    ],
+    "source_pages": [
+      {
+        "physical_page_number": 1,
+        "source_file": "【上海证券】中芯国际深度研究报告：晶圆制造龙头，领航国产芯片新征程.pdf"
+      },
+      {
+        "physical_page_number": 1,
+        "source_file": "【东方证券】产能利用率提升，持续推进工艺迭代和产品性能升级.pdf"
+      },
+      {
+        "physical_page_number": 1,
+        "source_file": "【中原证券】产能利用率显著提升，持续推进工艺迭代升级——中芯国际(688981)季报点评.pdf"
+      },
+      {
+        "physical_page_number": 1,
+        "source_file": "【光大证券】中芯国际2025年一季度业绩点评：1Q突发生产问题，2Q业绩有望筑底，自主可控趋势不改.pdf"
+      },
+      {
+        "physical_page_number": 1,
+        "source_file": "【兴证国际】季度盈利低于预期，看好国产芯片长期空间.pdf"
+      },
+      {
+        "physical_page_number": 1,
+        "source_file": "【华泰证券】中芯国际（688981）：上调港股目标价到63港币，看好DeepSeek推动代工需求强劲增长.pdf"
+      },
+      {
+        "physical_page_number": 4,
+        "source_file": "【国信证券】工业与汽车触底反弹，良率影响短期营收.pdf"
+      },
+      {
+        "physical_page_number": 4,
+        "source_file": "【财报】中芯国际：中芯国际2024年年度报告.pdf"
+      },
+      {
+        "physical_page_number": 2,
+        "source_file": "电信2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 29,
+        "source_file": "移动2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 3,
+        "source_file": "【上海证券】中芯国际深度研究报告：晶圆制造龙头，领航国产芯片新征程.pdf"
+      },
+      {
+        "physical_page_number": 2,
+        "source_file": "【东方证券】产能利用率提升，持续推进工艺迭代和产品性能升级.pdf"
+      },
+      {
+        "physical_page_number": 2,
+        "source_file": "【光大证券】中芯国际2025年一季度业绩点评：1Q突发生产问题，2Q业绩有望筑底，自主可控趋势不改.pdf"
+      },
+      {
+        "physical_page_number": 2,
+        "source_file": "【兴证国际】季度盈利低于预期，看好国产芯片长期空间.pdf"
+      },
+      {
+        "physical_page_number": 2,
+        "source_file": "【华泰证券】中芯国际（688981）：上调港股目标价到63港币，看好DeepSeek推动代工需求强劲增长.pdf"
+      },
+      {
+        "physical_page_number": 5,
+        "source_file": "【国信证券】工业与汽车触底反弹，良率影响短期营收.pdf"
+      },
+      {
+        "physical_page_number": 5,
+        "source_file": "【财报】中芯国际：中芯国际2024年年度报告.pdf"
+      },
+      {
+        "physical_page_number": 4,
+        "source_file": "电信2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 33,
+        "source_file": "移动2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 4,
+        "source_file": "【上海证券】中芯国际深度研究报告：晶圆制造龙头，领航国产芯片新征程.pdf"
+      },
+      {
+        "physical_page_number": 4,
+        "source_file": "【东方证券】产能利用率提升，持续推进工艺迭代和产品性能升级.pdf"
+      },
+      {
+        "physical_page_number": 3,
+        "source_file": "【光大证券】中芯国际2025年一季度业绩点评：1Q突发生产问题，2Q业绩有望筑底，自主可控趋势不改.pdf"
+      },
+      {
+        "physical_page_number": 3,
+        "source_file": "【兴证国际】季度盈利低于预期，看好国产芯片长期空间.pdf"
+      },
+      {
+        "physical_page_number": 7,
+        "source_file": "【华泰证券】中芯国际（688981）：上调港股目标价到63港币，看好DeepSeek推动代工需求强劲增长.pdf"
+      },
+      {
+        "physical_page_number": 7,
+        "source_file": "【财报】中芯国际：中芯国际2024年年度报告.pdf"
+      },
+      {
+        "physical_page_number": 5,
+        "source_file": "电信2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 34,
+        "source_file": "移动2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 5,
+        "source_file": "【上海证券】中芯国际深度研究报告：晶圆制造龙头，领航国产芯片新征程.pdf"
+      },
+      {
+        "physical_page_number": 4,
+        "source_file": "【光大证券】中芯国际2025年一季度业绩点评：1Q突发生产问题，2Q业绩有望筑底，自主可控趋势不改.pdf"
+      },
+      {
+        "physical_page_number": 4,
+        "source_file": "【兴证国际】季度盈利低于预期，看好国产芯片长期空间.pdf"
+      }
+    ]
+  },
+  "holdout": {
+    "companies": [
+      "中国联通"
+    ],
+    "count": 10,
+    "source_files": [
+      "联通2024年度报告.pdf"
+    ],
+    "source_pages": [
+      {
+        "physical_page_number": 4,
+        "source_file": "联通2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 5,
+        "source_file": "联通2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 6,
+        "source_file": "联通2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 7,
+        "source_file": "联通2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 8,
+        "source_file": "联通2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 9,
+        "source_file": "联通2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 16,
+        "source_file": "联通2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 17,
+        "source_file": "联通2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 18,
+        "source_file": "联通2024年度报告.pdf"
+      },
+      {
+        "physical_page_number": 19,
+        "source_file": "联通2024年度报告.pdf"
+      }
+    ]
+  },
+  "packet_status": "pending_review",
+  "packet_version": "v7-m1-review-packet-1",
+  "ready_for_verified_gate": false,
+  "sample_count": 40,
+  "scope_notice": "本包仅为普通表格 pending_review 候选；不含人工真值、预期答案或 verified 状态，不能单独关闭 M1.1/M4.4。",
+  "selection_rules": [
+    "同一 source_file 与 physical_page_number 最多保留一条候选",
+    "按 source_file 轮转抽样，避免单一文档主导",
+    "development 与 holdout 的公司和文档必须隔离",
+    "候选不含人工真值，不能直接写入 verified"
+  ],
+  "source_inventory": {
+    "additional_scanned_documents": [
+      "电信2024年度报告.pdf",
+      "移动2024年度报告.pdf",
+      "联通2024年度报告.pdf"
+    ],
+    "all_input_candidate_count": 645,
+    "existing_table_candidates": 385
+  }
+}

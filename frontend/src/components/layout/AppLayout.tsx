@@ -88,9 +88,11 @@ export default function AppLayout() {
 
             {/* 内容区域 */}
             <Content
+              className="app-workspace-content"
               style={{
                 overflow: isChatRoute ? 'hidden' : 'auto',
-                padding: isChatRoute ? 0 : 24,
+                // 页面级留白统一由辅助页面的 PageShell 管理，避免与外层内容区叠加。
+                padding: 0,
                 background: isDark ? colors.pageBackgroundDark : colors.pageBackgroundLight,
               }}
             >

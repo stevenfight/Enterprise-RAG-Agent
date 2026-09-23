@@ -5,6 +5,7 @@ import { Empty, Typography } from 'antd';
 import type { SourceInfo } from '@/types/chat';
 import SourceCard from './SourceCard';
 import { buildEvidenceBundles } from './evidenceBundle';
+import { getEvidenceKindLabel } from './evidenceSemantics';
 import { getPreferredScrollBehavior } from '@/utils/motionPreference';
 
 const { Text } = Typography;
@@ -48,7 +49,7 @@ export default function EvidenceContent({ sources, highlightedSourceIndex }: Evi
             const bundleKey = `${bundle.companyName}\u0000${bundle.sourceFile}`;
             const expanded = expandedKeys.has(bundleKey);
             const pageLabel = bundle.pages.length > 0 ? ` · P${bundle.pages.join('、P')}` : '';
-            const evidenceLabel = bundle.evidenceKind === 'retrieval' ? '检索证据' : '回答证据';
+            const evidenceLabel = getEvidenceKindLabel(bundle.evidenceKind);
             return (
               <section className="evidence-bundle" key={bundleKey} aria-label={`${bundle.companyName} ${bundle.sourceFile}`}>
                 <button
@@ -70,6 +71,11 @@ export default function EvidenceContent({ sources, highlightedSourceIndex }: Evi
                   </span>
                   <span className="evidence-bundle__meta"><span>{evidenceLabel}</span> · {bundle.sources.length} 条</span>
                 </button>
+                {bundle.integrityStatus === 'incomplete' && (
+                  <div role="alert" className="evidence-bundle__warning">
+                    视觉制品未完成或缺少已确认定位，当前不展示未经核验的视觉数值。
+                  </div>
+                )}
                 {expanded && (
                   <div className="evidence-bundle__items">
                     {bundle.sources.map((source) => (

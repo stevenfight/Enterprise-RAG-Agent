@@ -90,11 +90,11 @@ def get_documents() -> List[dict]:
         stat = pdf_file.stat()
         filename = pdf_file.name
 
-        # 判断索引状态：文件名包含已索引的公司名
-        indexed = any(company in filename for company in indexed_companies)
-
         manifest_doc = _manifest_document(filename)
-        index_status = manifest_doc.get("index_status") if manifest_doc else ("indexed" if indexed else "not_indexed")
+        # 清单记录是热加载/重试后的权威状态；仅在没有清单记录时兼容旧向量目录推断。
+        legacy_indexed = any(company in filename for company in indexed_companies)
+        index_status = manifest_doc.get("index_status") if manifest_doc else ("indexed" if legacy_indexed else "not_indexed")
+        indexed = index_status == "indexed"
         documents.append({
             "filename": filename,
             "size": stat.st_size,
@@ -151,6 +151,7 @@ def upload_pdf(
             "size_mb": round(len(file_content) / 1024 / 1024, 2),
             "sha256": registration.blob_sha256,
             "index_status": "pending_index",
+            "processing_status": "pending_processing",
             "idempotent": not registration.created,
             "logical_document_id": registration.logical_document_id,
             "document_version_id": registration.document_version_id,
@@ -260,7 +261,15 @@ def upload_pdf(
 
 def get_pending_documents() -> List[dict]:
     """返回等待解析或重建索引的文档，供后续后台 worker 热加载。"""
-    return [doc for doc in get_documents() if doc["index_status"] in {"pending_index", "index_failed"}]
+    pending = []
+    for document in get_documents():
+        if document["index_status"] not in {"pending_index", "index_failed"}:
+            continue
+        manifest_document = _manifest_document(document["filename"])
+        if manifest_document is not None and not manifest_document.get("index_retryable", True):
+            continue
+        pending.append(document)
+    return pending
 
 
 def sync_pdf_directory() -> dict[str, list[str]]:
@@ -330,7 +339,12 @@ def mark_pdf_indexed(
     index_attempts: int | None = None,
 ) -> bool:
     """仅允许当前文件版本标记为已索引，阻止旧任务覆盖新上传版本。"""
-    updates = {"index_generation": index_generation, "index_error": None}
+    updates = {
+        "index_generation": index_generation,
+        "index_error": None,
+        "index_error_category": None,
+        "index_retryable": False,
+    }
     if index_attempts is not None:
         updates["index_attempts"] = index_attempts
     return _update_index_status(filename, sha256, "indexed", **updates)
@@ -341,9 +355,16 @@ def mark_pdf_index_failed(
     sha256: str,
     error: str,
     index_attempts: int | None = None,
+    *,
+    retryable: bool = True,
+    error_category: str = "unknown",
 ) -> bool:
     """记录当前版本的索引失败，保留待重试状态和错误原因。"""
-    updates = {"index_error": str(error)}
+    updates = {
+        "index_error": str(error),
+        "index_error_category": error_category,
+        "index_retryable": retryable,
+    }
     if index_attempts is not None:
         updates["index_attempts"] = index_attempts
     return _update_index_status(filename, sha256, "index_failed", **updates)
@@ -359,14 +380,19 @@ def retry_pdf_index(filename: str) -> bool:
         document.update({
             "index_status": "pending_index",
             "index_error": None,
+            "index_error_category": None,
+            "index_retryable": True,
             "index_attempts": 0,
         })
         _write_manifest(manifest)
     return True
 
 
-def delete_pdf(filename: str) -> bool:
+def delete_pdf(filename: str, *, deletion_coordinator=None) -> bool:
     """删除 PDF 文件（不清理对应的向量索引数据）
+
+    传入 deletion_coordinator（M3.6）时，先为同名全部未删除的 V7 文档版本
+    创建删除请求（幂等），再执行 legacy 文件与清单清理。
 
     Returns:
         True: 删除成功
@@ -385,6 +411,10 @@ def delete_pdf(filename: str) -> bool:
         logger.warning("[knowledge] 删除失败: 文件不存在 | 文件名: %s | 路径: %s",
                         filename, str(filepath))
         return False
+
+    # M3.6：V7 删除请求先于文件删除创建，失败时不触碰 legacy 文件状态
+    if deletion_coordinator is not None:
+        deletion_coordinator.request_deletion_by_original_filename(filename)
 
     file_size = filepath.stat().st_size
     logger.info("[knowledge] 开始删除 PDF | 文件名: %s | 路径: %s | 大小: %d bytes",

@@ -48,3 +48,18 @@ def test_page_renderer_rejects_out_of_range_or_unsafe_document_version_id(tmp_pa
         renderer.render("../unsafe", pdf_path, physical_page_number=1)
     with pytest.raises(ValueError, match="document_version_id"):
         renderer.render(None, pdf_path, physical_page_number=1)
+
+
+def test_page_renderer_uses_short_png_temporary_name_for_deep_output_paths(tmp_path: Path):
+    from src.page_image_renderer import PageImageRenderer
+
+    output_path = tmp_path / "rendered" / "version-1" / (
+        "a" * 64 + ".thumbnail.png"
+    )
+
+    temporary_path = PageImageRenderer._temporary_path(output_path)
+
+    assert temporary_path.parent == output_path.parent
+    assert temporary_path.suffix == ".png"
+    assert output_path.stem not in temporary_path.name
+    assert ".thumbnail" not in temporary_path.name

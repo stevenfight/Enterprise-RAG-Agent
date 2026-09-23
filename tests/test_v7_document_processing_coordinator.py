@@ -109,3 +109,55 @@ def test_coordinator_rejects_source_sha_or_page_count_that_do_not_match_version(
             document_version_id=registration.document_version_id,
             source_pdf_path=source_pdf,
         )
+
+
+def test_coordinator_recovers_only_its_configured_page_artifact_root(tmp_path: Path):
+    store, _, _ = _registered_document(tmp_path)
+    coordinator = _coordinator(tmp_path, store)
+    pending = tmp_path / "rendered" / "orphan.png.deleting"
+    pending.parent.mkdir()
+    pending.write_bytes(b"orphan")
+
+    assert coordinator.recover_pending_page_file_cleanup() == (pending,)
+    assert coordinator.recover_pending_page_file_cleanup() == ()
+
+
+def test_coordinator_routes_real_pages_and_never_dispatches_vision_for_text_only_page(
+    tmp_path: Path,
+):
+    """迁移编排使用真实 PDF 信号；普通文本页不进入视觉分发器。"""
+    store, registration, source_pdf = _registered_document(tmp_path)
+    document = fitz.open(source_pdf)
+    document[0].insert_text((50, 50), "ordinary text page")
+    document.save(tmp_path / "with-text.pdf")
+    document.close()
+    routed_pdf = tmp_path / "with-text.pdf"
+    routed_content = routed_pdf.read_bytes()
+    from src.v7_document_repository import V7DocumentRepository
+
+    routed_registration = V7DocumentRepository(store, tmp_path / "blobs").register_document_version(
+        logical_document_key="routed-report-2025",
+        display_name="路由报告",
+        original_filename="路由报告.pdf",
+        file_content=routed_content,
+        physical_page_count=2,
+    )
+    coordinator = _coordinator(tmp_path, store)
+    manifest = coordinator.start(
+        document_version_id=routed_registration.document_version_id,
+        source_pdf_path=routed_registration.blob_path,
+        source_sha256=routed_registration.blob_sha256,
+        physical_page_count=2,
+    )
+    dispatched = []
+
+    snapshot = coordinator.route_document_pages(
+        manifest_id=manifest.manifest_id,
+        document_version_id=routed_registration.document_version_id,
+        source_pdf_path=routed_registration.blob_path,
+        vision_dispatcher=dispatched.append,
+    )
+
+    assert [decision.page_type for decision in snapshot.decisions] == ["text", "scan"]
+    assert snapshot.decisions[0].use_vision is False
+    assert [decision.page_number for decision in dispatched] == [2]
