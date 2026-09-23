@@ -37,6 +37,23 @@ import { getCurrentResearchIdentity, RESEARCH_IDENTITY_CHANGED_EVENT, type Resea
 
 const { Text } = Typography;
 
+/** 公共 HTTP 入口不保证提供 Web Crypto，任务 ID 不依赖安全上下文 API。 */
+function createResearchTaskId(): string {
+  return `research-task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function submissionErrorMessage(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'response' in error) {
+    const response = (error as { response?: { data?: { detail?: { message?: unknown } | unknown; message?: unknown } } }).response;
+    const detail = response?.data?.detail;
+    if (typeof detail === 'object' && detail !== null && 'message' in detail && typeof detail.message === 'string') return detail.message;
+    if (typeof detail === 'string') return detail;
+    if (typeof response?.data?.message === 'string') return response.data.message;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return '任务未提交，请稍后重试。';
+}
+
 const STATUS_META: Record<string, { label: string; color: string }> = {
   pending: { label: '等待开始', color: 'blue' },
   running: { label: '运行中', color: 'processing' },
@@ -243,7 +260,7 @@ export default function ResearchTasksPage() {
     try {
       const scope = values.scope.split(/[，,]/).map((item) => item.trim()).filter(Boolean);
       const created = await createResearchTask({
-        task_id: `research-task-${crypto.randomUUID()}`,
+        task_id: createResearchTaskId(),
         dag_step_ids: ['plan', 'retrieve', 'review', 'report'],
         objective: values.objective.trim(),
         scope,
@@ -258,8 +275,8 @@ export default function ResearchTasksPage() {
       form.resetFields();
       await loadTasks();
       setSelectedTaskId(created.task_id);
-    } catch {
-      setSubmissionError('任务未提交，请确认当前会话、研究范围和预算。');
+    } catch (error) {
+      setSubmissionError(`任务未提交：${submissionErrorMessage(error)}`);
     } finally {
       setSubmittingTask(false);
     }
