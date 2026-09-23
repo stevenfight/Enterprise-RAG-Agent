@@ -154,7 +154,7 @@ class DocumentAssetManifestRepository:
                 connection.execute("BEGIN IMMEDIATE")
                 manifest = connection.execute(
                     """
-                    SELECT physical_page_count
+                    SELECT physical_page_count, asset_status
                     FROM v7_document_asset_manifests
                     WHERE manifest_id = ?
                     """,
@@ -283,14 +283,23 @@ class DocumentAssetManifestRepository:
                     or failed_parse_pages
                     or unresolved_parse_pages
                 )
-                connection.execute(
-                    """
-                    UPDATE v7_document_asset_manifests
-                    SET asset_status = ?
-                    WHERE manifest_id = ?
-                    """,
-                    ("complete" if complete else "incomplete", manifest_id),
-                )
+                next_status = "complete" if complete else "incomplete"
+                previous_status = manifest[1]
+                if previous_status != next_status:
+                    connection.execute(
+                        """
+                        UPDATE v7_document_asset_manifests
+                        SET asset_status = ?
+                        WHERE manifest_id = ?
+                        """,
+                        (next_status, manifest_id),
+                    )
+                    connection.execute(
+                        """INSERT INTO v7_visual_artifact_status_events(
+                            entity_type, entity_id, previous_status, next_status
+                        ) VALUES ('document_asset_manifest', ?, ?, ?)""",
+                        (manifest_id, previous_status, next_status),
+                    )
                 connection.commit()
             except Exception:
                 connection.rollback()

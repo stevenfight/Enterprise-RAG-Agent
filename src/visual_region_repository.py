@@ -23,6 +23,11 @@ class VisualRegionRepository:
     """将规范化视觉区域登记到既有 PageArtifact。"""
 
     _ALLOWED_REGION_STATUSES = {"pending", "complete", "incomplete"}
+    _STATUS_TRANSITIONS = {
+        "pending": {"incomplete", "complete"},
+        "incomplete": {"pending", "complete"},
+        "complete": set(),
+    }
 
     def __init__(self, store: V7MetadataStore) -> None:
         self.store = store
@@ -97,6 +102,46 @@ class VisualRegionRepository:
             physical_page_number=int(artifact[1]),
             created=True,
         )
+
+    def transition_status(self, visual_region_id: str, next_status: str) -> str:
+        """按受限状态机迁移区域状态，并与审计事件同事务提交。"""
+        if not isinstance(visual_region_id, str) or not visual_region_id.strip():
+            raise ValueError("visual_region_id 不能为空")
+        if next_status not in self._ALLOWED_REGION_STATUSES:
+            raise ValueError("region_status 无效")
+        self.store.initialize()
+        with self.store.connect() as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute(
+                    """SELECT region_status FROM v7_visual_regions
+                    WHERE visual_region_id = ?""",
+                    (visual_region_id,),
+                ).fetchone()
+                if row is None:
+                    raise ValueError("visual_region_id 不存在")
+                previous_status = row[0]
+                if previous_status == next_status:
+                    connection.commit()
+                    return next_status
+                if next_status not in self._STATUS_TRANSITIONS[previous_status]:
+                    raise ValueError("视觉区域状态不允许迁移")
+                connection.execute(
+                    """UPDATE v7_visual_regions SET region_status = ?
+                    WHERE visual_region_id = ?""",
+                    (next_status, visual_region_id),
+                )
+                connection.execute(
+                    """INSERT INTO v7_visual_artifact_status_events(
+                        entity_type, entity_id, previous_status, next_status
+                    ) VALUES ('visual_region', ?, ?, ?)""",
+                    (visual_region_id, previous_status, next_status),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return next_status
 
     @staticmethod
     def _validate_coordinates(

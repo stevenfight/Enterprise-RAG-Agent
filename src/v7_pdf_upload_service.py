@@ -2,6 +2,7 @@
 """v7 PDF staging 上传服务。"""
 
 import os
+import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -71,3 +72,23 @@ class V7PdfUploadService:
         finally:
             if staging_path.exists():
                 staging_path.unlink()
+
+    def cleanup_expired_staging(
+        self,
+        *,
+        older_than_seconds: float,
+        now: float | None = None,
+    ) -> list[str]:
+        """只清理超过保留期的上传暂存文件，避免干扰正在进行的上传。"""
+        if older_than_seconds < 0:
+            raise ValueError("older_than_seconds 不能为负数")
+        now = time.time() if now is None else now
+        if not self.staging_root.exists():
+            return []
+        removed: list[str] = []
+        for staging_path in sorted(self.staging_root.glob("*.uploading")):
+            if now - staging_path.stat().st_mtime < older_than_seconds:
+                continue
+            staging_path.unlink()
+            removed.append(staging_path.name)
+        return removed

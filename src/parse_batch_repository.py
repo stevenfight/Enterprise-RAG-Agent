@@ -33,6 +33,12 @@ class ParseBatchRepository:
     """以 manifest 为边界保存不可重叠的解析物理页段。"""
 
     _ALLOWED_BATCH_STATUSES = {"pending", "processing", "complete", "failed"}
+    _STATUS_TRANSITIONS = {
+        "pending": {"processing", "failed"},
+        "processing": {"complete", "failed"},
+        "failed": {"pending"},
+        "complete": set(),
+    }
 
     def __init__(self, store: V7MetadataStore) -> None:
         self.store = store
@@ -147,6 +153,55 @@ class ParseBatchRepository:
             True,
         )
 
+    def transition_status(
+        self,
+        manifest_id: str,
+        batch_id: str,
+        next_status: str,
+        *,
+        error_code: str | None = None,
+    ) -> str:
+        """按解析批次状态机迁移，并和审计事件在同一事务内提交。"""
+        if not isinstance(manifest_id, str) or not manifest_id.strip():
+            raise ValueError("manifest_id 不能为空")
+        if not isinstance(batch_id, str) or not batch_id.strip():
+            raise ValueError("batch_id 不能为空")
+        self._validate_transition_input(next_status, error_code)
+        self.store.initialize()
+        with self.store.connect() as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute(
+                    """SELECT batch_status FROM v7_parse_batches
+                    WHERE manifest_id = ? AND batch_id = ?""",
+                    (manifest_id, batch_id),
+                ).fetchone()
+                if row is None:
+                    raise ValueError("解析批次不存在")
+                previous_status = row[0]
+                if previous_status == next_status:
+                    connection.commit()
+                    return next_status
+                if next_status not in self._STATUS_TRANSITIONS[previous_status]:
+                    raise ValueError("解析批次状态不允许迁移")
+                connection.execute(
+                    """UPDATE v7_parse_batches
+                    SET batch_status = ?, error_code = ?
+                    WHERE manifest_id = ? AND batch_id = ?""",
+                    (next_status, error_code, manifest_id, batch_id),
+                )
+                connection.execute(
+                    """INSERT INTO v7_visual_artifact_status_events(
+                        entity_type, entity_id, previous_status, next_status
+                    ) VALUES ('parse_batch', ?, ?, ?)""",
+                    (f"{manifest_id}:{batch_id}", previous_status, next_status),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return next_status
+
     def summarize(self, manifest_id: str) -> ParseBatchCoverage:
         """汇总物理页段，避免把失败或未完成批次误报为完整解析。"""
         self.store.initialize()
@@ -198,6 +253,17 @@ class ParseBatchRepository:
             failed_physical_pages=failed_pages,
             unresolved_physical_pages=unresolved_pages,
         )
+
+    @classmethod
+    def _validate_transition_input(cls, next_status: str, error_code: str | None) -> None:
+        """验证状态迁移的目标状态和失败证据。"""
+        if next_status not in cls._ALLOWED_BATCH_STATUSES:
+            raise ValueError("batch_status 无效")
+        if next_status == "failed":
+            if not isinstance(error_code, str) or not error_code.strip():
+                raise ValueError("failed 批次必须记录 error_code")
+        elif error_code is not None:
+            raise ValueError("只有 failed 批次可以记录 error_code")
 
     @classmethod
     def _validate_input(

@@ -69,6 +69,9 @@ data/stock_data/pdf_reports/
 # 调试数据
 data/stock_data/debug_data/
 
+# v7 发布集运行时元数据与迁移备份
+data/v7/
+
 # 临时文件
 *.tmp
 *.temp

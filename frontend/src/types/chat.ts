@@ -7,6 +7,27 @@
 /** 后端评分数值或状态字段。 */
 export type SourceScoreValue = number | string;
 
+/** 后端已确认完整制品的页内视觉区域定位。 */
+export interface VisualLocator {
+  manifest_id: string;
+  page_artifact_id: string;
+  visual_region_id: string;
+  normalized_bbox: [number, number, number, number];
+  artifact_status: 'complete';
+}
+
+/** 已识别图表的可选前端展示载荷；缺少时保持旧来源契约。 */
+export interface VisualChartEvidence {
+  title: string;
+  chart_type: 'bar' | 'line' | 'pie' | 'hbar';
+  labels: string[];
+  values: number[];
+  xlabel?: string;
+  ylabel?: string;
+  numeric_confidence: number;
+  trends?: string[];
+}
+
 /** 来源信息 (对应后端 SourceInfo) */
 export interface SourceInfo {
   index: number;
@@ -15,6 +36,12 @@ export interface SourceInfo {
   company_name: string;
   scores: Record<string, SourceScoreValue>;
   excerpt?: string;
+  /** 缺失时保持旧来源契约，不代表存在页图或视觉区域。 */
+  visual_locator?: VisualLocator;
+  /** 后端确认视觉制品未完成时的受限提示，不含路径或坐标。 */
+  visual_preview_status?: 'incomplete';
+  /** 后端仅在已识别图表可审计时提供；数值展示仍受定位与置信度门禁限制。 */
+  visual_chart?: VisualChartEvidence;
 }
 
 /** RAG 问答请求 (对应后端 QueryRequest) */

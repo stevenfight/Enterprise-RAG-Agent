@@ -4,6 +4,7 @@ import { Button, Tag } from 'antd';
 import { ArrowRightOutlined, FileSearchOutlined } from '@ant-design/icons';
 import type { SourceInfo } from '@/types/chat';
 import { buildEvidenceChain } from './evidenceChain';
+import { getEvidenceKindLabel } from './evidenceSemantics';
 
 interface EvidenceChainGraphProps {
   answer: string;
@@ -26,7 +27,7 @@ export default function EvidenceChainGraph({ answer, sources, onViewEvidence }: 
         <span>由来源支撑</span>
       </div>
       <div className="evidence-chain-graph__sources" aria-label="回答来源节点">
-        {chain.nodes.map(({ index, source, cited }) => (
+        {chain.nodes.map(({ index, source, cited, evidenceKind, integrityStatus }) => (
           <Button
             key={index}
             type="text"
@@ -39,6 +40,8 @@ export default function EvidenceChainGraph({ answer, sources, onViewEvidence }: 
               <strong>{source.source_file}</strong>
               <span>{source.company_name} · 第 {source.pages.join('、')} 页</span>
             </span>
+            <Tag color={evidenceKind === 'visual' ? 'gold' : 'blue'}>{getEvidenceKindLabel(evidenceKind)}</Tag>
+            {integrityStatus === 'incomplete' && <Tag color="warning">视觉制品未完成</Tag>}
             <Tag color={cited ? 'success' : 'default'}>{cited ? '已引用' : '未在正文标记'}</Tag>
           </Button>
         ))}

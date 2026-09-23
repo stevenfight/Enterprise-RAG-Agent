@@ -85,15 +85,19 @@ class RetrieveTool(BaseTool):
     # 类级别锁，保护多线程首次初始化 _retriever
     _init_lock = threading.Lock()
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, publication_resolver=None):
         """初始化检索工具
 
         Args:
             api_key: DashScope API Key（可选，默认从环境读取）
+            publication_resolver: 统一 PublicationResolver（可选）。
+                注入后每次请求开始固定 publication 快照，检索使用快照代际，
+                返回结果携带 publication_id；未注入时行为保持不变。
         """
         self._api_key = api_key
         self._retriever = None
         self._vector_db_dir = None
+        self._publication_resolver = publication_resolver
 
         logger.info("[RetrieveTool] 初始化完成（HybridRetriever 延迟加载）")
 
@@ -146,7 +150,17 @@ class RetrieveTool(BaseTool):
                     from ..retrieval import HybridRetriever
 
                     vector_db_dir = self._resolve_vector_db_dir()
-                    self._retriever = HybridRetriever(vector_db_dir, api_key=self._api_key)
+
+                    # M1.9：注入请求级快照代际解析（每次调用从固定快照动态读取）
+                    generation_resolver = None
+                    if self._publication_resolver is not None:
+                        def generation_resolver(company_name):
+                            return self._publication_resolver.resolve_generation_id()
+
+                    self._retriever = HybridRetriever(
+                        vector_db_dir, api_key=self._api_key,
+                        generation_resolver=generation_resolver,
+                    )
                     logger.info("[RetrieveTool] HybridRetriever 实例化完成")
 
         return self._retriever
@@ -238,56 +252,68 @@ class RetrieveTool(BaseTool):
         company_name = kwargs.get("company_name", None)
         top_n = min(kwargs.get("top_n", 5), 10)
 
-        logger.info("[RetrieveTool] ====== 检索开始 ======")
-        logger.info("[RetrieveTool] query='%s', company=%s, top_n=%d",
-                     query[:80] + ("..." if len(query) > 80 else ""),
-                     company_name or "全部",
-                     top_n)
+        # M1.9：请求开始固定 publication 快照，整个请求使用同一视图
+        request_snapshot = None
+        if self._publication_resolver is not None:
+            request_snapshot = self._publication_resolver.begin_request()
+        request_publication_id = request_snapshot.publication_id if request_snapshot is not None else None
 
-        # ---- 执行检索 ----
         try:
-            retriever = self._get_retriever()
-            results = retriever.search(
-                query=query,
-                company_name=company_name,
-                top_n=top_n,
-            )
-        except FileNotFoundError as e:
-            logger.error("[RetrieveTool] 检索失败: 索引文件不存在")
-            return ToolResult(
-                success=False,
-                error=(
-                    "向量数据库索引文件不存在。请先运行以下命令构建索引：\n"
-                    "python src/ingestion.py"
+            logger.info("[RetrieveTool] ====== 检索开始 ======")
+            logger.info("[RetrieveTool] query='%s', company=%s, top_n=%d",
+                         query[:80] + ("..." if len(query) > 80 else ""),
+                         company_name or "全部",
+                         top_n)
+
+            # ---- 执行检索 ----
+            try:
+                retriever = self._get_retriever()
+                results = retriever.search(
+                    query=query,
+                    company_name=company_name,
+                    top_n=top_n,
                 )
-            )
-        except ValueError as e:
-            logger.error("[RetrieveTool] 检索失败: 参数错误 - %s", str(e))
-            return ToolResult(success=False, error=str(e))
-        except Exception as e:
-            logger.error("[RetrieveTool] 检索失败: 未知异常 - %s", str(e))
-            return ToolResult(success=False, error="检索异常: %s" % str(e))
+            except FileNotFoundError as e:
+                logger.error("[RetrieveTool] 检索失败: 索引文件不存在")
+                return ToolResult(
+                    success=False,
+                    error=(
+                        "向量数据库索引文件不存在。请先运行以下命令构建索引：\n"
+                        "python src/ingestion.py"
+                    )
+                )
+            except ValueError as e:
+                logger.error("[RetrieveTool] 检索失败: 参数错误 - %s", str(e))
+                return ToolResult(success=False, error=str(e))
+            except Exception as e:
+                logger.error("[RetrieveTool] 检索失败: 未知异常 - %s", str(e))
+                return ToolResult(success=False, error="检索异常: %s" % str(e))
 
-        # ---- 空结果处理 ----
-        if not results:
-            logger.info("[RetrieveTool] ====== 检索完成: 0 条结果 ======")
-            return ToolResult(
-                success=True,
-                data={
-                    "query": query,
-                    "company_name": company_name or "全部",
-                    "count": 0,
-                    "message": (
-                        "未检索到相关数据。建议：\n"
-                        "1. 调整查询关键词，补充具体信息（如年份、指标名称）\n"
-                        "2. 去掉公司限制，扩大检索范围\n"
-                        "3. 确认查询的公司名称拼写正确"
-                    ),
-                    "results": [],
-                }
-            )
+            # ---- 空结果处理 ----
+            if not results:
+                logger.info("[RetrieveTool] ====== 检索完成: 0 条结果 ======")
+                return ToolResult(
+                    success=True,
+                    data={
+                        "query": query,
+                        "company_name": company_name or "全部",
+                        "count": 0,
+                        "publication_id": request_publication_id,
+                        "message": (
+                            "未检索到相关数据。建议：\n"
+                            "1. 调整查询关键词，补充具体信息（如年份、指标名称）\n"
+                            "2. 去掉公司限制，扩大检索范围\n"
+                            "3. 确认查询的公司名称拼写正确"
+                        ),
+                        "results": [],
+                    }
+                )
 
-        # ---- 格式化并返回 ----
-        formatted_results = self._format_results(results, query, company_name)
-        logger.info("[RetrieveTool] ====== 检索完成: %d 条结果 ======", len(results))
-        return ToolResult(success=True, data=formatted_results)
+            # ---- 格式化并返回 ----
+            formatted_results = self._format_results(results, query, company_name)
+            logger.info("[RetrieveTool] ====== 检索完成: %d 条结果 ======", len(results))
+            return ToolResult(success=True, data={**formatted_results, "publication_id": request_publication_id})
+        finally:
+            # M1.9：请求结束释放固定快照（无论成败）
+            if self._publication_resolver is not None:
+                self._publication_resolver.end_request()

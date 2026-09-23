@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 
 def _document_version_id(tmp_path: Path) -> tuple[object, str]:
     from src.v7_document_repository import V7DocumentRepository
@@ -166,6 +168,14 @@ def test_manifest_marks_complete_only_when_every_physical_page_has_intact_images
     assert result.missing_physical_pages == ()
     assert result.invalid_physical_pages == ()
     assert repository.get(manifest.manifest_id).asset_status == "complete"
+    with store.connect() as connection:
+        events = connection.execute(
+            """SELECT previous_status, next_status
+            FROM v7_visual_artifact_status_events
+            WHERE entity_type = 'document_asset_manifest' AND entity_id = ?""",
+            (manifest.manifest_id,),
+        ).fetchall()
+    assert events == [("incomplete", "complete")]
 
 
 def test_manifest_keeps_incomplete_when_physical_page_is_missing_or_file_is_deleted(
@@ -211,3 +221,70 @@ def test_manifest_requires_complete_parse_batch_coverage_before_complete(tmp_pat
     assert result.complete is False
     assert result.missing_parse_physical_pages == (1, 2)
     assert repository.get(manifest.manifest_id).asset_status == "incomplete"
+
+
+def test_manifest_completion_write_failure_rolls_back_status_and_audit_event(
+    tmp_path: Path,
+):
+    """清单完成状态或审计写入失败时必须整体回滚。"""
+    import sqlite3
+
+    from src.page_artifact_repository import PageArtifactRepository
+    from src.page_image_renderer import PageImageRenderer
+    from src.parse_batch_repository import ParseBatchRepository
+
+    repository, store, manifest, document, pdf_path = _page_manifest(tmp_path)
+    renderer = PageImageRenderer(tmp_path / "rendered")
+    page_repository = PageArtifactRepository(store)
+    for physical_page_number in (1, 2):
+        artifact = renderer.render(
+            document.document_version_id,
+            pdf_path,
+            physical_page_number=physical_page_number,
+        )
+        page_repository.register_page_image(manifest.manifest_id, artifact)
+    ParseBatchRepository(store).record(
+        manifest_id=manifest.manifest_id,
+        batch_id="atomic-failure-1-2",
+        physical_page_start=1,
+        physical_page_end=2,
+        parser_name="mineru",
+        parser_version="v4",
+        batch_status="complete",
+    )
+
+    with store.connect() as connection:
+        connection.execute(
+            """
+            CREATE TRIGGER fail_manifest_completion_audit
+            BEFORE INSERT ON v7_visual_artifact_status_events
+            WHEN NEW.entity_type = 'document_asset_manifest'
+            BEGIN
+                SELECT RAISE(ABORT, 'injected manifest completion failure');
+            END
+            """
+        )
+
+    with pytest.raises(sqlite3.IntegrityError, match="injected manifest completion failure"):
+        repository.verify_page_image_completeness(manifest.manifest_id)
+
+    assert repository.get(manifest.manifest_id).asset_status == "incomplete"
+    with store.connect() as connection:
+        events = connection.execute(
+            """
+            SELECT previous_status, next_status
+            FROM v7_visual_artifact_status_events
+            WHERE entity_type = 'document_asset_manifest' AND entity_id = ?
+            """,
+            (manifest.manifest_id,),
+        ).fetchall()
+        issues = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM v7_manifest_validation_issues
+            WHERE manifest_id = ?
+            """,
+            (manifest.manifest_id,),
+        ).fetchone()[0]
+    assert events == []
+    assert issues == 0

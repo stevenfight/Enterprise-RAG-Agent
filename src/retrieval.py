@@ -439,9 +439,11 @@ class BM25Retriever:
 class HybridRetriever:
     """混合检索器：0.5*BM25 + 0.5*向量，归一化后加权融合，再 gte-rerank-v2 重排"""
 
-    def __init__(self, vector_db_dir, api_key=None):
+    def __init__(self, vector_db_dir, api_key=None, generation_resolver=None):
         self.vector_db_dir = Path(vector_db_dir)
         self._api_key = api_key
+        # 可选的请求级快照代际解析器：返回 generation_id 时优先于 legacy 指针
+        self._generation_resolver = generation_resolver
         self._vector_retrievers = {}
         self._bm25_retrievers = {}
         self._retriever_generations = {}
@@ -484,7 +486,13 @@ class HybridRetriever:
         return self._company_registry
 
     def _resolve_company_dir(self, company_name):
-        """优先读取已发布 generation；没有发布指针时保持旧目录契约。"""
+        """优先读取请求固定快照代际；其次读取已发布 generation；没有发布指针时保持旧目录契约。"""
+        # M1.9：请求级快照代际优先（由 PublicationResolver 固定的 publication）
+        if self._generation_resolver is not None:
+            snapshot_generation = self._generation_resolver(company_name)
+            if snapshot_generation:
+                snapshot_dir = self.vector_db_dir / "generations" / snapshot_generation / company_name
+                return snapshot_dir, snapshot_generation
         pointer_path = self.vector_db_dir / "active" / f"{company_name}.json"
         if pointer_path.exists():
             try:
@@ -1426,11 +1434,13 @@ class RAGGenerator:
     GENERATION_MODEL = "qwen-max"
     MAX_CONTEXT_TOKENS = 6000
 
-    def __init__(self, vector_db_dir, api_key=None, conversation_manager=None):
+    def __init__(self, vector_db_dir, api_key=None, conversation_manager=None, publication_resolver=None):
         self.vector_db_dir = Path(vector_db_dir)
         self._api_key = api_key
         self._retriever = None
         self.conversation_manager = conversation_manager
+        # 可选的统一 PublicationResolver：请求开始固定快照，检索与返回使用同一 publication
+        self._publication_resolver = publication_resolver
 
         logger.info("[RAGGenerator] 初始化，向量数据库目录: %s", self.vector_db_dir)
 
@@ -1442,7 +1452,16 @@ class RAGGenerator:
 
     def _get_retriever(self):
         if not self._retriever:
-            self._retriever = HybridRetriever(self.vector_db_dir, api_key=self._ensure_api_key())
+            generation_resolver = None
+            if self._publication_resolver is not None:
+                # 每次调用时从当前请求固定快照动态读取代际，保证请求内一致、新请求自动刷新
+                def generation_resolver(company_name):
+                    return self._publication_resolver.resolve_generation_id()
+
+            self._retriever = HybridRetriever(
+                self.vector_db_dir, api_key=self._ensure_api_key(),
+                generation_resolver=generation_resolver,
+            )
         return self._retriever
 
     def _build_context(self, retrieved_results):
@@ -1706,100 +1725,112 @@ class RAGGenerator:
 
     @traceable(name="rag-query")
     def query(self, query, company_name=None, top_n=RERANK_TOP_N, mentioned_companies=None, intent=None, extracted_years=None):
-        logger.info("=" * 60)
-        logger.info("[RAGGenerator] 开始 RAG 问答流程")
-        logger.info("[RAGGenerator] 查询: '%s'", query)
-        logger.info("[RAGGenerator] 指定公司: %s", company_name or "全部")
-        logger.info("[RAGGenerator] 提及公司: %s", mentioned_companies or "未指定")
-        logger.info("[RAGGenerator] 意图: %s", intent or "未指定")
-        logger.info("[RAGGenerator] 提取年份: %s", extracted_years or "未指定")
-        logger.info("[RAGGenerator] 重排返回条数: %d", top_n)
-        logger.info("=" * 60)
+        # M1.9：请求开始固定 publication 快照，整个请求使用同一视图
+        request_snapshot = None
+        if self._publication_resolver is not None:
+            request_snapshot = self._publication_resolver.begin_request()
+        request_publication_id = request_snapshot.publication_id if request_snapshot is not None else None
+        try:
+            logger.info("=" * 60)
+            logger.info("[RAGGenerator] 开始 RAG 问答流程")
+            logger.info("[RAGGenerator] 查询: '%s'", query)
+            logger.info("[RAGGenerator] 指定公司: %s", company_name or "全部")
+            logger.info("[RAGGenerator] 提及公司: %s", mentioned_companies or "未指定")
+            logger.info("[RAGGenerator] 意图: %s", intent or "未指定")
+            logger.info("[RAGGenerator] 提取年份: %s", extracted_years or "未指定")
+            logger.info("[RAGGenerator] 重排返回条数: %d", top_n)
+            logger.info("=" * 60)
 
-        retriever = self._get_retriever()
-        logger.info("[RAGGenerator] 阶段1: 混合检索 + gte-rerank-v2 重排")
-        retrieved_results = retriever.search(query, company_name=company_name, top_n=top_n,
-                                              mentioned_companies=mentioned_companies, intent=intent,
-                                              extracted_years=extracted_years)
+            retriever = self._get_retriever()
+            logger.info("[RAGGenerator] 阶段1: 混合检索 + gte-rerank-v2 重排")
+            retrieved_results = retriever.search(query, company_name=company_name, top_n=top_n,
+                                                  mentioned_companies=mentioned_companies, intent=intent,
+                                                  extracted_years=extracted_years)
 
-        if not retrieved_results:
-            logger.warning("[RAGGenerator] 检索无结果，返回空答案")
-            return {
-                "answer": "抱歉，未检索到与您问题相关的文档内容，无法回答该问题。",
-                "sources": [],
+            if not retrieved_results:
+                logger.warning("[RAGGenerator] 检索无结果，返回空答案")
+                return {
+                    "answer": "抱歉，未检索到与您问题相关的文档内容，无法回答该问题。",
+                    "sources": [],
+                    "query": query,
+                    "company_name": company_name,
+                    "retrieved_count": 0,
+                    "publication_id": request_publication_id,
+                }
+
+            logger.info("[RAGGenerator] 阶段2: 构建 LLM 上下文")
+            context, used_count, used_result_indices, used_result_texts = self._build_context(retrieved_results)
+
+            from src.verified_financial_facts import VerifiedFinancialFactRegistry
+            verified_registry = VerifiedFinancialFactRegistry()
+            comparison = verified_registry.get_comparison_for_query(query)
+
+            if comparison["available"]:
+                logger.info("[RAGGenerator] 阶段3: 使用已核验比较事实生成正文")
+                answer = verified_registry.build_comparison_answer(comparison)
+            else:
+                logger.info("[RAGGenerator] 阶段3: 构建 Prompt")
+                conversation_context = ""
+                if self.conversation_manager:
+                    conversation_context = self.conversation_manager.get_context_string()
+                    if conversation_context:
+                        logger.info("[RAGGenerator] 注入对话历史上下文 (%d 字符)", len(conversation_context))
+                if intent == "comparison":
+                    prompt = self._build_comparison_prompt(query, context, conversation_context)
+                    logger.info("[RAGGenerator] 使用对比分析 Prompt")
+                elif intent == "financial_data":
+                    prompt = self._build_financial_data_prompt(query, context, conversation_context)
+                    logger.info("[RAGGenerator] 使用财务数据专用 Prompt")
+                elif intent == "trend":
+                    prompt = self._build_trend_prompt(query, context, conversation_context)
+                    logger.info("[RAGGenerator] 使用趋势分析专用 Prompt")
+                elif intent == "business_analysis":
+                    prompt = self._build_business_analysis_prompt(query, context, conversation_context)
+                    logger.info("[RAGGenerator] 使用业务分析专用 Prompt")
+                else:
+                    prompt = self._build_prompt(query, context, conversation_context)
+                    logger.info("[RAGGenerator] 使用通用 Prompt")
+
+                logger.info("[RAGGenerator] 阶段4: LLM 生成答案")
+                answer = self._generate_answer(prompt)
+
+            logger.info("[RAGGenerator] 阶段5: 构建来源摘要")
+            used_results = [
+                {
+                    **result,
+                    "parent_text": used_result_texts[index],
+                    "_source_index": index + 1,
+                }
+                for index, result in enumerate(retrieved_results)
+                if index in used_result_indices
+            ]
+            sources = self._build_sources_summary(used_results)
+
+            result = {
+                "answer": answer,
+                "sources": sources,
                 "query": query,
                 "company_name": company_name,
-                "retrieved_count": 0,
+                "retrieved_count": len(retrieved_results),
+                "context_used_count": used_count,
+                "publication_id": request_publication_id,
             }
+            if comparison["available"]:
+                result["comparison"] = comparison
 
-        logger.info("[RAGGenerator] 阶段2: 构建 LLM 上下文")
-        context, used_count, used_result_indices, used_result_texts = self._build_context(retrieved_results)
+            logger.info("=" * 60)
+            logger.info("[RAGGenerator] RAG 问答流程完成")
+            logger.info("[RAGGenerator] 答案长度: %d 字符", len(answer))
+            logger.info("[RAGGenerator] 来源数: %d, 实际使用: %d", len(sources), used_count)
+            logger.info("[RAGGenerator] 答案预览: %s",
+                         answer[:100] + "..." if len(answer) > 100 else answer)
+            logger.info("=" * 60)
 
-        from src.verified_financial_facts import VerifiedFinancialFactRegistry
-        verified_registry = VerifiedFinancialFactRegistry()
-        comparison = verified_registry.get_comparison_for_query(query)
-
-        if comparison["available"]:
-            logger.info("[RAGGenerator] 阶段3: 使用已核验比较事实生成正文")
-            answer = verified_registry.build_comparison_answer(comparison)
-        else:
-            logger.info("[RAGGenerator] 阶段3: 构建 Prompt")
-            conversation_context = ""
-            if self.conversation_manager:
-                conversation_context = self.conversation_manager.get_context_string()
-                if conversation_context:
-                    logger.info("[RAGGenerator] 注入对话历史上下文 (%d 字符)", len(conversation_context))
-            if intent == "comparison":
-                prompt = self._build_comparison_prompt(query, context, conversation_context)
-                logger.info("[RAGGenerator] 使用对比分析 Prompt")
-            elif intent == "financial_data":
-                prompt = self._build_financial_data_prompt(query, context, conversation_context)
-                logger.info("[RAGGenerator] 使用财务数据专用 Prompt")
-            elif intent == "trend":
-                prompt = self._build_trend_prompt(query, context, conversation_context)
-                logger.info("[RAGGenerator] 使用趋势分析专用 Prompt")
-            elif intent == "business_analysis":
-                prompt = self._build_business_analysis_prompt(query, context, conversation_context)
-                logger.info("[RAGGenerator] 使用业务分析专用 Prompt")
-            else:
-                prompt = self._build_prompt(query, context, conversation_context)
-                logger.info("[RAGGenerator] 使用通用 Prompt")
-
-            logger.info("[RAGGenerator] 阶段4: LLM 生成答案")
-            answer = self._generate_answer(prompt)
-
-        logger.info("[RAGGenerator] 阶段5: 构建来源摘要")
-        used_results = [
-            {
-                **result,
-                "parent_text": used_result_texts[index],
-                "_source_index": index + 1,
-            }
-            for index, result in enumerate(retrieved_results)
-            if index in used_result_indices
-        ]
-        sources = self._build_sources_summary(used_results)
-
-        result = {
-            "answer": answer,
-            "sources": sources,
-            "query": query,
-            "company_name": company_name,
-            "retrieved_count": len(retrieved_results),
-            "context_used_count": used_count,
-        }
-        if comparison["available"]:
-            result["comparison"] = comparison
-
-        logger.info("=" * 60)
-        logger.info("[RAGGenerator] RAG 问答流程完成")
-        logger.info("[RAGGenerator] 答案长度: %d 字符", len(answer))
-        logger.info("[RAGGenerator] 来源数: %d, 实际使用: %d", len(sources), used_count)
-        logger.info("[RAGGenerator] 答案预览: %s",
-                     answer[:100] + "..." if len(answer) > 100 else answer)
-        logger.info("=" * 60)
-
-        return result
+            return result
+        finally:
+            # M1.9：请求结束释放固定快照（无论成败）
+            if self._publication_resolver is not None:
+                self._publication_resolver.end_request()
 
 
 if __name__ == "__main__":

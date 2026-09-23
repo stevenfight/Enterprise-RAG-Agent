@@ -209,7 +209,11 @@ def build_bm25_index(child_chunks):
     return bm25
 
 
-def build_faiss_index(child_chunks, api_key):
+class EmbeddingIncompleteError(RuntimeError):
+    """strict 模式下 embedding 批次失败，索引构建中止并标记不完整。"""
+
+
+def build_faiss_index(child_chunks, api_key, strict=False):
     texts = []
     for c in child_chunks:
         t = truncate_text_to_tokens(c["text"])
@@ -229,6 +233,11 @@ def build_faiss_index(child_chunks, api_key):
             embeddings = get_embeddings_with_retry(batch_texts, api_key)
             all_embeddings.extend(embeddings)
         except Exception as e:
+            # M3.8：strict 模式禁止把补零向量当成功，任一批次失败即中止
+            if strict:
+                raise EmbeddingIncompleteError(
+                    f"strict 模式下 embedding 批次 {batch_idx + 1}/{num_batches} 失败: {e}"
+                ) from e
             print(f"    [失败] 批次 {batch_idx + 1}/{num_batches}: {e}", flush=True)
             for _ in batch_texts:
                 all_embeddings.append([0.0] * EMBEDDING_DIM)
@@ -250,13 +259,13 @@ def build_faiss_index(child_chunks, api_key):
     return index
 
 
-def build_company_index(company_name, child_chunks, parent_texts, output_dir, api_key):
+def build_company_index(company_name, child_chunks, parent_texts, output_dir, api_key, strict=False):
     company_dir = Path(output_dir) / company_name
     company_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"\n  [构建] {company_name}: {len(child_chunks)} 个子块", flush=True)
 
-    index = build_faiss_index(child_chunks, api_key)
+    index = build_faiss_index(child_chunks, api_key, strict=strict)
 
     faiss_path = company_dir / "index.faiss"
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -267,7 +276,7 @@ def build_company_index(company_name, child_chunks, parent_texts, output_dir, ap
 
     metadata = []
     for c in child_chunks:
-        metadata.append({
+        entry = {
             "child_id": c["child_id"],
             "parent_key": c["parent_key"],
             "parent_id": c["parent_id"],
@@ -277,7 +286,11 @@ def build_company_index(company_name, child_chunks, parent_texts, output_dir, ap
             "company_name": c["company_name"],
             "hash": c["hash"],
             "tags": c.get("tags", []),
-        })
+        }
+        # M3.7：复用同一 FAISS/BM25 metadata 链透传 artifact 引用，未携带时不写该字段
+        if "artifact_refs" in c:
+            entry["artifact_refs"] = c["artifact_refs"]
+        metadata.append(entry)
 
     metadata_path = company_dir / "metadata.json"
     metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -306,10 +319,13 @@ def build_company_index(company_name, child_chunks, parent_texts, output_dir, ap
 
 def build_company_index_to_publication(
     company_name, child_chunks, parent_texts, output_dir, api_key,
-    source_pdf_path=None, expected_sha256=None,
+    source_pdf_path=None, expected_sha256=None, strict=False,
 ):
-    """复用旧索引构建逻辑，但把产物交给 staging 发布层。"""
+    """复用旧索引构建逻辑，并按调用方选择 strict staging 发布。"""
+    if type(strict) is not bool:
+        raise ValueError("strict 必须是布尔值")
     manager = IndexPublicationManager(output_dir)
+
     def validate_source_version():
         if source_pdf_path is None or expected_sha256 is None:
             return
@@ -320,15 +336,21 @@ def build_company_index_to_publication(
         if digest.hexdigest() != expected_sha256:
             raise RuntimeError("源 PDF 在索引构建期间发生变化，取消发布")
 
-    return manager.build_and_publish(
-        company_name,
-        lambda staging_company: build_company_index(
+    def build_staging_index(staging_company):
+        """strict 只在显式启用时传给既有 builder，保留默认调用兼容性。"""
+        builder_kwargs = {"strict": True} if strict else {}
+        return build_company_index(
             company_name,
             child_chunks,
             parent_texts,
             staging_company.parent,
             api_key,
-        ),
+            **builder_kwargs,
+        )
+
+    return manager.build_and_publish(
+        company_name,
+        build_staging_index,
         pre_publish_validator=validate_source_version,
     )
 

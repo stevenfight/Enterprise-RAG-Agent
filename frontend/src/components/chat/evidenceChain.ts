@@ -1,11 +1,14 @@
 // -*- coding: utf-8 -*-
 /** 回答级证据链数据映射。 */
 import type { SourceInfo } from '@/types/chat';
+import { getSourceEvidenceKind, getSourceIntegrityStatus, type EvidenceIntegrityStatus, type EvidenceKind } from './evidenceSemantics';
 
 export interface EvidenceChainNode {
   index: number;
   source: SourceInfo;
   cited: boolean;
+  evidenceKind: EvidenceKind;
+  integrityStatus: EvidenceIntegrityStatus;
 }
 
 export interface EvidenceChain {
@@ -27,6 +30,8 @@ export function buildEvidenceChain(answer: string, sources: SourceInfo[]): Evide
       index: source.index,
       source,
       cited: citedSet.has(source.index),
+      evidenceKind: getSourceEvidenceKind(source),
+      integrityStatus: getSourceIntegrityStatus(source),
     })),
   };
 }

@@ -1,0 +1,23 @@
+{
+  "upload_result_keys": [
+    "filename",
+    "idempotent",
+    "index_status",
+    "sha256",
+    "size",
+    "size_mb"
+  ],
+  "document_result_keys": [
+    "filename",
+    "index_attempts",
+    "index_error",
+    "index_generation",
+    "index_status",
+    "indexed",
+    "sha256",
+    "size",
+    "size_mb",
+    "upload_time"
+  ],
+  "delete_result": true
+}

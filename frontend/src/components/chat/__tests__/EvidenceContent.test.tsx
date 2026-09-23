@@ -73,4 +73,18 @@ describe('EvidenceContent', () => {
     expect(screen.queryByRole('button', { name: /中国移动.*移动2024年度报告.pdf/ })).toBeNull();
     expect(screen.getByRole('button', { name: /中国电信.*电信2024年度报告.pdf/ })).toBeInTheDocument();
   });
+
+  it('M4.2: 视觉制品不完整时显示完整性警告，并保留可访问分组按钮', () => {
+    render(<EvidenceContent sources={[{
+      index: 1,
+      source_file: '扫描年报.pdf',
+      pages: [21],
+      company_name: '示例公司',
+      scores: {},
+      visual_preview_status: 'incomplete',
+    }]} />);
+
+    expect(screen.getByRole('button', { name: /示例公司.*扫描年报.pdf/ })).toHaveTextContent('视觉证据');
+    expect(screen.getByRole('alert')).toHaveTextContent('视觉制品未完成');
+  });
 });

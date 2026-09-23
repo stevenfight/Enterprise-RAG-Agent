@@ -110,7 +110,65 @@ def generate_subset_csv(pdf_files, csv_path, md_dir=None):
     print(f"  已生成 {len(pdf_files)} 条记录")
 
 
-def _extract_single(client, pdf_path, markdown_dir, page_range=None):
+class MinerUParseBatchBypass:
+    """MinerU 解析旁路状态记录器：把每批解析结果写入 ParseBatch 仓储。
+
+    M1.4 旁路语义：记录为尽力而为（best-effort），任何记录失败只打印警告，
+    绝不影响原解析流程与结果；不传入旁路时行为与旧版完全一致。
+    """
+
+    def __init__(self, parse_batch_repository, manifest_id, parser_version="v4"):
+        self.repository = parse_batch_repository
+        self.manifest_id = manifest_id
+        self.parser_version = parser_version
+        self._counter = 0
+
+    def record_success(self, physical_page_start, physical_page_end):
+        """记录一批解析成功的物理页段。"""
+        self._record(physical_page_start, physical_page_end, "complete")
+
+    def record_failure(self, physical_page_start, physical_page_end, error_code):
+        """记录一批解析失败的物理页段及失败证据。"""
+        self._record(physical_page_start, physical_page_end, "failed", error_code)
+
+    def _record(self, physical_page_start, physical_page_end, batch_status, error_code=None):
+        self._counter += 1
+        try:
+            self.repository.record(
+                manifest_id=self.manifest_id,
+                batch_id=f"mineru-{self._counter:04d}",
+                physical_page_start=int(physical_page_start),
+                physical_page_end=int(physical_page_end),
+                parser_name="mineru",
+                parser_version=self.parser_version,
+                batch_status=batch_status,
+                error_code=error_code,
+            )
+        except Exception as e:
+            # 旁路记录失败不得影响原解析流程与结果
+            print(f"  [警告] 解析批次旁路记录失败 (页码{physical_page_start}-{physical_page_end}): {e}", flush=True)
+
+
+def _page_range_bounds(page_range):
+    """把 "1-150" 形式的页码区间解析为 (start, end)；无法解析时返回 None。"""
+    if page_range is None:
+        return None
+    text = str(page_range)
+    if "-" not in text:
+        return None
+    left, right = text.split("-", 1)
+    if not left.strip().isdigit() or not right.strip().isdigit():
+        return None
+    return int(left), int(right)
+
+
+def _error_code_from(err):
+    """把 MinerU 错误信息压缩为可入库的 error_code。"""
+    code = str(err).strip() if err is not None else ""
+    return code[:64] if code else "mineru_unknown_error"
+
+
+def _extract_single(client, pdf_path, markdown_dir, page_range=None, parse_batch_bypass=None):
     filename = Path(pdf_path).name
     kwargs = dict(
         model="vlm",
@@ -126,17 +184,29 @@ def _extract_single(client, pdf_path, markdown_dir, page_range=None):
         result = client.extract(str(pdf_path), **kwargs)
     except Exception as e:
         print(f"  [失败] {filename} (页码{page_range}): {e}", flush=True)
+        if parse_batch_bypass is not None:
+            bounds = _page_range_bounds(page_range)
+            if bounds is not None:
+                parse_batch_bypass.record_failure(bounds[0], bounds[1], _error_code_from(e))
         return None
 
     if result.state == "done" and result.markdown:
+        if parse_batch_bypass is not None:
+            bounds = _page_range_bounds(page_range)
+            if bounds is not None:
+                parse_batch_bypass.record_success(bounds[0], bounds[1])
         return result.markdown
     else:
         err = getattr(result, "error", "未知错误")
         print(f"  [失败] {filename} (页码{page_range}): {err}", flush=True)
+        if parse_batch_bypass is not None:
+            bounds = _page_range_bounds(page_range)
+            if bounds is not None:
+                parse_batch_bypass.record_failure(bounds[0], bounds[1], _error_code_from(err))
         return None
 
 
-def _process_large_pdf(client, pdf_path, markdown_dir, chunk_size=150):
+def _process_large_pdf(client, pdf_path, markdown_dir, chunk_size=150, parse_batch_bypass=None):
     filename = Path(pdf_path).name
     print(f"  [分页] {filename}: 检测为大型文件，分批解析中...", flush=True)
 
@@ -156,7 +226,7 @@ def _process_large_pdf(client, pdf_path, markdown_dir, chunk_size=150):
         page_range = f"{start}-{end}"
 
         print(f"  [分页] {filename}: 解析第 {start}-{end} 页 ({i+1}/{batch_count})...", flush=True)
-        md_content = _extract_single(client, pdf_path, markdown_dir, page_range=page_range)
+        md_content = _extract_single(client, pdf_path, markdown_dir, page_range=page_range, parse_batch_bypass=parse_batch_bypass)
 
         if md_content:
             all_markdown.append(md_content)
