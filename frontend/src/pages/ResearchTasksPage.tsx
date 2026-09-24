@@ -37,9 +37,9 @@ import { getCurrentResearchIdentity, RESEARCH_IDENTITY_CHANGED_EVENT, type Resea
 
 const { Text } = Typography;
 
-/** 公共 HTTP 入口不保证提供 Web Crypto，任务 ID 不依赖安全上下文 API。 */
-function createResearchTaskId(): string {
-  return `research-task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+/** 公共 HTTP 入口不保证提供 Web Crypto，客户端标识不依赖安全上下文 API。 */
+function createClientIdentifier(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function submissionErrorMessage(error: unknown): string {
@@ -260,7 +260,7 @@ export default function ResearchTasksPage() {
     try {
       const scope = values.scope.split(/[，,]/).map((item) => item.trim()).filter(Boolean);
       const created = await createResearchTask({
-        task_id: createResearchTaskId(),
+        task_id: createClientIdentifier('research-task'),
         dag_step_ids: ['plan', 'retrieve', 'review', 'report'],
         objective: values.objective.trim(),
         scope,
@@ -289,7 +289,7 @@ export default function ResearchTasksPage() {
     try {
       const input = {
         expected_revision: selectedTask.revision,
-        command_id: `submission-${action}-${crypto.randomUUID()}`,
+        command_id: createClientIdentifier(`submission-${action}`),
       };
       const updated = action === 'approve'
         ? await approveResearchTaskSubmission(selectedTask.task_id, input)
@@ -308,7 +308,7 @@ export default function ResearchTasksPage() {
     try {
       const created = await retryFailedResearchTask(selectedTask.task_id, {
         expected_revision: selectedTask.revision,
-        command_id: `retry-${crypto.randomUUID()}`,
+        command_id: createClientIdentifier('retry'),
       });
       setTasks((current) => [...current, created]);
       setSelectedTaskId(created.task_id);
@@ -323,7 +323,7 @@ export default function ResearchTasksPage() {
     setDisposingLegacy(true);
     setSubmissionError('');
     try {
-      const updated = await disposeLegacyRunningResearchTask(selectedTask.task_id, { expected_revision: selectedTask.revision, command_id: `legacy-disposition-${crypto.randomUUID()}`, reason: legacyReason.trim() });
+      const updated = await disposeLegacyRunningResearchTask(selectedTask.task_id, { expected_revision: selectedTask.revision, command_id: createClientIdentifier('legacy-disposition'), reason: legacyReason.trim() });
       setTasks((current) => current.map((item) => item.task_id === updated.task_id ? updated : item));
     } catch {
       setSubmissionError('遗留任务未处置；仅无执行证据的 running 任务可由审批人处置。');
