@@ -255,6 +255,7 @@ describe('ResearchTasksPage', () => {
 
   it('E-T32: researcher 可以提交任务，approver 可批准并启动待审批任务', async () => {
     const user = userEvent.setup();
+    vi.stubGlobal('crypto', {});
     listResearchTasks.mockResolvedValue([{ task_id: 'task-submitted', run_id: 'research:task-submitted', status: 'pending', revision: 0, dag_step_ids: [], submission: { status: 'submitted', requester: 'alice', reviewer: null } }]);
     getCurrentResearchIdentity.mockResolvedValueOnce({ user_id: 'user-1', username: 'alice', roles: ['researcher', 'approver'] });
     createResearchTask.mockResolvedValueOnce({ task_id: 'task-new', run_id: 'research:task-new', status: 'pending', revision: 0, dag_step_ids: ['plan', 'retrieve', 'review', 'report'], submission: { status: 'submitted', requester: 'alice', reviewer: null } });
