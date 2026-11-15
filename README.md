@@ -6,6 +6,8 @@
 > 基于 RAG 技术的企业年报智能 Agent 系统，从管道 RAG 进化而来，支持 ReAct 自主推理 + 工具调用。
 > 原始 RAG 项目：[enterprise-rag-financial-reports](https://github.com/stevenfight/enterprise-rag-financial-reports)
 > 完整搭建笔记见知乎专栏：[《企业级 RAG Agent 实战》系列](https://www.zhihu.com/column/c_2050590785557487739)
+>
+> **作者主页**：[suweizhao.com](https://www.suweizhao.com) ｜ 更多项目、完整案例与实测数据
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.x-green)](https://fastapi.tiangolo.com/)
